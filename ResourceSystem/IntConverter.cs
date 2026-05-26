@@ -1,4 +1,3 @@
-using GameCore.Runtime._Core.GameCore.Runtime.Scripts.ResourceSystem;
 
 namespace GameCore.Runtime
 {

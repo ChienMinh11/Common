@@ -1,43 +1,64 @@
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
-using GameCore.Runtime._Core.GameCore.Runtime.Scripts.ResourceSystem;
 using MyFramework;
 using Sirenix.OdinInspector;
 using UnityEngine;
+using VContainer;
 
 namespace GameCore.Runtime
 {
-    public class ResourceManager : MonoBehaviour, IInitialisable
+    public class ResourceManager : MonoBehaviour, IResourceManager, IInitialisable
     {
-        [SerializeField] private ResourcePresenterFactory presenterFactory;
-        
-        public readonly HashSet<ResourceType> ExcludedTypes = new HashSet<ResourceType>
-        {
-            ResourceType.Coin,
-            ResourceType.Lives
-        };
+        [SerializeField] private ResourceConfig resourceConfig;
+        [SerializeField] private bool useLongNumbers = false;
 
-        public ResourcePresenterFactory Factory => presenterFactory;
+        private ResourceModel<int> _intModel;
+        private ResourceModel<long> _longModel;
         
+        private ResourcePresenterFactory _factory;
+        private IEventService _eventService;
+        private ISaveSystem _saveSystem;
+
+        private readonly List<IResourcePresenter> _activePresenters = new();
+
         public int InitializationPriority => 0; 
         public bool IsInitialized { get; private set; }
-        private Dictionary<ResourceType, List<IResourceView>> registeredViews = new();
+
+        [Inject]
+        private void Construct(IEventService eventService, ISaveSystem saveSystem)
+        {
+            _eventService = eventService;
+            _saveSystem = saveSystem;
+        }
 
         public UniTask<bool> InitializeAsync(CancellationToken cancellationToken)
         {
             try
             {
-                // Initialize the presenter factory
-                if (presenterFactory == null)
+                if (_eventService == null)
                 {
-                    Debug.LogError("ResourcePresenterFactory reference is missing in ResourceManager!");
+                    Debug.LogError("[ResourceManager] Failed to get IEventService");
                     return UniTask.FromResult(false);
                 }
 
-                presenterFactory.Initialize();
+                _factory = new ResourcePresenterFactory(_eventService);
+
+                if (useLongNumbers)
+                {
+                    _longModel = new ResourceModel<long>(new LongConverter(), _eventService, _saveSystem);
+                    _longModel.Initialize(resourceConfig);
+                    _longModel.InitializeDefaultValues();
+                }
+                else
+                {
+                    _intModel = new ResourceModel<int>(new IntConverter(), _eventService, _saveSystem);
+                    _intModel.Initialize(resourceConfig);
+                    _intModel.InitializeDefaultValues();
+                }
+
                 IsInitialized = true;
-                return UniTask.FromResult(true);
+                return UniTask.FromResult(false); // Trả về true nếu thành công tùy logic project của bạn
             }
             catch (System.Exception e)
             {
@@ -45,40 +66,75 @@ namespace GameCore.Runtime
                 return UniTask.FromResult(false);
             }
         }
-        public void RegisterView(ResourceType resourceType, IResourceView view)
+
+        // Hiện thực từ IResourceManager
+        public IResourcePresenter RegisterView(ResourceType resourceType, IResourceView view)
         {
-            if (!registeredViews.ContainsKey(resourceType))
+            if (!IsInitialized) return null;
+
+            object activeModel = useLongNumbers ? (object)_longModel : (object)_intModel;
+            var presenter = _factory.CreatePresenter(resourceType, view, activeModel, useLongNumbers);
+            
+            if (presenter != null)
             {
-                registeredViews[resourceType] = new List<IResourceView>();
+                _activePresenters.Add(presenter);
             }
-        
-            registeredViews[resourceType].Add(view);
-        
-            presenterFactory.CreatePresenter(resourceType, view);
-        
-            // Khởi tạo view nếu cần
-            if (view is ResourceView resourceView)
+
+            return presenter; 
+        }
+
+        // Hiện thực từ IResourceManager
+        public void UnregisterPresenter(IResourcePresenter presenter)
+        {
+            if (presenter == null) return;
+            
+            if (_activePresenters.Contains(presenter))
             {
-                var eventService = ServiceLocator.GetService<IEventService>();
-                var timeManager = ServiceLocator.GetService<TimeManager>();
-                resourceView.Init(resourceType, eventService, timeManager,presenterFactory);
+                presenter.Cleanup();
+                _activePresenters.Remove(presenter);
             }
         }
-    
-        public void UnregisterView(ResourceType resourceType, IResourceView view)
-        {
-            if (registeredViews.TryGetValue(resourceType, out var views))
-            {
-                views.Remove(view);
-            }
-        }
-#if UNITY_EDITOR
+
+        #region Gameplay API
         [Button]
-        void UpdateResources(ResourceType resourceType)
+        public void AddResource(ResourceType resourceType, long amount, bool delayUpdate = false)
         {
-            presenterFactory.ProcessPendingUpdates(resourceType);
+            if (useLongNumbers) _longModel?.AddResource(resourceType, amount, delayUpdate);
+            else _intModel?.AddResource(resourceType, (int)amount, delayUpdate);
         }
-#endif
-        
+
+        [Button]
+        public bool SpendResource(ResourceType resourceType, long amount)
+        {
+            if (useLongNumbers) return _longModel?.SpendResource(resourceType, amount) ?? false;
+            return _intModel?.SpendResource(resourceType, (int)amount) ?? false;
+        }
+
+        [Button]
+        public long GetCurrentAmount(ResourceType resourceType)
+        {
+            if (useLongNumbers) return _longModel != null ? _longModel.GetAmount(resourceType) : 0;
+            return _intModel != null ? _intModel.GetAmount(resourceType) : 0;
+        }
+
+        [Button]
+        public bool IsAtMaxStack(ResourceType resourceType)
+        {
+            var resourceData = resourceConfig.GetResourceData(resourceType);
+            if (resourceData == null || resourceData.MaxStack <= 0) return false;
+            return GetCurrentAmount(resourceType) >= resourceData.MaxStack;
+        }
+        #endregion
+
+        private void OnDestroy()
+        {
+            foreach (var presenter in _activePresenters)
+            {
+                presenter?.Cleanup();
+            }
+            _activePresenters.Clear();
+            _intModel?.Cleanup();
+            _longModel?.Cleanup();
+        }
     }
 }

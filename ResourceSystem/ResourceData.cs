@@ -9,7 +9,6 @@ namespace GameCore.Runtime
         public ResourceType key;
         public string displayName;
         public Sprite icon;
-        public Sprite infiniteIcon;
         [SerializeField] private long maxStack;
         [SerializeField] private long defaultAmount = 0;
         
@@ -40,6 +39,7 @@ namespace GameCore.Runtime
         }
         public long DefaultAmount => defaultAmount;
     }
+
     public class ResourceChangeData<T>
     {
         public ResourceChangeData(ResourceType resourceId, T oldAmount, T newAmount)
@@ -64,21 +64,4 @@ namespace GameCore.Runtime
 
         public bool DelayUpdate { get; }
     }
-
-    public class ResourceInfiniteStatusData
-    {
-        public ResourceInfiniteStatusData(ResourceType resourceId, bool isInfinite, float duration, bool delayUpdate = false)
-        {
-            ResourceId = resourceId;
-            IsInfinite = isInfinite;
-            Duration = duration;
-            DelayUpdate = delayUpdate;
-        }
-
-        public ResourceType ResourceId { get; }
-        public bool IsInfinite { get; }
-        public float Duration { get; }
-        public bool DelayUpdate { get; }
-    }
-    
 }

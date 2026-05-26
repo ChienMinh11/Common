@@ -37,15 +37,11 @@ namespace GameCore.Runtime
     {
         public ResourceType ResourceId { get; }
         public long Amount { get; }
-        public bool IsInfinite { get; set; }
-        public float InfiniteDuration { get; set; }
 
         public ResourceUpdateData(ResourceType resourceId, long amount)
         {
             ResourceId = resourceId;
             Amount = amount;
-            IsInfinite = false;
-            InfiniteDuration = 0f;
         }
     }
 }
