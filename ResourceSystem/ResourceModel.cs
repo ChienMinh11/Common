@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
+using MyFramework;
 using UnityEngine;
 
-namespace MyFramework
+namespace GameCore.Runtime
 {
     public class ResourceModel<T>
     {

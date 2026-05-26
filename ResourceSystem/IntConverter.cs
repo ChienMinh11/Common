@@ -1,6 +1,6 @@
-using UnityEngine;
+using GameCore.Runtime._Core.GameCore.Runtime.Scripts.ResourceSystem;
 
-namespace MyFramework
+namespace GameCore.Runtime
 {
     public class IntConverter : INumberConverter<int>
     {

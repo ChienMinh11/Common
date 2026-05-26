@@ -1,6 +1,4 @@
-using UnityEngine;
-
-namespace MyFramework
+namespace GameCore.Runtime
 {
     public interface INumberConverter<T>
     {

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace MyFramework
+namespace GameCore.Runtime
 {
     [CreateAssetMenu(fileName = "ResourceConfig", menuName = "MyFramework/Config/ResourceConfig")]
     public class ResourceConfig : ScriptableObject

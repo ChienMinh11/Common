@@ -1,6 +1,7 @@
-using UnityEngine;
+using GameCore.Runtime._Core.GameCore.Runtime.Scripts.ResourceSystem;
+using MyFramework;
 
-namespace MyFramework
+namespace GameCore.Runtime
 {
     public class LongConverter : INumberConverter<long>
     {

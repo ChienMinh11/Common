@@ -1,14 +1,13 @@
 using System;
 using UnityEngine;
 
-namespace MyFramework
+namespace GameCore.Runtime
 {
     [Serializable]
     public class ResourceData 
     {
         public ResourceType key;
         public string displayName;
-        public ToastDataProvider displayNameLocalize;
         public Sprite icon;
         public Sprite infiniteIcon;
         [SerializeField] private long maxStack;

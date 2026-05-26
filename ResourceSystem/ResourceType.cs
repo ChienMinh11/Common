@@ -1,6 +1,4 @@
-using UnityEngine;
-
-namespace MyFramework
+namespace GameCore
 {
     public enum ResourceType
     {

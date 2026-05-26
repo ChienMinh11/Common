@@ -1,7 +1,6 @@
 using System.Collections.Generic;
-using UnityEngine;
 
-namespace MyFramework
+namespace GameCore.Runtime
 {
     public class ResourceUpdateQueue
     {

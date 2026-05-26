@@ -1,8 +1,10 @@
 using System.Collections.Generic;
+using GameCore.Runtime._Core.GameCore.Runtime.Scripts.ResourceSystem;
+using MyFramework;
 using Sirenix.OdinInspector;
 using UnityEngine;
 
-namespace MyFramework
+namespace GameCore.Runtime
 {
     public class ResourcePresenterFactory : MonoBehaviour
     {

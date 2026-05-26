@@ -1,7 +1,6 @@
 using System;
-using UnityEngine;
 
-namespace MyFramework
+namespace GameCore.Runtime
 {
     [Serializable]
     public class SavedInfiniteResourceData

@@ -1,12 +1,14 @@
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using GameCore.Runtime._Core.GameCore.Runtime.Scripts.ResourceSystem;
+using MyFramework;
 using Sirenix.OdinInspector;
 using UnityEngine;
 
-namespace MyFramework
+namespace GameCore.Runtime
 {
-    public class ResourceManager : SingletonBase<ResourceManager>, IInitialisable
+    public class ResourceManager : MonoBehaviour, IInitialisable
     {
         [SerializeField] private ResourcePresenterFactory presenterFactory;
         
@@ -17,8 +19,6 @@ namespace MyFramework
         };
 
         public ResourcePresenterFactory Factory => presenterFactory;
-           
-        protected override bool PersistAcrossScenes => true;
         
         public int InitializationPriority => 0; 
         public bool IsInitialized { get; private set; }

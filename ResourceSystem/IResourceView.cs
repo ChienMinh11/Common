@@ -1,3 +1,4 @@
+using GameCore.Runtime._Core.GameCore.Runtime.Scripts.ResourceSystem;
 using UnityEngine;
 
 namespace MyFramework
