@@ -18,22 +18,21 @@ namespace ChieChie.Core
         private const string SAVE_KEY_PREFIX = "Resource_";
         private const string FIRST_INIT_KEY = "ResourceFirstInit";
         
-        private  ResourceConfig config;
+        private ResourceConfig config;
         
         private readonly INumberConverter<T> converter;
         private readonly IEventService eventService;
-        private readonly IResourcePolicy resourcePolicy;
         private readonly ISaveSystem saveSystem;
+        private readonly IReadOnlyInfiniteStatus _infiniteStatus;
 
         private readonly Dictionary<ResourceType, T> resourceAmounts = new();
         private readonly Dictionary<ResourceType, string> cachedSaveKeys = new();
-
-        public ResourceModel(INumberConverter<T> converter, IEventService eventService, ISaveSystem saveSystem, IResourcePolicy resourcePolicy = null)
+        public ResourceModel(INumberConverter<T> converter, IEventService eventService, ISaveSystem saveSystem, IReadOnlyInfiniteStatus infiniteStatus)
         {
             this.converter = converter;
             this.eventService = eventService;
             this.saveSystem = saveSystem;
-            this.resourcePolicy = resourcePolicy ?? new DefaultResourcePolicy();
+            this._infiniteStatus = infiniteStatus;
         }
 
         public void Initialize(ResourceConfig config)
@@ -133,7 +132,7 @@ namespace ChieChie.Core
         {
             if (converter.IsLessThan(amount, converter.Zero)) return false;
 
-            if (resourcePolicy.IsInfinite(id))
+            if (_infiniteStatus != null && _infiniteStatus.IsCurrentlyInfinite(id))
             {
                 var currentAmt = GetAmount(id);
                 var changeData = new ResourceChangeData<T>(id, currentAmt, currentAmt); 

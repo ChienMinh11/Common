@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
@@ -7,33 +8,34 @@ using VContainer;
 
 namespace ChieChie.Core
 {
-    public class ResourceManager : MonoBehaviour, IResourceManager, IInitialisable
+    public class ResourceManager : MonoBehaviour, IResourceManager, IInitialisable,IReadOnlyInfiniteStatus
     {
-        private const string RESOURCE_CONFIG_PATH = "Config/ResourceConfig";
+      private const string RESOURCE_CONFIG_PATH = "Config/ResourceConfig";
         
-      
         [SerializeField] private ResourceConfig resourceConfig;
         [SerializeField] private bool useLongNumbers = false;
 
         private ResourceModel<int> _intModel;
         private ResourceModel<long> _longModel;
         
+        // Giữ bộ data lưu thời gian vô hạn hoàn toàn độc lập
+        private InfiniteResourceModel _infiniteModel;
+
         private ResourcePresenterFactory _factory;
         private IEventService _eventService;
         private ISaveSystem _saveSystem;
-        private IResourcePolicy _resourcePolicy;
 
         private readonly List<IResourcePresenter> _activePresenters = new();
 
-        public int InitializationPriority => 0; 
+        public int InitializationPriority => 0;
         public bool IsInitialized { get; private set; }
 
         [Inject]
-        private void Construct(IEventService eventService, ISaveSystem saveSystem, IResourcePolicy resourcePolicy= null)
+        private void Construct(IEventService eventService, ISaveSystem saveSystem)
         {
             _eventService = eventService;
             _saveSystem = saveSystem;
-            _resourcePolicy = resourcePolicy; 
+            // XÓA BỎ HOÀN TOÀN TRƯỜNG IResourcePolicy TẠI ĐÂY!
         }
 
         public UniTask<bool> InitializeAsync(CancellationToken cancellationToken)
@@ -50,20 +52,24 @@ namespace ChieChie.Core
 
             _factory = new ResourcePresenterFactory(_eventService);
 
+            // Khởi tạo Model quản lý thời gian
+            _infiniteModel = new InfiniteResourceModel(_saveSystem);
+            _infiniteModel.Initialize();
+
+            // SỬA TẠI ĐÂY: Truyền trực tiếp "this" thay cho policy cũ
             if (useLongNumbers)
             {
-                _longModel = new ResourceModel<long>(new LongConverter(), _eventService, _saveSystem, _resourcePolicy);
+                _longModel = new ResourceModel<long>(new LongConverter(), _eventService, _saveSystem, this);
                 _longModel.Initialize(resourceConfig);
             }
             else
             {
-                _intModel = new ResourceModel<int>(new IntConverter(), _eventService, _saveSystem, _resourcePolicy);
+                _intModel = new ResourceModel<int>(new IntConverter(), _eventService, _saveSystem, this);
                 _intModel.Initialize(resourceConfig);
-               
             }
 
             IsInitialized = true;
-            return UniTask.FromResult(true); 
+            return UniTask.FromResult(true);
         }
 
         // Hiện thực từ IResourceManager
@@ -122,6 +128,22 @@ namespace ChieChie.Core
             var resourceData = resourceConfig.GetResourceData(resourceType);
             if (resourceData == null || resourceData.MaxStack <= 0) return false;
             return GetCurrentAmount(resourceType) >= resourceData.MaxStack;
+        }
+        public void AddInfiniteDuration(ResourceType resourceType, TimeSpan duration)
+        {
+            if (!IsInitialized) return;
+            _infiniteModel.AddDuration(resourceType, duration);
+            ForceUpdateAllView(); // Render lại view ngay lập tức
+        }
+
+        public bool IsCurrentlyInfinite(ResourceType resourceType)
+        {
+            return IsInitialized && _infiniteModel.IsInfinite(resourceType);
+        }
+
+        public TimeSpan GetRemainingInfiniteTime(ResourceType resourceType)
+        {
+            return IsInitialized ? _infiniteModel.GetRemainingTime(resourceType) : TimeSpan.Zero;
         }
 
         public void ProcessPendingUpdate(ResourceType resourceType)
