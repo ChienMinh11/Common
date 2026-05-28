@@ -1,7 +1,6 @@
-using MyFramework;
 using UnityEngine;
 
-namespace GameCore.Runtime
+namespace ChieChie.Core
 {
     public class ResourcePresenterFactory
     {

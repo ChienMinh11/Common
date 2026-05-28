@@ -1,9 +1,8 @@
 using System;
 using System.Collections.Generic;
-using MyFramework;
 using UnityEngine;
 
-namespace GameCore.Runtime
+namespace ChieChie.Core
 {
     public enum ResourceEventType
     {
@@ -13,159 +12,152 @@ namespace GameCore.Runtime
         ResourceAdded,
         ResourceInsufficient,
     }
+
     public class ResourceModel<T>
     {
         private const string SAVE_KEY_PREFIX = "Resource_";
         private const string FIRST_INIT_KEY = "ResourceFirstInit";
+        
+        private  ResourceConfig config;
+        
         private readonly INumberConverter<T> converter;
         private readonly IEventService eventService;
-        private ResourceConfig config;
-        private ISaveSystem saveSystem;
+        private readonly IResourcePolicy resourcePolicy;
+        private readonly ISaveSystem saveSystem;
 
         private readonly Dictionary<ResourceType, T> resourceAmounts = new();
+        private readonly Dictionary<ResourceType, string> cachedSaveKeys = new();
 
-        public ResourceModel(INumberConverter<T> converter, IEventService eventService, ISaveSystem saveSystem)
+        public ResourceModel(INumberConverter<T> converter, IEventService eventService, ISaveSystem saveSystem, IResourcePolicy resourcePolicy = null)
         {
             this.converter = converter;
             this.eventService = eventService;
             this.saveSystem = saveSystem;
+            this.resourcePolicy = resourcePolicy ?? new DefaultResourcePolicy();
         }
 
         public void Initialize(ResourceConfig config)
         {
             this.config = config;
             config.Initialize();
-           
+   
             saveSystem.RegisterKey(FIRST_INIT_KEY);
+
+            foreach (var resourceData in config.GetAllResources())
+            {
+                cachedSaveKeys[resourceData.key] = SAVE_KEY_PREFIX + resourceData.key.ToString();
+            }
+
             foreach (var resourceData in config.GetAllResources())
             {
                 var saveKey = GetSaveKey(resourceData.key);
                 saveSystem.RegisterKey(saveKey);
                 resourceAmounts[resourceData.key] = LoadAmount(resourceData.key);
             }
-        }
 
-        public void InitializeDefaultValues()
-        {
-            var isFirstInit = saveSystem.Load<bool>(FIRST_INIT_KEY, true);
-    
-            if (isFirstInit)
+            if (!saveSystem.Load<bool>(FIRST_INIT_KEY, false))
             {
                 foreach (var resourceData in config.GetAllResources())
                 {
                     if (resourceData.DefaultAmount > 0)
                     {
-                        var defaultValue = converter.Parse(resourceData.DefaultAmount.ToString());
-                        resourceAmounts[resourceData.key] = defaultValue;
-                        SaveAmount(resourceData.key, defaultValue);
-                
-                        var changeData = new ResourceChangeData<T>(resourceData.key, converter.Zero, defaultValue);
-                        eventService.Publish(ResourceEventType.ResourceChanged, this, changeData);
+                        var defaultAmt = converter.FromLong(resourceData.DefaultAmount);
+                        resourceAmounts[resourceData.key] = defaultAmt;
+                        SaveAmount(resourceData.key, defaultAmt);
                     }
                 }
-                saveSystem.Save(FIRST_INIT_KEY, false);
-                Debug.Log("[ResourceModel] First-time initialization completed");
+                saveSystem.Save(FIRST_INIT_KEY, true);
             }
         }
 
         private string GetSaveKey(ResourceType id)
         {
-            return $"{SAVE_KEY_PREFIX}{id}";
+            if (cachedSaveKeys.TryGetValue(id, out var key))
+            {
+                return key;
+            }
+            string newKey = SAVE_KEY_PREFIX + id.ToString();
+            cachedSaveKeys[id] = newKey;
+            return newKey;
         }
 
         private T LoadAmount(ResourceType id)
         {
-            try
-            {
-                var saveKey = GetSaveKey(id);
-                var savedValue = saveSystem.Load<object>(saveKey, "0");
+            var saveKey = GetSaveKey(id);
+         
+            long savedLong = saveSystem.Load<long>(saveKey, 0L);
 
-                string stringValue = savedValue == null ? "0" : (savedValue is string str ? str : savedValue.ToString());
-                return converter.Parse(stringValue);
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"Cannot load amount for {id}, using default value. Error: {e.Message}");
-                return converter.Zero;
-            }
+            return converter.FromLong(savedLong);
         }
 
         private void SaveAmount(ResourceType id, T amount)
         {
             var saveKey = GetSaveKey(id);
-            saveSystem.Save(saveKey, converter.ToString(amount));
-        }
 
-        public bool AddResource(ResourceType id, T amount, bool delayUpdate = false)
-        {
-            var resourceData = config.GetResourceData(id);
-            if (resourceData == null) return false;
-
-            var oldAmount = resourceAmounts[id];
-
-            if (resourceData.MaxStack > 0)
-            {
-                var currentAmountStr = converter.ToString(oldAmount);
-                if (long.TryParse(currentAmountStr, out var currentAmount))
-                {
-                    if (currentAmount >= resourceData.MaxStack)
-                    {
-                        eventService.PublishEvent(ResourceEventType.ResourceMaxStackReached, this);
-                        return false;
-                    }
-
-                    var amountToAddStr = converter.ToString(amount);
-                    if (long.TryParse(amountToAddStr, out var amountToAdd))
-                    {
-                        var potentialNewAmount = currentAmount + amountToAdd;
-                        if (potentialNewAmount > resourceData.MaxStack)
-                            amount = converter.Parse((resourceData.MaxStack - currentAmount).ToString());
-                    }
-                }
-            }
-
-            var newAmount = converter.Add(oldAmount, amount);
-            if (converter.IsLessThan(newAmount, oldAmount)) newAmount = converter.MaxValue;
-
-            resourceAmounts[id] = newAmount;
-            SaveAmount(id, newAmount);
-            
-            var resourceChangeData = new ResourceChangeDataWithDelay<T>(id, oldAmount, newAmount, delayUpdate);
-            eventService.Publish(ResourceEventType.ResourceChanged, this, resourceChangeData);
-            eventService.Publish(ResourceEventType.ResourceAdded, this, resourceChangeData);
-
-            return true;
-        }
-
-        public bool SpendResource(ResourceType id, T amount)
-        {
-            if (!resourceAmounts.ContainsKey(id))
-            {
-                eventService.PublishEvent(ResourceEventType.ResourceInsufficient, this);
-                return false;
-            }
-
-            if (converter.IsLessThan(resourceAmounts[id], amount))
-            {
-                eventService.PublishEvent(ResourceEventType.ResourceInsufficient, this);
-                return false;
-            }
-
-            var oldAmount = resourceAmounts[id];
-            var newAmount = converter.Subtract(resourceAmounts[id], amount);
-            resourceAmounts[id] = newAmount;
-            SaveAmount(id, newAmount);
-            
-            var changeData = new ResourceChangeData<T>(id, oldAmount, newAmount);
-            eventService.Publish(ResourceEventType.ResourceChanged, this, changeData);
-            eventService.Publish(ResourceEventType.ResourceSpent, this, changeData);
-
-            return true;
+            long longAmount = converter.ToLong(amount);
+            saveSystem.Save<long>(saveKey, longAmount);
         }
 
         public T GetAmount(ResourceType id)
         {
             return resourceAmounts.TryGetValue(id, out var amount) ? amount : converter.Zero;
+        }
+
+        public void AddResource(ResourceType id, T amount, bool delayUpdate = false)
+        {
+            if (converter.IsLessThan(amount, converter.Zero)) return;
+
+            var currentAmount = GetAmount(id);
+            var newAmount = converter.Add(currentAmount, amount);
+
+            var maxStack = GetMaxStack(id);
+            if (maxStack > 0)
+            {
+                long longNewAmount = converter.ToLong(newAmount);
+                if (longNewAmount > maxStack)
+                {
+                    newAmount = converter.FromLong(maxStack);
+                    eventService.Publish(ResourceEventType.ResourceMaxStackReached, this, id);
+                }
+            }
+
+            resourceAmounts[id] = newAmount;
+            SaveAmount(id, newAmount);
+
+            var changeData = new ResourceChangeData<T>(id, currentAmount, newAmount, delayUpdate);
+            eventService.Publish(ResourceEventType.ResourceChanged, this, changeData);
+            eventService.Publish(ResourceEventType.ResourceAdded, this, changeData);
+        }
+
+        public bool SpendResource(ResourceType id, T amount)
+        {
+            if (converter.IsLessThan(amount, converter.Zero)) return false;
+
+            if (resourcePolicy.IsInfinite(id))
+            {
+                var currentAmt = GetAmount(id);
+                var changeData = new ResourceChangeData<T>(id, currentAmt, currentAmt); 
+        
+                eventService.Publish(ResourceEventType.ResourceSpent, this, changeData);
+                return true; 
+            }
+
+            var currentAmount = GetAmount(id);
+            if (converter.IsLessThan(currentAmount, amount))
+            {
+                eventService.Publish(ResourceEventType.ResourceInsufficient, this, id);
+                return false;
+            }
+
+            var newAmount = converter.Subtract(currentAmount, amount);
+            resourceAmounts[id] = newAmount;
+            SaveAmount(id, newAmount);
+
+            var changeDataNormal = new ResourceChangeData<T>(id, currentAmount, newAmount);
+            eventService.Publish(ResourceEventType.ResourceChanged, this, changeDataNormal);
+            eventService.Publish(ResourceEventType.ResourceSpent, this, changeDataNormal);
+
+            return true;
         }
 
         public ResourceData GetResourceData(ResourceType id)
@@ -175,7 +167,8 @@ namespace GameCore.Runtime
 
         public void Cleanup()
         {
-           
+            resourceAmounts.Clear();
+            cachedSaveKeys.Clear();
         }
 
         public bool SetMaxStack(ResourceType id, long newMaxStack)
@@ -191,18 +184,17 @@ namespace GameCore.Runtime
 
             if (newMaxStack > 0)
             {
-                var currentAmount = resourceAmounts[id];
-                var currentAmountStr = converter.ToString(currentAmount);
-                if (long.TryParse(currentAmountStr, out var longCurrentAmount))
-                    if (longCurrentAmount > newMaxStack)
-                    {
-                        var newAmount = converter.Parse(newMaxStack.ToString());
-                        resourceAmounts[id] = newAmount;
-                        SaveAmount(id, newAmount);
+                var currentAmount = GetAmount(id);
+                long longCurrentAmount = converter.ToLong(currentAmount);
+                if (longCurrentAmount > newMaxStack)
+                {
+                    var newAmount = converter.FromLong(newMaxStack);
+                    resourceAmounts[id] = newAmount;
+                    SaveAmount(id, newAmount);
 
-                        var changeData = new ResourceChangeData<T>(id, currentAmount, newAmount);
-                        eventService.Publish(ResourceEventType.ResourceChanged, this, changeData);
-                    }
+                    var changeData = new ResourceChangeData<T>(id, currentAmount, newAmount);
+                    eventService.Publish(ResourceEventType.ResourceChanged, this, changeData);
+                }
             }
 
             return true;

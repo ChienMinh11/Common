@@ -1,9 +1,8 @@
 using System;
-using MyFramework;
 using R3;
 using UnityEngine;
 
-namespace GameCore.Runtime
+namespace ChieChie.Core
 {
     public class ResourcePresenter<T> : IResourcePresenter
     {
@@ -18,7 +17,7 @@ namespace GameCore.Runtime
         private readonly ResourceUpdateQueue updateQueue;
         private ResourceData currentResourceData;
 
-        public ResourceType ResourceId { get; } // Thực hiện interface
+        public ResourceType ResourceId { get; }
         public bool HasPendingUpdates => updateQueue.HasPendingUpdates;
 
         public ResourcePresenter(
@@ -56,37 +55,22 @@ namespace GameCore.Runtime
         {
             if (changeData.ResourceId != ResourceId) return;
 
-            var updateData = changeData as ResourceChangeDataWithDelay<T>;
-            if (updateData?.DelayUpdate ?? false)
-            {
-                string amountStr = converter.ToString(changeData.NewAmount);
-                if (long.TryParse(amountStr, out long amount))
-                {
-                    updateQueue.EnqueueUpdate(new ResourceUpdateData(ResourceId, amount));
-                }
-            }
+            long oldDisplay = converter.ToLong(changeData.OldAmount);
+            long newDisplay = converter.ToLong(changeData.NewAmount);
+
+            if (changeData.DelayUpdate)
+                updateQueue.EnqueueUpdate(oldDisplay, newDisplay);
             else
             {
-                string amountStr = converter.ToString(changeData.NewAmount);
-                if (long.TryParse(amountStr, out long displayAmount))
-                {
-                    view.SetResourceAmountWithoutAnimation(displayAmount);
-
-                    var resourceData = model.GetResourceData(ResourceId);
-                    if (resourceData != null && resourceData.MaxStack > 0)
-                    {
-                        if (displayAmount >= resourceData.MaxStack)
-                        {
-                            view.OnMaxStackReached(changeData.ResourceId);
-                        }
-                    }
-                }
+                updateQueue.Clear();
+                view.SetResourceAmount(newDisplay);
             }
         }
 
         public void ProcessPendingUpdates()
         {
-            var update = updateQueue.ProcessNextUpdate();
+            var update = updateQueue.ProcessNextUpdate(ResourceId);
+    
             if (update != null)
             {
                 var data = model.GetResourceData(update.ResourceId);
@@ -111,11 +95,9 @@ namespace GameCore.Runtime
 
             updateQueue.Clear();
 
-            string amountStr = converter.ToString(model.GetAmount(ResourceId));
-            if (long.TryParse(amountStr, out long displayAmount))
-            {
-                view.SetResourceAmountWithoutAnimation(displayAmount);
-            }
+            // TỐI ƯU: Lấy giá trị trực tiếp đẩy sang View mà không đi vòng qua string
+            long displayAmount = converter.ToLong(model.GetAmount(ResourceId));
+            view.SetResourceAmountWithoutAnimation(displayAmount);
 
             view.SetResourceIcon(currentResourceData.icon);
             view.SetResourceName(currentResourceData.displayName);
@@ -128,12 +110,10 @@ namespace GameCore.Runtime
 
             view.SetResourceIcon(currentResourceData.icon);
 
-            string amountStr = converter.ToString(model.GetAmount(ResourceId));
-            if (long.TryParse(amountStr, out long displayAmount))
-            {
-                view.SetResourceAmount(displayAmount);
-                view.SetResourceName(currentResourceData.displayName);
-            }
+            // TỐI ƯU: Đọc thẳng giá trị long, loại bỏ hoàn toàn string allocation
+            long displayAmount = converter.ToLong(model.GetAmount(ResourceId));
+            view.SetResourceAmount(displayAmount);
+            view.SetResourceName(currentResourceData.displayName);
         }
 
         public bool TrySpendResource(T amount) => model.SpendResource(ResourceId, amount);

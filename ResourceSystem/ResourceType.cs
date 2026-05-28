@@ -1,4 +1,4 @@
-namespace GameCore
+namespace ChieChie.Core
 {
     public enum ResourceType
     {
@@ -10,7 +10,6 @@ namespace GameCore
         Lives = 5,
         DoubleChallenge = 6,
 
-        /// PowerUp ///
         PowerUp_1 = 101,
         PowerUp_2 = 102,
         PowerUp_3 = 103,

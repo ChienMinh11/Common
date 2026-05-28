@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace GameCore.Runtime
+namespace ChieChie.Core
 {
-    [CreateAssetMenu(fileName = "ResourceConfig", menuName = "MyFramework/Config/ResourceConfig")]
+    [CreateAssetMenu(fileName = "ResourceConfig", menuName = "CORE/Configs/ResourceConfig")]
     public class ResourceConfig : ScriptableObject
     {
         [SerializeField] private List<ResourceData> resources = new List<ResourceData>();

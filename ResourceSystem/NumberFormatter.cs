@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
-namespace MyFramework
+namespace ChieChie.Core
 {
     public static class NumberFormatter
     {

@@ -1,28 +1,46 @@
 using System.Collections.Generic;
 
-namespace GameCore.Runtime
+namespace ChieChie.Core
 {
     public class ResourceUpdateQueue
     {
-        private Queue<ResourceUpdateData> updateQueue = new Queue<ResourceUpdateData>();
+        private readonly Queue<long> updateQueue = new Queue<long>();
         private bool isProcessing = false;
 
-        public void EnqueueUpdate(ResourceUpdateData updateData)
+        public bool HasPendingUpdates => updateQueue.Count > 0;
+      
+        public void EnqueueUpdate(long oldAmount, long newAmount)
         {
-            updateQueue.Enqueue(updateData);
+            updateQueue.Enqueue(newAmount);
         }
 
-        public bool HasPendingUpdates => updateQueue.Count > 0;
-
-        public ResourceUpdateData ProcessNextUpdate()
+        public bool TryDequeue(out long nextAmount)
         {
             if (updateQueue.Count > 0 && !isProcessing)
             {
                 isProcessing = true;
-                var update = updateQueue.Dequeue();
+                nextAmount = updateQueue.Dequeue();
                 isProcessing = false;
-                return update;
+                return true;
             }
+
+            nextAmount = 0;
+            return false;
+        }
+
+        // SỬA TẠI ĐÂY: Truyền thêm ResourceId từ Presenter vào để đóng gói dữ liệu trả về
+        public ResourceUpdateData ProcessNextUpdate(ResourceType resourceId)
+        {
+            if (updateQueue.Count > 0 && !isProcessing)
+            {
+                isProcessing = true;
+                long nextAmount = updateQueue.Dequeue();
+                isProcessing = false;
+
+                // Trả về dữ liệu hợp lệ thay vì null
+                return new ResourceUpdateData(resourceId, nextAmount);
+            }
+           
             return null;
         }
 

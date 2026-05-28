@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace GameCore.Runtime
+namespace ChieChie.Core
 {
     public interface IResourceView
     {

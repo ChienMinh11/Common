@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace GameCore.Runtime
+namespace ChieChie.Core
 {
     [Serializable]
     public class ResourceData 
@@ -40,28 +40,30 @@ namespace GameCore.Runtime
         public long DefaultAmount => defaultAmount;
     }
 
-    public class ResourceChangeData<T>
+    public readonly struct ResourceChangeData<T>
     {
-        public ResourceChangeData(ResourceType resourceId, T oldAmount, T newAmount)
+        public readonly ResourceType ResourceId;
+        public readonly T OldAmount;
+        public readonly T NewAmount;
+        public readonly bool DelayUpdate;
+
+        public ResourceChangeData(ResourceType resourceId, T oldAmount, T newAmount, bool delayUpdate = false)
         {
             ResourceId = resourceId;
             OldAmount = oldAmount;
             NewAmount = newAmount;
-        }
-
-        public ResourceType ResourceId { get; }
-        public T OldAmount { get; }
-        public T NewAmount { get; }
-    }
-
-    public class ResourceChangeDataWithDelay<T> : ResourceChangeData<T>
-    {
-        public ResourceChangeDataWithDelay(ResourceType resourceId, T oldAmount, T newAmount, bool delayUpdate)
-            : base(resourceId, oldAmount, newAmount)
-        {
             DelayUpdate = delayUpdate;
         }
-
-        public bool DelayUpdate { get; }
     }
+
+    // public class ResourceChangeDataWithDelay<T> : ResourceChangeData<T>
+    // {
+    //     public ResourceChangeDataWithDelay(ResourceType resourceId, T oldAmount, T newAmount, bool delayUpdate)
+    //         : base(resourceId, oldAmount, newAmount)
+    //     {
+    //         DelayUpdate = delayUpdate;
+    //     }
+    //
+    //     public bool DelayUpdate { get; }
+    // }
 }

@@ -1,15 +1,17 @@
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
-using MyFramework;
 using Sirenix.OdinInspector;
 using UnityEngine;
 using VContainer;
 
-namespace GameCore.Runtime
+namespace ChieChie.Core
 {
     public class ResourceManager : MonoBehaviour, IResourceManager, IInitialisable
     {
+        private const string RESOURCE_CONFIG_PATH = "Config/ResourceConfig";
+        
+      
         [SerializeField] private ResourceConfig resourceConfig;
         [SerializeField] private bool useLongNumbers = false;
 
@@ -19,6 +21,7 @@ namespace GameCore.Runtime
         private ResourcePresenterFactory _factory;
         private IEventService _eventService;
         private ISaveSystem _saveSystem;
+        private IResourcePolicy _resourcePolicy;
 
         private readonly List<IResourcePresenter> _activePresenters = new();
 
@@ -26,45 +29,41 @@ namespace GameCore.Runtime
         public bool IsInitialized { get; private set; }
 
         [Inject]
-        private void Construct(IEventService eventService, ISaveSystem saveSystem)
+        private void Construct(IEventService eventService, ISaveSystem saveSystem, IResourcePolicy resourcePolicy= null)
         {
             _eventService = eventService;
             _saveSystem = saveSystem;
+            _resourcePolicy = resourcePolicy; 
         }
 
         public UniTask<bool> InitializeAsync(CancellationToken cancellationToken)
         {
-            try
+            if (resourceConfig == null)
             {
-                if (_eventService == null)
-                {
-                    Debug.LogError("[ResourceManager] Failed to get IEventService");
-                    return UniTask.FromResult(false);
-                }
-
-                _factory = new ResourcePresenterFactory(_eventService);
-
-                if (useLongNumbers)
-                {
-                    _longModel = new ResourceModel<long>(new LongConverter(), _eventService, _saveSystem);
-                    _longModel.Initialize(resourceConfig);
-                    _longModel.InitializeDefaultValues();
-                }
-                else
-                {
-                    _intModel = new ResourceModel<int>(new IntConverter(), _eventService, _saveSystem);
-                    _intModel.Initialize(resourceConfig);
-                    _intModel.InitializeDefaultValues();
-                }
-
-                IsInitialized = true;
-                return UniTask.FromResult(false); // Trả về true nếu thành công tùy logic project của bạn
+                resourceConfig = Resources.Load<ResourceConfig>(RESOURCE_CONFIG_PATH);
             }
-            catch (System.Exception e)
+                
+            if (_eventService == null)
             {
-                Debug.LogError($"Failed to initialize ResourceManager: {e.Message}");
-                return UniTask.FromResult(false);
+                Debug.LogError("[ResourceManager] Failed to get IEventService");
             }
+
+            _factory = new ResourcePresenterFactory(_eventService);
+
+            if (useLongNumbers)
+            {
+                _longModel = new ResourceModel<long>(new LongConverter(), _eventService, _saveSystem, _resourcePolicy);
+                _longModel.Initialize(resourceConfig);
+            }
+            else
+            {
+                _intModel = new ResourceModel<int>(new IntConverter(), _eventService, _saveSystem, _resourcePolicy);
+                _intModel.Initialize(resourceConfig);
+               
+            }
+
+            IsInitialized = true;
+            return UniTask.FromResult(true); 
         }
 
         // Hiện thực từ IResourceManager
@@ -124,6 +123,27 @@ namespace GameCore.Runtime
             if (resourceData == null || resourceData.MaxStack <= 0) return false;
             return GetCurrentAmount(resourceType) >= resourceData.MaxStack;
         }
+
+        public void ProcessPendingUpdate(ResourceType resourceType)
+        {
+            if (!IsInitialized) return;
+
+            // Tìm presenter quản lý loại tài nguyên này và yêu cầu xử lý update tiếp theo
+            var presenter = _activePresenters.Find(p => p.ResourceId == resourceType);
+            presenter?.ProcessPendingUpdates();
+        }
+
+        [Button]
+        public void ForceUpdateAllView()
+        {
+            if (!IsInitialized) return;
+
+            for (int i = 0; i < _activePresenters.Count; i++)
+            {
+                _activePresenters[i].ForceUpdateView(); 
+            }
+        }
+
         #endregion
 
         private void OnDestroy()

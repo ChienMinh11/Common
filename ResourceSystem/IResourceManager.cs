@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace GameCore.Runtime
+namespace ChieChie.Core
 {
     public interface IResourceManager
     {
@@ -15,5 +15,7 @@ namespace GameCore.Runtime
         bool SpendResource(ResourceType resourceType, long amount);
         long GetCurrentAmount(ResourceType resourceType);
         bool IsAtMaxStack(ResourceType resourceType);
+        void ProcessPendingUpdate(ResourceType resourceType);
+        void ForceUpdateAllView();
     }
 }
