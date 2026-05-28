@@ -8,16 +8,16 @@ using VContainer;
 
 namespace ChieChie.Core
 {
-    public class ResourceManager : MonoBehaviour, IResourceManager, IInitialisable,IReadOnlyInfiniteStatus
+    public class ResourceManager : MonoBehaviour, IResourceManager, IInitialisable, IReadOnlyInfiniteStatus
     {
-      private const string RESOURCE_CONFIG_PATH = "Config/ResourceConfig";
-        
+        private const string RESOURCE_CONFIG_PATH = "Config/ResourceConfig";
+
         [SerializeField] private ResourceConfig resourceConfig;
         [SerializeField] private bool useLongNumbers = false;
 
         private ResourceModel<int> _intModel;
         private ResourceModel<long> _longModel;
-        
+
         // Giữ bộ data lưu thời gian vô hạn hoàn toàn độc lập
         private InfiniteResourceModel _infiniteModel;
 
@@ -44,13 +44,13 @@ namespace ChieChie.Core
             {
                 resourceConfig = Resources.Load<ResourceConfig>(RESOURCE_CONFIG_PATH);
             }
-                
+
             if (_eventService == null)
             {
                 Debug.LogError("[ResourceManager] Failed to get IEventService");
             }
 
-            _factory = new ResourcePresenterFactory(_eventService);
+            _factory = new ResourcePresenterFactory(_eventService,this);
 
             // Khởi tạo Model quản lý thời gian
             _infiniteModel = new InfiniteResourceModel(_saveSystem);
@@ -79,20 +79,20 @@ namespace ChieChie.Core
 
             object activeModel = useLongNumbers ? (object)_longModel : (object)_intModel;
             var presenter = _factory.CreatePresenter(resourceType, view, activeModel, useLongNumbers);
-            
+
             if (presenter != null)
             {
                 _activePresenters.Add(presenter);
             }
 
-            return presenter; 
+            return presenter;
         }
 
         // Hiện thực từ IResourceManager
         public void UnregisterPresenter(IResourcePresenter presenter)
         {
             if (presenter == null) return;
-            
+
             if (_activePresenters.Contains(presenter))
             {
                 presenter.Cleanup();
@@ -101,6 +101,7 @@ namespace ChieChie.Core
         }
 
         #region Gameplay API
+
         [Button]
         public void AddResource(ResourceType resourceType, long amount, bool delayUpdate = false)
         {
@@ -129,6 +130,7 @@ namespace ChieChie.Core
             if (resourceData == null || resourceData.MaxStack <= 0) return false;
             return GetCurrentAmount(resourceType) >= resourceData.MaxStack;
         }
+
         public void AddInfiniteDuration(ResourceType resourceType, TimeSpan duration)
         {
             if (!IsInitialized) return;
@@ -144,6 +146,11 @@ namespace ChieChie.Core
         public TimeSpan GetRemainingInfiniteTime(ResourceType resourceType)
         {
             return IsInitialized ? _infiniteModel.GetRemainingTime(resourceType) : TimeSpan.Zero;
+        }
+        
+        TimeSpan IReadOnlyInfiniteStatus.GetRemainingInfiniteTime(ResourceType resourceType)
+        {
+            return this.GetRemainingInfiniteTime(resourceType);
         }
 
         public void ProcessPendingUpdate(ResourceType resourceType)
@@ -162,11 +169,13 @@ namespace ChieChie.Core
 
             for (int i = 0; i < _activePresenters.Count; i++)
             {
-                _activePresenters[i].ForceUpdateView(); 
+                _activePresenters[i].ForceUpdateView();
             }
         }
 
         #endregion
+
+   
 
         private void OnDestroy()
         {
@@ -174,6 +183,7 @@ namespace ChieChie.Core
             {
                 presenter?.Cleanup();
             }
+
             _activePresenters.Clear();
             _intModel?.Cleanup();
             _longModel?.Cleanup();

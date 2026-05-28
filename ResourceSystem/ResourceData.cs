@@ -9,6 +9,7 @@ namespace ChieChie.Core
         public ResourceType key;
         public string displayName;
         public Sprite icon;
+        public Sprite infinityIcon;
         [SerializeField] private long maxStack;
         [SerializeField] private long defaultAmount = 0;
         
