@@ -7,21 +7,23 @@ namespace ChieChie.Core
     [CreateAssetMenu(fileName = "ResourceRegenConfig", menuName = "CORE/Configs/ResourceRegenConfig")]
     public class ResourceRegenConfig : ScriptableObject
     {
-        [SerializeField] private System.Collections.Generic.List<ResourceRegenData> regenSettings = new();
-        private System.Collections.Generic.Dictionary<ResourceType, ResourceRegenData> _map;
+        [SerializeField] private List<ResourceRegenData> regenSettings = new();
+        private Dictionary<ResourceType, ResourceRegenData> _regenMap;
 
         public void Initialize()
         {
-            _map = new();
+            _regenMap = new Dictionary<ResourceType, ResourceRegenData>();
             foreach (var setting in regenSettings)
             {
-                _map[setting.resourceType] = setting;
+                _regenMap[setting.resourceType] = setting;
             }
         }
 
         public ResourceRegenData GetRegenData(ResourceType type)
         {
-            return _map != null && _map.TryGetValue(type, out var data) ? data : null;
+            return _regenMap.TryGetValue(type, out var data) ? data : null;
         }
+
+        public List<ResourceRegenData> GetAllRegenSettings() => regenSettings;
     }
 }

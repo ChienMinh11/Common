@@ -7,8 +7,8 @@ namespace ChieChie.Core
     public class ResourceRegenData
     {
         public ResourceType resourceType;
-        public bool isRegenEnabled;
-        public int regenIntervalMinutes = 30; // Mặc định 30 phút
-        public long regenAmountPerInterval = 1; // Mỗi lần hồi 1 điểm
+        public long regenAmount = 1;        // Số lượng hồi phục mỗi chu kỳ
+        public float intervalSeconds = 1800f;   // Chu kỳ hồi phục (giây)
+        public bool isEnabledByDefault = true;
     }
 }
