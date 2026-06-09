@@ -35,7 +35,16 @@ public class Entity
 
     public virtual void Draw(SpriteBatch spriteBatch)
     {
-        if(this.Texture != null) spriteBatch.Draw(Texture, Position, Color.White);
+        if (this.Texture != null)
+        {
+            // Làm tròn vị trí thực tế về số nguyên gần nhất trước khi render lên màn hình
+            Vector2 renderPosition = new Vector2(
+                (float)Math.Round(Position.X),
+                (float)Math.Round(Position.Y)
+            );
+
+            spriteBatch.Draw(Texture, renderPosition, Color.White);
+        }
     }
 }
     

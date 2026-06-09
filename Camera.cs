@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework;
+﻿using System;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace ChieChie;
@@ -15,12 +16,16 @@ public class Camera
         float minY = mapBounds.Top + viewport.Height / 2f;
         float maxY = mapBounds.Bottom - viewport.Height / 2f;
 
-        // 2. Nếu kích thước bản đồ nhỏ hơn hoặc bằng màn hình (như trường hợp 800x800 hiện tại)
-        // Thì cố định Camera nằm chính giữa bản đồ, không cho di chuyển tự do nữa.
+        // 2. Nếu kích thước bản đồ nhỏ hơn hoặc bằng màn hình
         float clampedX = maxX < minX ? (mapBounds.Left + mapBounds.Right) / 2f : MathHelper.Clamp(targetPosition.X, minX, maxX);
         float clampedY = maxY < minY ? (mapBounds.Top + mapBounds.Bottom) / 2f : MathHelper.Clamp(targetPosition.Y, minY, maxY);
 
-        // Dịch chuyển thế giới dựa trên tọa độ Camera đã được giới hạn (clamped)
+        // --- SỬA TẠI ĐÂY: Làm tròn tọa độ Camera về số nguyên ---
+        clampedX = (float)Math.Round(clampedX);
+        clampedY = (float)Math.Round(clampedY);
+        // --------------------------------------------------------
+
+        // Dịch chuyển thế giới dựa trên tọa độ Camera đã được giới hạn và làm tròn
         Matrix positionMatrix = Matrix.CreateTranslation(-clampedX, -clampedY, 0);
         Matrix offsetMatrix = Matrix.CreateTranslation(viewport.Width / 2f, viewport.Height / 2f, 0);
 
