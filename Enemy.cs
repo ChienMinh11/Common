@@ -16,12 +16,12 @@ public class Enemy: Entity
     public override void Update(GameTime gameTime)
     {
         if (this.IsExpired) return;
-        float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
-
-        Position = new Vector2(Position.X + (Speed * _direction * deltaTime), Position.Y);
-
-        if (Position.X > 700) _direction = -1f;
-        else if (Position.X < 50) _direction = 1f;
+        // float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
+        //
+        // Position = new Vector2(Position.X + (Speed * _direction * deltaTime), Position.Y);
+        //
+        // if (Position.X > 700) _direction = -1f;
+        // else if (Position.X < 50) _direction = 1f;
       
         base.Update(gameTime);
     }

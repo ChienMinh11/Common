@@ -12,6 +12,7 @@ public class MainGame : Game
     
     private EntityManager _entityManager;
     private LevelManager _levelManager;
+    private Camera _camera;
 
     public MainGame()
     {
@@ -24,6 +25,7 @@ public class MainGame : Game
     {
         _entityManager = new EntityManager();
         _levelManager = new LevelManager(_entityManager);
+        _camera = new Camera();
         ResourceManager.Instance.Initialize(this.Content);
         base.Initialize();
     }
@@ -42,6 +44,19 @@ public class MainGame : Game
             Exit();
       
         _entityManager.Update(gameTime);
+        
+        Player player = _entityManager.GetPlayer();
+        if (player != null)
+        {
+            Vector2 targetPos = player.Position;
+          
+            if (player.Texture != null)
+            {
+                targetPos += new Vector2(player.Texture.Width / 2f, player.Texture.Height / 2f);
+            }
+            
+            _camera.Follow(targetPos, GraphicsDevice.Viewport);
+        }
 
         base.Update(gameTime);
     }
@@ -50,7 +65,7 @@ public class MainGame : Game
     {
         GraphicsDevice.Clear(Color.DarkSlateGray);
 
-        _spriteBatch.Begin();
+        _spriteBatch.Begin(transformMatrix: _camera.Transform);
 
         _entityManager.Draw(_spriteBatch);
 

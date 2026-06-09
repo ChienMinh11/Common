@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -10,6 +11,10 @@ public class EntityManager
     private readonly List<Entity> _entitiesToAdd = new();
     private readonly CollisionManager _collisionManager = new();
 
+    public Player GetPlayer()
+    {
+        return _entities.OfType<Player>().FirstOrDefault();
+    }
     public void AddEntity(Entity entity)
     {
         if(entity ==null) return;
