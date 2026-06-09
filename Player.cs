@@ -10,13 +10,11 @@ public class Player: Entity
     public Action<Entity> OnSpawnEntity;
     private readonly Func<string, Texture2D> _loadTextureFunc;
     private Rectangle _mapBounds;
-    public Rectangle MapBounds => _mapBounds;
     
     public Player(Vector2 position, float speed, string assetName, Func<string, Texture2D> loadTextureFunc) 
         : base(position, speed, assetName, loadTextureFunc)
     {
         _loadTextureFunc = loadTextureFunc;
-        _mapBounds = new Rectangle(0, 0, 400, 400);
     }
     
     public void SetMapBounds(Rectangle bounds)

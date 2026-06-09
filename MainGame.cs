@@ -55,14 +55,13 @@ public class MainGame : Game
         if (player != null)
         {
             Vector2 targetPos = player.Position;
-      
+  
             if (player.Texture != null)
             {
                 targetPos += new Vector2(player.Texture.Width / 2f, player.Texture.Height / 2f);
             }
-        
-            // --- SỬA DÒNG NÀY: Truyền thêm player.MapBounds vào ---
-            _camera.Follow(targetPos, GraphicsDevice.Viewport, player.MapBounds);
+    
+            _camera.Follow(targetPos, GraphicsDevice.Viewport, _levelManager.CurrentMapBounds);
         }
 
         base.Update(gameTime);
