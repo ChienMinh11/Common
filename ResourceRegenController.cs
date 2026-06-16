@@ -16,8 +16,9 @@ namespace ChieChie.Resource
         private CancellationTokenSource _cts;
         private ResourceConfig _resourceConfig;
 
-        private readonly Dictionary<ResourceType, bool> _activeStatuses = new();
-        private readonly Dictionary<ResourceType, DateTime> _nextRegenTimes = new();
+        // SỬA: Chuyển đổi Key của Dictionary từ ResourceType sang int (Hash)
+        private readonly Dictionary<int, bool> _activeStatuses = new();
+        private readonly Dictionary<int, DateTime> _nextRegenTimes = new();
 
         public void Initialize(IResourceService resourceService, ISaveSystem saveSystem)
         {
@@ -29,25 +30,27 @@ namespace ChieChie.Resource
 
             foreach (var setting in _resourceConfig.GetAllRegenSettings())
             {
-                ResourceType type = setting.key;
+                // SỬA: Lấy .Hash và .ResourceKey từ ResourceData mới
+                int hash = setting.HashId;
+                string resKey = setting.ResourceId;
                 
-                string statusKey = REGEN_STATUS_KEY_PREFIX + type;
+                string statusKey = REGEN_STATUS_KEY_PREFIX + resKey;
                 _saveSystem.RegisterKey(statusKey);
                 
                 bool isEnabled = _saveSystem.Load(statusKey, setting.IsEnabledByDefault);
-                _activeStatuses[type] = isEnabled;
+                _activeStatuses[hash] = isEnabled;
                 
-                string timeKey = REGEN_NEXT_TIME_KEY_PREFIX + type;
+                string timeKey = REGEN_NEXT_TIME_KEY_PREFIX + resKey;
                 _saveSystem.RegisterKey(timeKey);
                 
                 long savedTicks = _saveSystem.Load<long>(timeKey, 0L);
                 if (savedTicks > 0)
                 {
-                    _nextRegenTimes[type] = new DateTime(savedTicks, DateTimeKind.Utc);
+                    _nextRegenTimes[hash] = new DateTime(savedTicks, DateTimeKind.Utc);
                 }
                 else
                 {
-                    _nextRegenTimes[type] = DateTime.UtcNow.AddSeconds(setting.IntervalSeconds);
+                    _nextRegenTimes[hash] = DateTime.UtcNow.AddSeconds(setting.IntervalSeconds);
                 }
             }
           
@@ -67,21 +70,22 @@ namespace ChieChie.Resource
 
                 foreach (var setting in _resourceConfig.GetAllRegenSettings())
                 {
-                    ResourceType type = setting.key;
+                    int hash = setting.HashId;
+                    string resKey = setting.ResourceId;
 
-                    if (_activeStatuses.TryGetValue(type, out bool isEnabled) && isEnabled)
+                    if (_activeStatuses.TryGetValue(hash, out bool isEnabled) && isEnabled)
                     {
-                        if (_resourceService.IsAtMaxStack(type))
+                        if (_resourceService.IsAtMaxStack(resKey))
                         {
-                            _nextRegenTimes[type] = now.AddSeconds(setting.IntervalSeconds);
+                            _nextRegenTimes[hash] = now.AddSeconds(setting.IntervalSeconds);
                             continue;
                         }
 
-                        if (now >= _nextRegenTimes[type])
+                        if (now >= _nextRegenTimes[hash])
                         {
-                            _resourceService.AddResource(type, setting.RegenAmount);
-                            _nextRegenTimes[type] = _nextRegenTimes[type].AddSeconds(setting.IntervalSeconds);
-                            _saveSystem.Save(REGEN_NEXT_TIME_KEY_PREFIX + type, _nextRegenTimes[type].Ticks);
+                            _resourceService.AddResource(resKey, setting.RegenAmount);
+                            _nextRegenTimes[hash] = _nextRegenTimes[hash].AddSeconds(setting.IntervalSeconds);
+                            _saveSystem.Save(REGEN_NEXT_TIME_KEY_PREFIX + resKey, _nextRegenTimes[hash].Ticks);
                         }
                     }
                 }
@@ -96,22 +100,23 @@ namespace ChieChie.Resource
 
             foreach (var setting in _resourceConfig.GetAllRegenSettings())
             {
-                ResourceType type = setting.key; 
+                int hash = setting.HashId; 
+                string resKey = setting.ResourceId;
 
-                if (_activeStatuses.TryGetValue(type, out bool isEnabled) && isEnabled)
+                if (_activeStatuses.TryGetValue(hash, out bool isEnabled) && isEnabled)
                 {
-                    if (_resourceService.IsAtMaxStack(type)) continue;
+                    if (_resourceService.IsAtMaxStack(resKey)) continue;
 
-                    DateTime nextTime = _nextRegenTimes[type];
+                    DateTime nextTime = _nextRegenTimes[hash];
                     if (now >= nextTime)
                     {
                         TimeSpan overdue = now - nextTime;
                         int extraCycles = (int)(overdue.TotalSeconds / setting.IntervalSeconds) + 1;
 
                         long totalRegenAmount = extraCycles * setting.RegenAmount;
-                        _resourceService.AddResource(type, totalRegenAmount);
-                        _nextRegenTimes[type] = nextTime.AddSeconds(extraCycles * setting.IntervalSeconds);
-                        _saveSystem.Save(REGEN_NEXT_TIME_KEY_PREFIX + type, _nextRegenTimes[type].Ticks);
+                        _resourceService.AddResource(resKey, totalRegenAmount);
+                        _nextRegenTimes[hash] = nextTime.AddSeconds(extraCycles * setting.IntervalSeconds);
+                        _saveSystem.Save(REGEN_NEXT_TIME_KEY_PREFIX + resKey, _nextRegenTimes[hash].Ticks);
                     }
                 }
             }
@@ -119,42 +124,44 @@ namespace ChieChie.Resource
 
         #region PublicAPI
 
-        public void SetRegenStatus(ResourceType type, bool isEnabled)
+        // SỬA: Chuyển đổi tham số định danh các hàm Public API từ ResourceType sang int (Hash)
+        public void SetRegenStatus(int hash, bool isEnabled)
         {
-            if (_activeStatuses.ContainsKey(type))
+            if (_activeStatuses.ContainsKey(hash))
             {
-                _activeStatuses[type] = isEnabled;
-                _saveSystem.Save(REGEN_STATUS_KEY_PREFIX + type, isEnabled);
+                _activeStatuses[hash] = isEnabled;
                 
-                if (isEnabled)
+                var setting = _resourceConfig.GetResourceData(hash);
+                if (setting != null)
                 {
-                    var setting = _resourceConfig.GetResourceData(type);
-                    if (setting != null && setting.HasRegen)
+                    _saveSystem.Save(REGEN_STATUS_KEY_PREFIX + setting.ResourceId, isEnabled);
+                    
+                    if (isEnabled && setting.HasRegen)
                     {
-                        _nextRegenTimes[type] = DateTime.UtcNow.AddSeconds(setting.IntervalSeconds);
-                        _saveSystem.Save(REGEN_NEXT_TIME_KEY_PREFIX + type, _nextRegenTimes[type].Ticks);
+                        _nextRegenTimes[hash] = DateTime.UtcNow.AddSeconds(setting.IntervalSeconds);
+                        _saveSystem.Save(REGEN_NEXT_TIME_KEY_PREFIX + setting.ResourceId, _nextRegenTimes[hash].Ticks);
                     }
                 }
             }
         }
 
-        public bool IsRegenEnabled(ResourceType type)
+        public bool IsRegenEnabled(int hash)
         {
-            return _activeStatuses.TryGetValue(type, out bool isEnabled) && isEnabled;
+            return _activeStatuses.TryGetValue(hash, out bool isEnabled) && isEnabled;
         }
 
-        public void SetRegenAmount(ResourceType type, long newAmount)
+        public void SetRegenAmount(int hash, long newAmount)
         {
-            var data = _resourceConfig.GetResourceData(type);
+            var data = _resourceConfig.GetResourceData(hash);
             if (data != null && data.HasRegen)
             {
                 data.RegenAmount = newAmount;
             }
         }
 
-        public DateTime GetNextRegenTime(ResourceType type)
+        public DateTime GetNextRegenTime(int hash)
         {
-            return _nextRegenTimes.TryGetValue(type, out var time) ? time : DateTime.UtcNow;
+            return _nextRegenTimes.TryGetValue(hash, out var time) ? time : DateTime.UtcNow;
         }
 
         public void SaveAllRegenTimes()
@@ -163,13 +170,13 @@ namespace ChieChie.Resource
 
             foreach (var setting in _resourceConfig.GetAllRegenSettings())
             {
-                ResourceType type = setting.key;
+                int hash = setting.HashId;
               
-                if (_activeStatuses.TryGetValue(type, out bool isEnabled) && isEnabled)
+                if (_activeStatuses.TryGetValue(hash, out bool isEnabled) && isEnabled)
                 {
-                    if (_nextRegenTimes.TryGetValue(type, out DateTime nextTime))
+                    if (_nextRegenTimes.TryGetValue(hash, out DateTime nextTime))
                     {
-                        _saveSystem.Save(REGEN_NEXT_TIME_KEY_PREFIX + type, nextTime.Ticks);
+                        _saveSystem.Save(REGEN_NEXT_TIME_KEY_PREFIX + setting.ResourceId, nextTime.Ticks);
                     }
                 }
             }

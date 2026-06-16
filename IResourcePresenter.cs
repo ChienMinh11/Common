@@ -4,7 +4,7 @@ namespace ChieChie.Resource
 {
     public interface IResourcePresenter
     {
-        ResourceType ResourceId { get; }
+        int ResourceHash { get; }
         bool HasPendingUpdates { get; }
         void ProcessPendingUpdates();
         void ForceUpdateView();

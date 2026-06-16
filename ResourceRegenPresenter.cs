@@ -3,13 +3,18 @@ using System.Threading;
 using ChieChie.Core;
 using Cysharp.Threading.Tasks;
 using R3;
+using UnityEngine; // Cần thêm để sử dụng Animator.StringToHash
 
 namespace ChieChie.Resource
 {
     public class ResourceRegenPresenter : IDisposable
     {
         private readonly IResourceRegenView _view;
-        private readonly ResourceType _resourceType;
+        
+        // SỬA: Chuyển đổi định danh quản lý từ ResourceType sang chuỗi Key và mã Hash số nguyên
+        private readonly string _resourceKey;
+        private readonly int _resourceHash;
+        
         private readonly IResourceService _resourceService; 
         private readonly IEventService _eventService;
         
@@ -18,18 +23,21 @@ namespace ChieChie.Resource
 
         public ResourceRegenPresenter(
             IResourceRegenView view, 
-            ResourceType resourceType,
+            string resourceKey, // SỬA: Nhận string thay vì ResourceType enum
             IResourceService resourceService,
             IEventService eventService)
         {
             _view = view;
-            _resourceType = resourceType;
+            _resourceKey = resourceKey;
+            // Tự động băm chuỗi định danh để xử lý logic tìm kiếm và bắt Event nội bộ nhanh
+            _resourceHash = string.IsNullOrEmpty(resourceKey) ? 0 : Animator.StringToHash(resourceKey);
             _resourceService = resourceService;
             _eventService = eventService;
         }
 
         public void Initialize()
         {
+            // Lắng nghe dữ liệu thay đổi từ Model thông qua ResourceChangeData nhận dạng bằng Hash int
             _eventService.Observe<ResourceChangeData<long>, ResourceEventType>(ResourceEventType.ResourceChanged)
                 .Subscribe(OnResourceChanged)
                 .AddTo(_disposableBag); 
@@ -41,7 +49,8 @@ namespace ChieChie.Resource
 
         private void OnResourceChanged(ResourceChangeData<long> changeData)
         {
-            if (changeData.ResourceId == _resourceType)
+            // SỬA: Kiểm tra trùng khớp định danh bằng mã Hash (int)
+            if (changeData.ResourceId == _resourceHash)
             {
                 UpdateVisuals();
             }
@@ -60,22 +69,23 @@ namespace ChieChie.Resource
         {
             if (_view == null) return;
           
-            if (_resourceService.IsCurrentlyInfinite(_resourceType))
+            // SỬA: Các hàm API của IResourceService đã được chuyển sang nhận diện bằng string hoặc mã Hash int
+            if (_resourceService.IsCurrentlyInfinite(_resourceKey))
             {
                 _view.SetRegenStatusActive(false);
                 return;
             }
            
-            if (_resourceService.IsAtMaxStack(_resourceType))
+            if (_resourceService.IsAtMaxStack(_resourceKey))
             {
                 _view.SetRegenStatusActive(true);
                 _view.SetRegenStatusText("Full");
                 return;
             }
         
-            if (_resourceService.IsRegenEnabled(_resourceType))
+            if (_resourceService.IsRegenEnabled(_resourceKey))
             {
-                DateTime nextRegenTime = _resourceService.GetNextRegenTime(_resourceType);
+                DateTime nextRegenTime = _resourceService.GetNextRegenTime(_resourceKey);
                 TimeSpan remainingTime = nextRegenTime - DateTime.UtcNow;
                 if (remainingTime < TimeSpan.Zero) remainingTime = TimeSpan.Zero;
                 _view.SetRegenStatusActive(true);

@@ -1,14 +1,38 @@
 using System;
 using ChieChie.Core;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace ChieChie.Resource
 {
     [Serializable]
     public class ResourceData 
     {
-        public ResourceType key;
+        [SerializeField] private string resourceId;
+        public string ResourceId => resourceId;
+        
+        private int? _hashId;
+     
+        public int HashId
+        {
+            get
+            {
+                if (!_hashId.HasValue)
+                {
+                    _hashId = string.IsNullOrEmpty(resourceId) ? 0 : resourceId.GetHashCode() ;
+                }
+                return _hashId.Value;
+            }
+        }
+        
         public string displayName;
+        
+        [SerializeField] private Sprite icon;
+        public Sprite Icon => icon;
+        
+        [SerializeField] private Sprite infinityIcon;
+        public Sprite InfinityIcon => infinityIcon;
+        
         [SerializeField] private long maxStack;
         [SerializeField] private long defaultAmount = 0;
 
@@ -52,12 +76,12 @@ namespace ChieChie.Resource
 
     public readonly struct ResourceChangeData<T>
     {
-        public readonly ResourceType ResourceId;
+        public readonly int ResourceId;
         public readonly T OldAmount;
         public readonly T NewAmount;
         public readonly bool DelayUpdate;
 
-        public ResourceChangeData(ResourceType resourceId, T oldAmount, T newAmount, bool delayUpdate = false)
+        public ResourceChangeData(int resourceId, T oldAmount, T newAmount, bool delayUpdate = false)
         {
             ResourceId = resourceId;
             OldAmount = oldAmount;

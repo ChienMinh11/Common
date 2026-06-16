@@ -5,25 +5,28 @@ namespace ChieChie.Resource
 {
     public interface IResourceService
     {
-        IResourcePresenter RegisterView(ResourceType resourceType, IResourceView view);
+     
+        IResourcePresenter RegisterView(string resourceKey, IResourceView view);
         void UnregisterPresenter(IResourcePresenter presenter);
-
-        void AddResource(ResourceType resourceType, long amount, bool delayUpdate = false);
-        bool SpendResource(ResourceType resourceType, long amount);
-        long GetCurrentAmount(ResourceType resourceType);
-        bool IsAtMaxStack(ResourceType resourceType);
-        long GetMaxStack(ResourceType resourceType);
-        void SetMaxStackAndFill(ResourceType resourceType, long newMaxStack, bool fillFull = false);
-        void ProcessPendingUpdate(ResourceType resourceType);
+     
+        void AddResource(string resourceKey, long amount, bool delayUpdate = false);
+        bool SpendResource(string resourceKey, long amount);
+        long GetCurrentAmount(string resourceKey);
+        bool IsAtMaxStack(string resourceKey);
+        long GetMaxStack(string resourceKey);
+ 
+        void SetMaxStackAndFill(string resourceKey, long newMaxStack, bool fillFull = false);
+        void ProcessPendingUpdate(string resourceKey);
         void ForceUpdateAllView();
 
-        void AddInfiniteDuration(ResourceType resourceType, TimeSpan duration);
-        bool IsCurrentlyInfinite(ResourceType resourceType);
-        TimeSpan GetRemainingInfiniteTime(ResourceType resourceType);
-        ResourceConfig GetConfig();
+        void AddInfiniteDuration(string resourceKey, TimeSpan duration);
+        bool IsCurrentlyInfinite(string resourceKey);
+        TimeSpan GetRemainingInfiniteTime(string resourceKey);
         
-        bool IsRegenEnabled(ResourceType type);
-        DateTime GetNextRegenTime(ResourceType type);
-        void SetRegenStatus(ResourceType type, bool isEnabled);
+        ResourceConfig GetConfig();
+
+        bool IsRegenEnabled(string resourceKey);
+        DateTime GetNextRegenTime(string resourceKey);
+        void SetRegenStatus(string resourceKey, bool isEnabled);
     }
 }

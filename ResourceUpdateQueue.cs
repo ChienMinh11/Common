@@ -29,14 +29,15 @@ namespace ChieChie.Resource
             return false;
         }
       
-        public ResourceUpdateData ProcessNextUpdate(ResourceType resourceId)
+        // SỬA: Chuyển đổi ResourceType sang int resourceHash
+        public ResourceUpdateData ProcessNextUpdate(int resourceHash)
         {
             if (updateQueue.Count > 0 && !isProcessing)
             {
                 isProcessing = true;
                 long nextAmount = updateQueue.Dequeue();
                 isProcessing = false;
-                return new ResourceUpdateData(resourceId, nextAmount);
+                return new ResourceUpdateData(resourceHash, nextAmount);
             }
            
             return null;
@@ -51,12 +52,12 @@ namespace ChieChie.Resource
 
     public class ResourceUpdateData
     {
-        public ResourceType ResourceId { get; }
+        public int ResourceHash { get; }
         public long Amount { get; }
 
-        public ResourceUpdateData(ResourceType resourceId, long amount)
+        public ResourceUpdateData(int resourceHash, long amount)
         {
-            ResourceId = resourceId;
+            ResourceHash = resourceHash;
             Amount = amount;
         }
     }

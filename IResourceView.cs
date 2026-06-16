@@ -10,7 +10,7 @@ namespace ChieChie.Resource
         void SetResourceIcon(Sprite icon);
         void SetResourceName(string name);
         void ShowInsufficientMessage();
-        void OnMaxStackReached(ResourceType type);
+        void OnMaxStackReached(int resourceHash);
         void SetInfiniteStatus(bool isInfinite);
         void UpdateInfinityRemainingTime(string formattedTime);
     }

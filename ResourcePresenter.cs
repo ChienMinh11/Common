@@ -14,7 +14,6 @@ namespace ChieChie.Resource
         private readonly INumberConverter<T> _converter;
         private readonly IEventService _eventService;
         private readonly IReadOnlyInfiniteStatus _infiniteStatus;
-        private readonly IIconProvider _iconProvider;
 
         private IDisposable _resourceChangeSubscription;
         private IDisposable _resourceInsufficientSubscription;
@@ -24,25 +23,26 @@ namespace ChieChie.Resource
 
         private readonly CancellationTokenSource _countdownCts;
 
-        public ResourceType ResourceId { get; }
+        public string ResourceKey { get; }
+        public int ResourceHash { get; }
         public bool HasPendingUpdates => _updateQueue.HasPendingUpdates;
 
         public ResourcePresenter(
             ResourceModel<T> model,
             IResourceView view,
-            ResourceType resourceId,
+            string resourceKey, 
             INumberConverter<T> converter,
             IEventService eventService,
-            IReadOnlyInfiniteStatus infiniteStatus,
-            IIconProvider iconProvider)
+            IReadOnlyInfiniteStatus infiniteStatus)
         {
             _model = model;
             _view = view;
-            ResourceId = resourceId;
+            ResourceKey = resourceKey;
+            
+            ResourceHash = string.IsNullOrEmpty(resourceKey) ? 0 : Animator.StringToHash(resourceKey);
             _converter = converter;
             _eventService = eventService;
             _infiniteStatus = infiniteStatus;
-            _iconProvider = iconProvider;
             this._updateQueue = new ResourceUpdateQueue();
 
             SubscribeToEvents();
@@ -71,23 +71,22 @@ namespace ChieChie.Resource
                     break;
                 }
 
-                bool isCurrentlyInfinite = _infiniteStatus.IsCurrentlyInfinite(ResourceId);
-                
-                Sprite iconToSet = (isCurrentlyInfinite ) 
-                    ? GetIconResourceReward(ResourceId,true)
-                    : GetIconResourceReward(ResourceId,false);
+                bool isCurrentlyInfinite = _infiniteStatus.IsCurrentlyInfinite(ResourceHash);
+          
+                _currentResourceData = _model.GetResourceData(ResourceHash);
+                Sprite iconToSet = _currentResourceData?.Icon;
                 
                 _view.SetResourceIcon(iconToSet);
                 _view.SetInfiniteStatus(isCurrentlyInfinite);
                 if (isCurrentlyInfinite)
                 {
-                    TimeSpan remaining = _infiniteStatus.GetRemainingInfiniteTime(ResourceId);
+                    TimeSpan remaining = _infiniteStatus.GetRemainingInfiniteTime(ResourceHash);
                     _view.UpdateInfinityRemainingTime(TimeFormatter.FormatRemainingTime(remaining));
                 }
 
                 if (!isCurrentlyInfinite)
                 {
-                    long displayAmount = _converter.ToLong(_model.GetAmount(ResourceId));
+                    long displayAmount = _converter.ToLong(_model.GetAmount(ResourceKey));
                     _view.SetResourceAmount(displayAmount);
                 }
 
@@ -109,7 +108,7 @@ namespace ChieChie.Resource
 
         private void OnResourceChanged(ResourceChangeData<T> changeData)
         {
-            if (changeData.ResourceId != ResourceId) return;
+            if (changeData.ResourceId != ResourceHash) return;
 
             long oldDisplay = _converter.ToLong(changeData.OldAmount);
             long newDisplay = _converter.ToLong(changeData.NewAmount);
@@ -120,7 +119,7 @@ namespace ChieChie.Resource
             {
                 _updateQueue.Clear();
 
-                if (!_infiniteStatus.IsCurrentlyInfinite(ResourceId))
+                if (!_infiniteStatus.IsCurrentlyInfinite(ResourceHash))
                 {
                     _view.SetResourceAmount(newDisplay);
                 }
@@ -129,19 +128,19 @@ namespace ChieChie.Resource
 
         public void ProcessPendingUpdates()
         {
-            var update = _updateQueue.ProcessNextUpdate(ResourceId);
+            var update = _updateQueue.ProcessNextUpdate(ResourceHash); 
             if (update != null)
             {
-                var data = _model.GetResourceData(update.ResourceId);
+                var data = _model.GetResourceData(ResourceHash);
                 if (data != null)
                 {
                     _view.SetResourceAmount(update.Amount);
-                    _view.SetResourceIcon(GetIconResourceReward(ResourceId,false));
+                    _view.SetResourceIcon(data.Icon);
                     _view.SetResourceName(data.displayName);
 
                     if (data.MaxStack > 0 && update.Amount >= data.MaxStack)
                     {
-                        _view.OnMaxStackReached(update.ResourceId);
+                        _view.OnMaxStackReached(ResourceHash);
                     }
                 }
             }
@@ -149,38 +148,26 @@ namespace ChieChie.Resource
 
         public void ForceUpdateView()
         {
-            _currentResourceData = _model.GetResourceData(ResourceId);
+            _currentResourceData = _model.GetResourceData(ResourceHash);
             if (_currentResourceData == null) return;
 
             _updateQueue.Clear();
-            long displayAmount = _converter.ToLong(_model.GetAmount(ResourceId));
+            long displayAmount = _converter.ToLong(_model.GetAmount(ResourceKey));
             _view.SetResourceAmountWithoutAnimation(displayAmount);
 
-            if(_infiniteStatus.IsCurrentlyInfinite(ResourceId))
-                _view.SetResourceIcon(GetIconResourceReward(ResourceId,false));
+            _view.SetResourceIcon(_currentResourceData.Icon);
             _view.SetResourceName(_currentResourceData.displayName);
         }
 
         private void UpdateView()
         {
-            _currentResourceData = _model.GetResourceData(ResourceId);
+            _currentResourceData = _model.GetResourceData(ResourceHash);
             if (_currentResourceData == null) return;
-            bool isCurrentlyInfinite = _infiniteStatus.IsCurrentlyInfinite(ResourceId);
-            Sprite iconToSet = (isCurrentlyInfinite) 
-                ? GetIconResourceReward(ResourceId,true) 
-                : GetIconResourceReward(ResourceId,false);
 
-            _view.SetResourceIcon(iconToSet);
-            long displayAmount = _converter.ToLong(_model.GetAmount(ResourceId));
+            _view.SetResourceIcon(_currentResourceData.Icon);
+            long displayAmount = _converter.ToLong(_model.GetAmount(ResourceKey));
             _view.SetResourceAmount(displayAmount);
             _view.SetResourceName(_currentResourceData.displayName);
-        }
-
-        private Sprite GetIconResourceReward(ResourceType resourceType, bool isInfinite)
-        {
-            if (_iconProvider == null) return null;
-         
-            return _iconProvider.GetRewardIcon(resourceType, isInfinite);
         }
 
         public void Cleanup()

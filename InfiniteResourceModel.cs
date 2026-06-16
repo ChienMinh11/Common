@@ -10,49 +10,70 @@ namespace ChieChie.Resource
         private const string SAVE_KEY_PREFIX = "Resource_Inf_Time_";
         private readonly ISaveSystem _saveSystem;
         private readonly IEventService _eventService;
-        private readonly Dictionary<ResourceType, DateTime> _expirationTimes = new();
+
+        private ResourceConfig _config;
+        
+        private readonly Dictionary<int, DateTime> _expirationTimes = new();
 
         public InfiniteResourceModel(ISaveSystem saveSystem, IEventService eventService)
         {
             _saveSystem = saveSystem;
             _eventService = eventService;
         }
-        public void Initialize()
+
+        // SỬA: Nhận ResourceConfig để khởi tạo thay vì duyệt Enum.GetValues cũ
+        public void Initialize(ResourceConfig config)
         {
-            var resourceTypes = (ResourceType[])Enum.GetValues(typeof(ResourceType));
-            foreach (var type in resourceTypes)
+            _config = config;
+            if (_config == null) return;
+
+            foreach (var resourceData in _config.GetAllResources())
             {
-                string key = SAVE_KEY_PREFIX + type.ToString();
+                int hash = resourceData.HashId;
+                string key = SAVE_KEY_PREFIX + resourceData.ResourceId;
                 _saveSystem.RegisterKey(key);
                 
                 long savedTicks = _saveSystem.Load<long>(key, 0L);
-                _expirationTimes[type] = savedTicks > 0 ? new DateTime(savedTicks, DateTimeKind.Utc) : DateTime.MinValue;
+                _expirationTimes[hash] = savedTicks > 0 ? new DateTime(savedTicks, DateTimeKind.Utc) : DateTime.MinValue;
             }
         }
 
-        public void AddDuration(ResourceType type, TimeSpan duration)
+        public void AddDuration(int hash, TimeSpan duration)
         {
             if (duration <= TimeSpan.Zero) return;
             DateTime now = DateTime.UtcNow;
-            DateTime currentExpiration = _expirationTimes.TryGetValue(type, out var time) ? time : DateTime.MinValue;
-            _expirationTimes[type] = (currentExpiration > now) ? currentExpiration.Add(duration) : now.Add(duration);
-            _saveSystem.Save(SAVE_KEY_PREFIX + type.ToString(), _expirationTimes[type].Ticks);
-            _eventService?.Publish<ResourceType, SharedEventType>(SharedEventType.OnInfiniteDurationAdded, type);
+            DateTime currentExpiration = _expirationTimes.TryGetValue(hash, out var time) ? time : DateTime.MinValue;
+            _expirationTimes[hash] = (currentExpiration > now) ? currentExpiration.Add(duration) : now.Add(duration);
+         
+            var resourceData = _config?.GetResourceData(hash);
+            if (resourceData != null)
+            {
+                string key = SAVE_KEY_PREFIX + resourceData.ResourceId;
+                _saveSystem.Save(key, _expirationTimes[hash].Ticks);
+            }
+            
+            _eventService?.Publish<int, SharedEventType>(SharedEventType.OnInfiniteDurationAdded, hash);
         }
 
-        public TimeSpan GetRemainingTime(ResourceType type)
+        public TimeSpan GetRemainingTime(int hash)
         {
-            if (!_expirationTimes.TryGetValue(type, out var expiration)) return TimeSpan.Zero;
+            if (!_expirationTimes.TryGetValue(hash, out var expiration)) return TimeSpan.Zero;
             DateTime now = DateTime.UtcNow;
 
             if (expiration <= now)
             {
                 if (expiration != DateTime.MinValue)
                 {
-                    _expirationTimes[type] = DateTime.MinValue;
-                    _saveSystem.Save(SAVE_KEY_PREFIX + type.ToString(), DateTime.MinValue.Ticks);
+                    _expirationTimes[hash] = DateTime.MinValue;
+                    
+                    var resourceData = _config?.GetResourceData(hash);
+                    if (resourceData != null)
+                    {
+                        string key = SAVE_KEY_PREFIX + resourceData.ResourceId;
+                        _saveSystem.Save(key, DateTime.MinValue.Ticks);
+                    }
                 
-                    _eventService?.Publish<ResourceType, SharedEventType>(SharedEventType.OnInfiniteDurationExpired, type);
+                    _eventService?.Publish<int, SharedEventType>(SharedEventType.OnInfiniteDurationExpired, hash);
                     Debug.Log($"Infinite Duration Expired: {expiration}");
                 }
                 return TimeSpan.Zero;
@@ -61,9 +82,9 @@ namespace ChieChie.Resource
             return expiration - now;
         }
 
-        public bool IsInfinite(ResourceType type)
+        public bool IsInfinite(int hash)
         {
-            return GetRemainingTime(type) > TimeSpan.Zero;
+            return GetRemainingTime(hash) > TimeSpan.Zero;
         }
     }
 }

@@ -8,7 +8,7 @@ namespace ChieChie.Resource
     public class ResourceConfig : ScriptableObject, ISerializationCallbackReceiver
     {
         [SerializeField] private List<ResourceData> resourcesList = new List<ResourceData>();
-        private Dictionary<ResourceType, ResourceData> resourceMap = new Dictionary<ResourceType, ResourceData>();
+        private Dictionary<int, ResourceData> resourceMap = new Dictionary<int, ResourceData>();
         private readonly List<ResourceData> regenResourcesCache = new();
 
         public void OnAfterDeserialize()
@@ -18,9 +18,9 @@ namespace ChieChie.Resource
             
             foreach (var resource in resourcesList)
             {
-                if (resource != null && !resourceMap.ContainsKey(resource.key))
+                if (resource != null && !resourceMap.ContainsKey(resource.HashId))
                 {
-                    resourceMap[resource.key] = resource;
+                    resourceMap[resource.HashId] = resource;
                     
                     if (resource.HasRegen)
                     {
@@ -35,9 +35,9 @@ namespace ChieChie.Resource
             // Thường để trống trừ khi bạn muốn đồng bộ ngược từ Dict vào List trong Runtime
         }
        
-        public ResourceData GetResourceData(ResourceType type)
+        public ResourceData GetResourceData(int typeHash)
         {
-            return resourceMap.TryGetValue(type, out var data) ? data : null;
+            return resourceMap.TryGetValue(typeHash, out var data) ? data : null;
         }
         public IReadOnlyList<ResourceData> GetAllRegenSettings() => regenResourcesCache;
 

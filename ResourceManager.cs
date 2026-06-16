@@ -4,12 +4,12 @@ using System.Threading;
 using ChieChie.Core;
 using Cysharp.Threading.Tasks;
 using R3;
+using UnityEngine; // Cần thêm để sử dụng Animator.StringToHash
 
 namespace ChieChie.Resource
 {
     public class ResourceManager : IServiceInitialisable, IResourceService, IReadOnlyInfiniteStatus, IDisposable
     {
-        
         private readonly ResourceConfig _resourceConfig;
         private ResourceRegenController _resourceRegenController;
         
@@ -17,18 +17,17 @@ namespace ChieChie.Resource
         private InfiniteResourceModel _infiniteModel;
         private readonly IEventService _eventService;
         private readonly ISaveSystem _saveSystem;
-        private readonly IIconProvider _iconProvider;
-        private IDisposable _eventSubscription;
+        // XÓA: IIconProvider không cần thiết nữa do Sprite nằm ở ResourceData
 
+        private IDisposable _eventSubscription;
         private readonly List<IResourcePresenter> _activePresenters = new();
         public bool IsInitialized { get; private set; }
 
-        public ResourceManager(ResourceConfig resourceConfig,IEventService eventService, ISaveSystem saveSystem, IIconProvider iconProvider)
+        public ResourceManager(ResourceConfig resourceConfig, IEventService eventService, ISaveSystem saveSystem)
         {
             _resourceConfig = resourceConfig;
             _eventService = eventService;
             _saveSystem = saveSystem;
-            _iconProvider = iconProvider;
         }
 
         public UniTask<bool> InitializeAsync(CancellationToken cancellationToken)
@@ -36,30 +35,20 @@ namespace ChieChie.Resource
             _longModel = new ResourceModel<long>(new LongConverter(), _eventService, _saveSystem, this);
             _longModel?.Initialize(_resourceConfig);
             _infiniteModel = new InfiniteResourceModel(_saveSystem, _eventService);
-            _infiniteModel.Initialize();
+            _infiniteModel.Initialize(_resourceConfig);
 
             _resourceRegenController = new ResourceRegenController();
             _resourceRegenController.Initialize(this, _saveSystem);
-            RegEvent();
             IsInitialized = true;
             return UniTask.FromResult(true);
         }
+      
 
-        private void RegEvent()
-        {
-            if (_eventService != null)
-            {
-                _eventSubscription = _eventService
-                    .Observe<List<ResourceRewardCommand>, SharedEventType>(SharedEventType.RequestAddResource)
-                    .Subscribe(OnResourceRewardRequested);
-            }
-        }
-
-        public IResourcePresenter RegisterView(ResourceType resourceType, IResourceView view)
+        public IResourcePresenter RegisterView(string resourceKey, IResourceView view)
         {
             if (!IsInitialized) return null;
 
-            var presenter = new ResourcePresenter<long>(_longModel, view, resourceType, new LongConverter(), _eventService, this, _iconProvider);
+            var presenter = new ResourcePresenter<long>(_longModel, view, resourceKey, new LongConverter(), _eventService, this);
             if (presenter != null) _activePresenters.Add(presenter);
             return presenter;
         }
@@ -74,50 +63,88 @@ namespace ChieChie.Resource
             }
         }
 
-        public void AddResource(ResourceType resourceType, long amount, bool delayUpdate = false) => _longModel?.AddResource(resourceType, amount, delayUpdate);
-        public bool SpendResource(ResourceType resourceType, long amount) => _longModel?.SpendResource(resourceType, amount) ?? false;
-        public long GetCurrentAmount(ResourceType resourceType) => _longModel != null ? _longModel.GetAmount(resourceType) : 0;
+        public void AddResource(string resourceKey, long amount, bool delayUpdate = false) => _longModel?.AddResource(resourceKey, amount, delayUpdate);
+        public bool SpendResource(string resourceKey, long amount) => _longModel?.SpendResource(resourceKey, amount) ?? false;
+        public long GetCurrentAmount(string resourceKey) => _longModel != null ? _longModel.GetAmount(resourceKey) : 0;
         
-        public bool IsAtMaxStack(ResourceType resourceType)
+        public bool IsAtMaxStack(string resourceKey)
         {
-            var resourceData = _resourceConfig.GetResourceData(resourceType);
+            int hash = string.IsNullOrEmpty(resourceKey) ? 0 : Animator.StringToHash(resourceKey);
+            var resourceData = _resourceConfig.GetResourceData(hash);
             if (resourceData == null || resourceData.MaxStack <= 0) return false;
-            return GetCurrentAmount(resourceType) >= resourceData.MaxStack;
+            return GetCurrentAmount(resourceKey) >= resourceData.MaxStack;
         }
 
-        public long GetMaxStack(ResourceType resourceType) => _resourceConfig?.GetResourceData(resourceType)?.MaxStack ?? 0;
+        public long GetMaxStack(string resourceKey)
+        {
+            int hash = string.IsNullOrEmpty(resourceKey) ? 0 : Animator.StringToHash(resourceKey);
+            return _resourceConfig?.GetResourceData(hash)?.MaxStack ?? 0;
+        }
 
-        public void SetMaxStackAndFill(ResourceType resourceType, long newMaxStack, bool fillFull = false)
+        public void SetMaxStackAndFill(string resourceKey, long newMaxStack, bool fillFull = false)
         {
             if (!IsInitialized) return;
-            _longModel?.SetMaxStack(resourceType, newMaxStack);
+            int hash = string.IsNullOrEmpty(resourceKey) ? 0 : Animator.StringToHash(resourceKey);
+            _longModel?.SetMaxStack(hash, newMaxStack);
             if (fillFull)
             {
-                long currentAmount = GetCurrentAmount(resourceType);
-                if (currentAmount < newMaxStack) AddResource(resourceType, newMaxStack - currentAmount);
+                long currentAmount = GetCurrentAmount(resourceKey);
+                if (currentAmount < newMaxStack) AddResource(resourceKey, newMaxStack - currentAmount);
             }
         }
 
-        public void AddInfiniteDuration(ResourceType resourceType, TimeSpan duration)
+        public void AddInfiniteDuration(string resourceKey, TimeSpan duration)
         {
             if (!IsInitialized) return;
-            _infiniteModel.AddDuration(resourceType, duration);
+            int hash = string.IsNullOrEmpty(resourceKey) ? 0 : Animator.StringToHash(resourceKey);
+            _infiniteModel.AddDuration(hash, duration);
             ForceUpdateAllView();
         }
 
-        public bool IsCurrentlyInfinite(ResourceType resourceType) => IsInitialized && _infiniteModel.IsInfinite(resourceType);
-        public TimeSpan GetRemainingInfiniteTime(ResourceType resourceType) => IsInitialized ? _infiniteModel.GetRemainingTime(resourceType) : TimeSpan.Zero;
+        public bool IsCurrentlyInfinite(string resourceKey)
+        {
+            int hash = string.IsNullOrEmpty(resourceKey) ? 0 : Animator.StringToHash(resourceKey);
+            return IsCurrentlyInfinite(hash);
+        }
+
+        public TimeSpan GetRemainingInfiniteTime(string resourceKey)
+        {
+            int hash = string.IsNullOrEmpty(resourceKey) ? 0 : Animator.StringToHash(resourceKey);
+            return IsInitialized ? _infiniteModel.GetRemainingTime(hash) : TimeSpan.Zero;
+        }
+        public bool IsCurrentlyInfinite(int resourceHash) => IsInitialized && _infiniteModel.IsInfinite(resourceHash);
+        
+        TimeSpan IReadOnlyInfiniteStatus.GetRemainingInfiniteTime(int resourceHash) 
+            => IsInitialized ? _infiniteModel.GetRemainingTime(resourceHash) : TimeSpan.Zero;
+
         public ResourceConfig GetConfig() => _resourceConfig;
-        public bool IsRegenEnabled(ResourceType type) => _resourceRegenController != null && _resourceRegenController.IsRegenEnabled(type);
-        public DateTime GetNextRegenTime(ResourceType type) => _resourceRegenController != null ? _resourceRegenController.GetNextRegenTime(type) : DateTime.UtcNow;
-        public void SetRegenStatus(ResourceType type, bool isEnabled) => _resourceRegenController?.SetRegenStatus(type, isEnabled);
+  
+        public bool IsRegenEnabled(string resourceKey)
+        {
+            if (_resourceRegenController == null) return false;
+            int hash = string.IsNullOrEmpty(resourceKey) ? 0 : Animator.StringToHash(resourceKey);
+            return _resourceRegenController.IsRegenEnabled(hash);
+        }
 
-        TimeSpan IReadOnlyInfiniteStatus.GetRemainingInfiniteTime(ResourceType resourceType) => GetRemainingInfiniteTime(resourceType);
+        public DateTime GetNextRegenTime(string resourceKey)
+        {
+            if (_resourceRegenController == null) return DateTime.UtcNow;
+            int hash = string.IsNullOrEmpty(resourceKey) ? 0 : Animator.StringToHash(resourceKey);
+            return _resourceRegenController.GetNextRegenTime(hash);
+        }
 
-        public void ProcessPendingUpdate(ResourceType resourceType)
+        public void SetRegenStatus(string resourceKey, bool isEnabled)
+        {
+            if (_resourceRegenController == null) return;
+            int hash = string.IsNullOrEmpty(resourceKey) ? 0 : Animator.StringToHash(resourceKey);
+            _resourceRegenController.SetRegenStatus(hash, isEnabled);
+        }
+
+        public void ProcessPendingUpdate(string resourceKey)
         {
             if (!IsInitialized) return;
-            _activePresenters.Find(p => p.ResourceId == resourceType)?.ProcessPendingUpdates();
+            int hash = string.IsNullOrEmpty(resourceKey) ? 0 : Animator.StringToHash(resourceKey);
+            _activePresenters.Find(p => p.ResourceHash == hash)?.ProcessPendingUpdates();
         }
 
         public void ForceUpdateAllView()
@@ -125,17 +152,6 @@ namespace ChieChie.Resource
             if (!IsInitialized) return;
             for (int i = 0; i < _activePresenters.Count; i++) _activePresenters[i].ForceUpdateView();
         }
-        
-        private void OnResourceRewardRequested(List<ResourceRewardCommand> commands)
-        {
-            if (commands == null || !IsInitialized) return;
-            foreach (var cmd in commands)
-            {
-                if (cmd.IsInfinite) AddInfiniteDuration(cmd.ResourceType, TimeSpan.FromSeconds(cmd.DurationInSeconds));
-                else AddResource(cmd.ResourceType, cmd.Amount);
-            }
-        }
-
         public void OnAppQuit() => _resourceRegenController?.SaveAllRegenTimes();
     
         public void OnAppPause(bool pauseStatus) 

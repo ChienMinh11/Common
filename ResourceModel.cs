@@ -25,8 +25,8 @@ namespace ChieChie.Resource
         private readonly ISaveSystem saveSystem;
         private readonly IReadOnlyInfiniteStatus _infiniteStatus;
 
-        private readonly Dictionary<ResourceType, T> resourceAmounts = new();
-        private readonly Dictionary<ResourceType, string> cachedSaveKeys = new();
+        private readonly Dictionary<int, T> resourceAmounts = new();
+        private readonly Dictionary<int, string> cachedSaveKeys = new();
         public ResourceModel(INumberConverter<T> converter, IEventService eventService, ISaveSystem saveSystem, IReadOnlyInfiniteStatus infiniteStatus)
         {
             this.converter = converter;
@@ -43,14 +43,14 @@ namespace ChieChie.Resource
 
             foreach (var resourceData in config.GetAllResources())
             {
-                cachedSaveKeys[resourceData.key] = SAVE_KEY_PREFIX + resourceData.key.ToString();
+                cachedSaveKeys[resourceData.HashId] = SAVE_KEY_PREFIX + resourceData.ResourceId;
             }
 
             foreach (var resourceData in config.GetAllResources())
             {
-                var saveKey = GetSaveKey(resourceData.key);
+                var saveKey = GetSaveKey(resourceData.HashId, resourceData.ResourceId);
                 saveSystem.RegisterKey(saveKey);
-                resourceAmounts[resourceData.key] = LoadAmount(resourceData.key);
+                resourceAmounts[resourceData.HashId] = LoadAmount(resourceData.HashId, resourceData.ResourceId);
             }
 
             if (!saveSystem.Load<bool>(FIRST_INIT_KEY, false))
@@ -71,148 +71,129 @@ namespace ChieChie.Resource
                     if (initialAmount > 0)
                     {
                         var convertedAmt = converter.FromLong(initialAmount);
-                        resourceAmounts[resourceData.key] = convertedAmt;
-                        SaveAmount(resourceData.key, convertedAmt);
+                        resourceAmounts[resourceData.HashId] = convertedAmt;
+                        SaveAmount(resourceData.HashId, resourceData.ResourceId, convertedAmt);
                     }
                 }
                 saveSystem.Save(FIRST_INIT_KEY, true);
             }
         }
 
-        private string GetSaveKey(ResourceType id)
+        private string GetSaveKey(int hash, string resourceId)
         {
-            if (cachedSaveKeys.TryGetValue(id, out var key))
-            {
-                return key;
-            }
-            string newKey = SAVE_KEY_PREFIX + id.ToString();
-            cachedSaveKeys[id] = newKey;
+            if (cachedSaveKeys.TryGetValue(hash, out var key)) return key;
+            string newKey = SAVE_KEY_PREFIX + resourceId;
+            cachedSaveKeys[hash] = newKey;
             return newKey;
         }
 
-        private T LoadAmount(ResourceType id)
+        private T LoadAmount(int hash, string resourceId)
         {
-            var saveKey = GetSaveKey(id);
-         
+            var saveKey = GetSaveKey(hash, resourceId);
             long savedLong = saveSystem.Load<long>(saveKey, 0L);
-
             return converter.FromLong(savedLong);
         }
-
-        private void SaveAmount(ResourceType id, T amount)
+        private void SaveAmount(int hash, string resourceId, T amount)
         {
-            var saveKey = GetSaveKey(id);
-
+            var saveKey = GetSaveKey(hash, resourceId);
             long longAmount = converter.ToLong(amount);
             saveSystem.Save<long>(saveKey, longAmount);
         }
 
-        public T GetAmount(ResourceType id)
+        public T GetAmount(string resourceId)
         {
-            return resourceAmounts.TryGetValue(id, out var amount) ? amount : converter.Zero;
+            int hash = string.IsNullOrEmpty(resourceId) ? 0 : Animator.StringToHash(resourceId);
+            return resourceAmounts.TryGetValue(hash, out var amount) ? amount : converter.Zero;
         }
 
-        public void AddResource(ResourceType id, T amount, bool delayUpdate = false)
+        public void AddResource(string resourceId, T amount, bool delayUpdate = false)
         {
             if (converter.IsLessThan(amount, converter.Zero)) return;
 
-            var currentAmount = GetAmount(id);
+            int hash = string.IsNullOrEmpty(resourceId) ? 0 : Animator.StringToHash(resourceId);
+            var currentAmount = resourceAmounts.TryGetValue(hash, out var amt) ? amt : converter.Zero;
             var newAmount = converter.Add(currentAmount, amount);
 
-            var maxStack = GetMaxStack(id);
+            var maxStack = GetMaxStack(hash);
             if (maxStack > 0)
             {
                 long longNewAmount = converter.ToLong(newAmount);
                 if (longNewAmount > maxStack)
                 {
                     newAmount = converter.FromLong(maxStack);
-                    eventService.Publish(ResourceEventType.ResourceMaxStackReached, this, id);
+                    eventService.Publish(ResourceEventType.ResourceMaxStackReached, this, hash);
                 }
             }
 
-            resourceAmounts[id] = newAmount;
-            SaveAmount(id, newAmount);
+            resourceAmounts[hash] = newAmount;
+            SaveAmount(hash, resourceId, newAmount);
 
-            var changeData = new ResourceChangeData<T>(id, currentAmount, newAmount, delayUpdate);
+            var changeData = new ResourceChangeData<T>(hash, currentAmount, newAmount, delayUpdate);
             eventService.Publish(ResourceEventType.ResourceChanged, this, changeData);
             eventService.Publish(ResourceEventType.ResourceAdded, this, changeData);
         }
 
-        public bool SpendResource(ResourceType id, T amount)
+        public bool SpendResource(string resourceId, T amount)
         {
             if (converter.IsLessThan(amount, converter.Zero)) return false;
 
-            if (_infiniteStatus != null && _infiniteStatus.IsCurrentlyInfinite(id))
+            int hash = string.IsNullOrEmpty(resourceId) ? 0 : Animator.StringToHash(resourceId);
+
+            if (_infiniteStatus != null && _infiniteStatus.IsCurrentlyInfinite(hash))
             {
-                var currentAmt = GetAmount(id);
-                var changeData = new ResourceChangeData<T>(id, currentAmt, currentAmt); 
-        
+                var currentAmt = resourceAmounts.TryGetValue(hash, out var amt) ? amt : converter.Zero;
+                var changeData = new ResourceChangeData<T>(hash, currentAmt, currentAmt); 
                 eventService.Publish(ResourceEventType.ResourceSpent, this, changeData);
                 return true; 
             }
 
-            var currentAmount = GetAmount(id);
+            var currentAmount = resourceAmounts.TryGetValue(hash, out var cAmt) ? cAmt : converter.Zero;
             if (converter.IsLessThan(currentAmount, amount))
             {
-                eventService.Publish(ResourceEventType.ResourceInsufficient, this, id);
+                eventService.Publish(ResourceEventType.ResourceInsufficient, this, hash);
                 return false;
             }
 
             var newAmount = converter.Subtract(currentAmount, amount);
-            resourceAmounts[id] = newAmount;
-            SaveAmount(id, newAmount);
+            resourceAmounts[hash] = newAmount;
+            SaveAmount(hash, resourceId, newAmount);
 
-            var changeDataNormal = new ResourceChangeData<T>(id, currentAmount, newAmount);
+            var changeDataNormal = new ResourceChangeData<T>(hash, currentAmount, newAmount);
             eventService.Publish(ResourceEventType.ResourceChanged, this, changeDataNormal);
             eventService.Publish(ResourceEventType.ResourceSpent, this, changeDataNormal);
-
             return true;
         }
 
-        public ResourceData GetResourceData(ResourceType id)
+        public ResourceData GetResourceData(int hash) => config.GetResourceData(hash);
+        public long GetMaxStack(int hash) => config.GetResourceData(hash)?.MaxStack ?? 0;
+
+        public bool SetMaxStack(int hash, long newMaxStack)
         {
-            return config.GetResourceData(id);
+            var resourceData = config.GetResourceData(hash);
+            if (resourceData == null) return false;
+
+            resourceData.MaxStack = newMaxStack;
+            if (newMaxStack > 0)
+            {
+                var currentAmount = resourceAmounts.TryGetValue(hash, out var amt) ? amt : converter.Zero;
+                long longCurrentAmount = converter.ToLong(currentAmount);
+                if (longCurrentAmount > newMaxStack)
+                {
+                    var newAmount = converter.FromLong(newMaxStack);
+                    resourceAmounts[hash] = newAmount;
+                    SaveAmount(hash, resourceData.ResourceId, newAmount);
+
+                    var changeData = new ResourceChangeData<T>(hash, currentAmount, newAmount);
+                    eventService.Publish(ResourceEventType.ResourceChanged, this, changeData);
+                }
+            }
+            return true;
         }
 
         public void Cleanup()
         {
             resourceAmounts.Clear();
             cachedSaveKeys.Clear();
-        }
-
-        public bool SetMaxStack(ResourceType id, long newMaxStack)
-        {
-            var resourceData = config.GetResourceData(id);
-            if (resourceData == null)
-            {
-                Debug.LogWarning($"[ResourceModel] Cannot set max stack: Resource {id} not found");
-                return false;
-            }
-
-            resourceData.MaxStack = newMaxStack;
-
-            if (newMaxStack > 0)
-            {
-                var currentAmount = GetAmount(id);
-                long longCurrentAmount = converter.ToLong(currentAmount);
-                if (longCurrentAmount > newMaxStack)
-                {
-                    var newAmount = converter.FromLong(newMaxStack);
-                    resourceAmounts[id] = newAmount;
-                    SaveAmount(id, newAmount);
-
-                    var changeData = new ResourceChangeData<T>(id, currentAmount, newAmount);
-                    eventService.Publish(ResourceEventType.ResourceChanged, this, changeData);
-                }
-            }
-
-            return true;
-        }
-
-        public long GetMaxStack(ResourceType id)
-        {
-            var resourceData = config.GetResourceData(id);
-            return resourceData?.MaxStack ?? 0;
         }
     }
 }

@@ -5,7 +5,7 @@ namespace ChieChie.Resource
 {
     public interface IReadOnlyInfiniteStatus
     {
-        bool IsCurrentlyInfinite(ResourceType resourceType);
-        TimeSpan GetRemainingInfiniteTime(ResourceType resourceType);
+        bool IsCurrentlyInfinite(int resourceHash);
+        TimeSpan GetRemainingInfiniteTime(int resourceHash);
     }
 }
