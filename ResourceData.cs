@@ -19,7 +19,7 @@ namespace ChieChie.Resource
             {
                 if (!_hashId.HasValue)
                 {
-                    _hashId = string.IsNullOrEmpty(resourceId) ? 0 : resourceId.GetHashCode() ;
+                    _hashId = string.IsNullOrEmpty(resourceId) ? 0 : Animator.StringToHash(resourceId) ;
                 }
                 return _hashId.Value;
             }

@@ -39,7 +39,7 @@ namespace ChieChie.Resource
             _view = view;
             ResourceKey = resourceKey;
             
-            ResourceHash = string.IsNullOrEmpty(resourceKey) ? 0 : resourceKey.GetHashCode();
+            ResourceHash = string.IsNullOrEmpty(resourceKey) ? 0 : Animator.StringToHash(resourceKey);
             _converter = converter;
             _eventService = eventService;
             _infiniteStatus = infiniteStatus;
@@ -75,6 +75,10 @@ namespace ChieChie.Resource
           
                 _currentResourceData = _model.GetResourceData(ResourceHash);
                 Sprite iconToSet = _currentResourceData?.Icon;
+                if (isCurrentlyInfinite && _currentResourceData != null && _currentResourceData.InfinityIcon != null)
+                {
+                    iconToSet = _currentResourceData.InfinityIcon;
+                }
                 
                 _view.SetResourceIcon(iconToSet);
                 _view.SetInfiniteStatus(isCurrentlyInfinite);
