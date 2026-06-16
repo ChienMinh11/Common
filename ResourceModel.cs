@@ -17,10 +17,10 @@ namespace ChieChie.Resource
     {
         private const string SAVE_KEY_PREFIX = "Resource_";
         private const string FIRST_INIT_KEY = "ResourceFirstInit";
-        
+
         private ResourceConfig _config;
         private IResourceService _resourceService;
-        
+
         private readonly INumberConverter<T> _converter;
         private readonly IEventService _eventService;
         private readonly ISaveSystem _saveSystem;
@@ -28,7 +28,9 @@ namespace ChieChie.Resource
 
         private readonly Dictionary<int, T> _resourceAmounts = new();
         private readonly Dictionary<int, string> _cachedSaveKeys = new();
-        public ResourceModel(INumberConverter<T> converter, IEventService eventService, ISaveSystem saveSystem, IReadOnlyInfiniteStatus infiniteStatus)
+
+        public ResourceModel(INumberConverter<T> converter, IEventService eventService, ISaveSystem saveSystem,
+            IReadOnlyInfiniteStatus infiniteStatus)
         {
             this._converter = converter;
             this._eventService = eventService;
@@ -39,45 +41,66 @@ namespace ChieChie.Resource
         public void Initialize(ResourceConfig config)
         {
             _config = config;
-   
-            _saveSystem.RegisterKey(FIRST_INIT_KEY);
 
+            _saveSystem.RegisterKey(FIRST_INIT_KEY);
+         
             foreach (var resourceData in config.GetAllResources())
             {
                 _cachedSaveKeys[resourceData.HashId] = SAVE_KEY_PREFIX + resourceData.ResourceId;
-            }
-
-            foreach (var resourceData in config.GetAllResources())
-            {
                 var saveKey = GetSaveKey(resourceData.HashId, resourceData.ResourceId);
                 _saveSystem.RegisterKey(saveKey);
-                _resourceAmounts[resourceData.HashId] = LoadAmount(resourceData.HashId, resourceData.ResourceId);
             }
 
-            if (!_saveSystem.Load<bool>(FIRST_INIT_KEY, false))
+            bool isFirstInit = !_saveSystem.Load<bool>(FIRST_INIT_KEY, false);
+
+            if (isFirstInit)
             {
+                // UnityEngine.Debug.Log(
+                //     "[ResourceModel] Khởi tạo lần đầu! Nạp cấu hình mặc định (MaxStack / DefaultAmount) từ Config.");
+
                 foreach (var resourceData in config.GetAllResources())
-                {long initialAmount = 0;
-                   
+                {
+                    long initialAmount = 0;
+
                     if (resourceData.HasRegen)
                     {
                         initialAmount = resourceData.MaxStack;
                     }
-                    
                     else if (resourceData.DefaultAmount > 0)
                     {
                         initialAmount = resourceData.DefaultAmount;
                     }
 
-                    if (initialAmount > 0)
-                    {
-                        var convertedAmt = _converter.FromLong(initialAmount);
-                        _resourceAmounts[resourceData.HashId] = convertedAmt;
-                        SaveAmount(resourceData.HashId, resourceData.ResourceId, convertedAmt);
-                    }
+                    var convertedAmt = _converter.FromLong(initialAmount);
+                    _resourceAmounts[resourceData.HashId] = convertedAmt;
+
+                    SaveAmount(resourceData.HashId, resourceData.ResourceId, convertedAmt);
                 }
+
                 _saveSystem.Save(FIRST_INIT_KEY, true);
             }
+            else
+            {
+                // UnityEngine.Debug.Log(
+                //     "[ResourceModel] Trạng thái game cũ phát hiện. Tiến hành nạp dữ liệu từ File Save.");
+
+                foreach (var resourceData in config.GetAllResources())
+                {
+                    long fallbackValue = resourceData.HasRegen ? resourceData.MaxStack : resourceData.DefaultAmount;
+
+                    _resourceAmounts[resourceData.HashId] = LoadAmountWithFallback(resourceData.HashId,
+                        resourceData.ResourceId, fallbackValue);
+                }
+            }
+        }
+
+        private T LoadAmountWithFallback(int hash, string resourceId, long fallbackValue)
+        {
+            var saveKey = GetSaveKey(hash, resourceId);
+
+            long savedLong = _saveSystem.Load<long>(saveKey, fallbackValue);
+
+            return _converter.FromLong(savedLong);
         }
 
         private string GetSaveKey(int hash, string resourceId)
@@ -94,6 +117,7 @@ namespace ChieChie.Resource
             long savedLong = _saveSystem.Load<long>(saveKey, 0L);
             return _converter.FromLong(savedLong);
         }
+
         private void SaveAmount(int hash, string resourceId, T amount)
         {
             var saveKey = GetSaveKey(hash, resourceId);
@@ -143,9 +167,9 @@ namespace ChieChie.Resource
             if (_infiniteStatus != null && _infiniteStatus.IsCurrentlyInfinite(hash))
             {
                 var currentAmt = _resourceAmounts.TryGetValue(hash, out var amt) ? amt : _converter.Zero;
-                var changeData = new ResourceChangeData<T>(hash, currentAmt, currentAmt); 
+                var changeData = new ResourceChangeData<T>(hash, currentAmt, currentAmt);
                 _eventService.Publish(ResourceEventType.ResourceSpent, this, changeData);
-                return true; 
+                return true;
             }
 
             var currentAmount = _resourceAmounts.TryGetValue(hash, out var cAmt) ? cAmt : _converter.Zero;
@@ -188,6 +212,7 @@ namespace ChieChie.Resource
                     _eventService.Publish(ResourceEventType.ResourceChanged, this, changeData);
                 }
             }
+
             return true;
         }
 

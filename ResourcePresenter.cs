@@ -83,7 +83,8 @@ namespace ChieChie.Resource
 
                 if (!isCurrentlyInfinite)
                 {
-                    long displayAmount = _converter.ToLong(_model.GetAmount(ResourceKey));
+                    string exactKey = _currentResourceData != null ? _currentResourceData.ResourceId : ResourceKey;
+                    long displayAmount = _converter.ToLong(_model.GetAmount(exactKey));
                     _view.SetResourceAmount(displayAmount);
                 }
 
@@ -164,7 +165,7 @@ namespace ChieChie.Resource
             if (_currentResourceData == null) return;
 
             _updateQueue.Clear();
-            long displayAmount = _converter.ToLong(_model.GetAmount(ResourceKey));
+            long displayAmount = _converter.ToLong(_model.GetAmount(_currentResourceData.ResourceId));
             _view.SetResourceAmountWithoutAnimation(displayAmount);
             bool isCurrentlyInfinite = _infiniteStatus.IsCurrentlyInfinite(ResourceHash);
             Sprite iconToSet = SetIcon(isCurrentlyInfinite);
@@ -179,7 +180,7 @@ namespace ChieChie.Resource
             bool isCurrentlyInfinite = _infiniteStatus.IsCurrentlyInfinite(ResourceHash);
             Sprite iconToSet = SetIcon(isCurrentlyInfinite);
             _view.SetResourceIcon(iconToSet);
-            long displayAmount = _converter.ToLong(_model.GetAmount(ResourceKey));
+            long displayAmount = _converter.ToLong(_model.GetAmount(_currentResourceData.ResourceId));
             _view.SetResourceAmount(displayAmount);
             _view.SetResourceName(_currentResourceData.DisplayName);
         }
