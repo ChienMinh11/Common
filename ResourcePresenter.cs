@@ -38,18 +38,15 @@ namespace ChieChie.Resource
             _model = model;
             _view = view;
             ResourceKey = resourceKey;
-            
             ResourceHash = string.IsNullOrEmpty(resourceKey) ? 0 : Animator.StringToHash(resourceKey);
             _converter = converter;
             _eventService = eventService;
             _infiniteStatus = infiniteStatus;
             this._updateQueue = new ResourceUpdateQueue();
-
+            _currentResourceData = _model.GetResourceData(ResourceHash);
             SubscribeToEvents();
             UpdateView();
-
             _countdownCts = new CancellationTokenSource();
-
             CancellationToken linkedToken = _countdownCts.Token;
             if (view is MonoBehaviour monoView)
             {
@@ -72,8 +69,7 @@ namespace ChieChie.Resource
                 }
 
                 bool isCurrentlyInfinite = _infiniteStatus.IsCurrentlyInfinite(ResourceHash);
-          
-                _currentResourceData = _model.GetResourceData(ResourceHash);
+              
                 Sprite iconToSet = _currentResourceData?.Icon;
                 if (isCurrentlyInfinite && _currentResourceData != null && _currentResourceData.InfinityIcon != null)
                 {
@@ -139,7 +135,9 @@ namespace ChieChie.Resource
                 if (data != null)
                 {
                     _view.SetResourceAmount(update.Amount);
-                    _view.SetResourceIcon(data.Icon);
+                    bool isCurrentlyInfinite = _infiniteStatus.IsCurrentlyInfinite(ResourceHash);
+                    Sprite iconToSet = (isCurrentlyInfinite && data.InfinityIcon != null) ? data.InfinityIcon : data.Icon;
+                    _view.SetResourceIcon(iconToSet);
                     _view.SetResourceName(data.DisplayName);
 
                     if (data.MaxStack > 0 && update.Amount >= data.MaxStack)
@@ -158,8 +156,9 @@ namespace ChieChie.Resource
             _updateQueue.Clear();
             long displayAmount = _converter.ToLong(_model.GetAmount(ResourceKey));
             _view.SetResourceAmountWithoutAnimation(displayAmount);
-
-            _view.SetResourceIcon(_currentResourceData.Icon);
+            bool isCurrentlyInfinite = _infiniteStatus.IsCurrentlyInfinite(ResourceHash);
+    Sprite iconToSet = (isCurrentlyInfinite && _currentResourceData.InfinityIcon != null) ? _currentResourceData.InfinityIcon : _currentResourceData.Icon;
+    _view.SetResourceIcon(iconToSet);
             _view.SetResourceName(_currentResourceData.DisplayName);
         }
 
@@ -167,8 +166,9 @@ namespace ChieChie.Resource
         {
             _currentResourceData = _model.GetResourceData(ResourceHash);
             if (_currentResourceData == null) return;
-
-            _view.SetResourceIcon(_currentResourceData.Icon);
+            bool isCurrentlyInfinite = _infiniteStatus.IsCurrentlyInfinite(ResourceHash);
+            Sprite iconToSet = (isCurrentlyInfinite && _currentResourceData.InfinityIcon != null) ? _currentResourceData.InfinityIcon : _currentResourceData.Icon;
+            _view.SetResourceIcon(iconToSet);
             long displayAmount = _converter.ToLong(_model.GetAmount(ResourceKey));
             _view.SetResourceAmount(displayAmount);
             _view.SetResourceName(_currentResourceData.DisplayName);

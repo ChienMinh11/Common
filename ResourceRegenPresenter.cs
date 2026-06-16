@@ -3,6 +3,7 @@ using System.Threading;
 using ChieChie.Core;
 using Cysharp.Threading.Tasks;
 using R3;
+using UnityEngine;
 
 namespace ChieChie.Resource
 {
@@ -27,7 +28,7 @@ namespace ChieChie.Resource
         {
             _view = view;
             _resourceKey = resourceKey;
-            _resourceHash = string.IsNullOrEmpty(resourceKey) ? 0 : resourceKey.GetHashCode();
+            _resourceHash = string.IsNullOrEmpty(resourceKey) ? 0 : Animator.StringToHash(resourceKey);
             _resourceService = resourceService;
             _eventService = eventService;
         }

@@ -10,7 +10,7 @@ namespace ChieChie.Resource
     {
         [Header("Identity Reference")]
         [Tooltip("Kéo thả ScriptableObject ở tầng Game (có implement IResourceIdentitySource) vào đây")]
-        [SerializeField] private UnityEngine.Object identitySource; // Unity sẽ hiển thị ô này lên Editor
+        [SerializeField] private UnityEngine.Object identitySource; 
      
         private IResourceIdentitySource Identity => identitySource as IResourceIdentitySource;
         public string ResourceId => Identity.ResourceId;
