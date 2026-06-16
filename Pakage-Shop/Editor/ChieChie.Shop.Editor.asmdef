@@ -1,0 +1,19 @@
+{
+    "name": "ChieChie.Shop.Editor",
+    "rootNamespace": "ChieChie.Shop.Editor",
+    "references": [
+        "GUID:77693d9e498321a49872695c760ff802",
+        "GUID:3f6ebe4ca36ca7e4a9f70e7e2f31ed93"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

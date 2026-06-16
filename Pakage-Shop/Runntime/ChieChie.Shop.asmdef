@@ -1,0 +1,19 @@
+{
+    "name": "ChieChie.Shop",
+    "rootNamespace": "ChieChie.Shop",
+    "references": [
+        "GUID:77693d9e498321a49872695c760ff802",
+        "GUID:f51ebe6a0ceec4240a699833d6309b23",
+        "GUID:b0214a6008ed146ff8f122a6a9c2f6cc",
+        ""
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
