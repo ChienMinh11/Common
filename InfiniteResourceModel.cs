@@ -20,12 +20,12 @@ namespace ChieChie.Resource
             _saveSystem = saveSystem;
             _eventService = eventService;
         }
-
-        // SỬA: Nhận ResourceConfig để khởi tạo thay vì duyệt Enum.GetValues cũ
+     
         public void Initialize(ResourceConfig config)
         {
             _config = config;
-            if (_config == null) return;
+
+            if (_config == null)  return;
 
             foreach (var resourceData in _config.GetAllResources())
             {

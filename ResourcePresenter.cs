@@ -39,7 +39,7 @@ namespace ChieChie.Resource
             _view = view;
             ResourceKey = resourceKey;
             
-            ResourceHash = string.IsNullOrEmpty(resourceKey) ? 0 : Animator.StringToHash(resourceKey);
+            ResourceHash = string.IsNullOrEmpty(resourceKey) ? 0 : resourceKey.GetHashCode();
             _converter = converter;
             _eventService = eventService;
             _infiniteStatus = infiniteStatus;

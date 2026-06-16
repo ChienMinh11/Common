@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using ChieChie.Core;
 using Cysharp.Threading.Tasks;
+using UnityEngine;
 
 namespace ChieChie.Resource
 {
@@ -16,7 +17,6 @@ namespace ChieChie.Resource
         private CancellationTokenSource _cts;
         private ResourceConfig _resourceConfig;
 
-        // SỬA: Chuyển đổi Key của Dictionary từ ResourceType sang int (Hash)
         private readonly Dictionary<int, bool> _activeStatuses = new();
         private readonly Dictionary<int, DateTime> _nextRegenTimes = new();
 
@@ -26,11 +26,10 @@ namespace ChieChie.Resource
             _saveSystem = saveSystem;
             _resourceConfig = _resourceService.GetConfig();
             
-            if (_resourceConfig == null) return;
+            if (_resourceConfig == null)return;
 
             foreach (var setting in _resourceConfig.GetAllRegenSettings())
             {
-                // SỬA: Lấy .Hash và .ResourceKey từ ResourceData mới
                 int hash = setting.HashId;
                 string resKey = setting.ResourceId;
                 

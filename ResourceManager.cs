@@ -17,7 +17,6 @@ namespace ChieChie.Resource
         private InfiniteResourceModel _infiniteModel;
         private readonly IEventService _eventService;
         private readonly ISaveSystem _saveSystem;
-        // XÓA: IIconProvider không cần thiết nữa do Sprite nằm ở ResourceData
 
         private IDisposable _eventSubscription;
         private readonly List<IResourcePresenter> _activePresenters = new();
