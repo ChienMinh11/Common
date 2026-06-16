@@ -140,7 +140,7 @@ namespace ChieChie.Resource
                 {
                     _view.SetResourceAmount(update.Amount);
                     _view.SetResourceIcon(data.Icon);
-                    _view.SetResourceName(data.displayName);
+                    _view.SetResourceName(data.DisplayName);
 
                     if (data.MaxStack > 0 && update.Amount >= data.MaxStack)
                     {
@@ -160,7 +160,7 @@ namespace ChieChie.Resource
             _view.SetResourceAmountWithoutAnimation(displayAmount);
 
             _view.SetResourceIcon(_currentResourceData.Icon);
-            _view.SetResourceName(_currentResourceData.displayName);
+            _view.SetResourceName(_currentResourceData.DisplayName);
         }
 
         private void UpdateView()
@@ -171,7 +171,7 @@ namespace ChieChie.Resource
             _view.SetResourceIcon(_currentResourceData.Icon);
             long displayAmount = _converter.ToLong(_model.GetAmount(ResourceKey));
             _view.SetResourceAmount(displayAmount);
-            _view.SetResourceName(_currentResourceData.displayName);
+            _view.SetResourceName(_currentResourceData.DisplayName);
         }
 
         public void Cleanup()

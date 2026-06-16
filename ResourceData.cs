@@ -6,10 +6,14 @@ using UnityEngine.Serialization;
 namespace ChieChie.Resource
 {
     [Serializable]
-    public class ResourceData 
+    public class ResourceData
     {
-        [SerializeField] private string resourceId;
-        public string ResourceId => resourceId;
+        [Header("Identity Reference")]
+        [Tooltip("Kéo thả ScriptableObject ở tầng Game (có implement IResourceIdentitySource) vào đây")]
+        [SerializeField] private UnityEngine.Object identitySource; // Unity sẽ hiển thị ô này lên Editor
+     
+        private IResourceIdentitySource Identity => identitySource as IResourceIdentitySource;
+        public string ResourceId => Identity.ResourceId;
         
         private int? _hashId;
      
@@ -19,19 +23,15 @@ namespace ChieChie.Resource
             {
                 if (!_hashId.HasValue)
                 {
-                    _hashId = string.IsNullOrEmpty(resourceId) ? 0 : Animator.StringToHash(resourceId) ;
+                    _hashId = string.IsNullOrEmpty(Identity.ResourceId) ? 0 : Animator.StringToHash(Identity.ResourceId) ;
                 }
                 return _hashId.Value;
             }
         }
-        
-        public string displayName;
-        
-        [SerializeField] private Sprite icon;
-        public Sprite Icon => icon;
-        
-        [SerializeField] private Sprite infinityIcon;
-        public Sprite InfinityIcon => infinityIcon;
+        public string DisplayName => Identity.DisplayName;
+       
+        public Sprite Icon => Identity.Icon;
+        public Sprite InfinityIcon =>Identity.InfinityIcon;
         
         [SerializeField] private long maxStack;
         [SerializeField] private long defaultAmount = 0;
@@ -41,6 +41,7 @@ namespace ChieChie.Resource
         [SerializeField] private long regenAmount = 1;        
         [SerializeField] private float intervalSeconds = 1800f;   
         [SerializeField] private bool isEnabledByDefault = true;
+
         
 #if UNITY_EDITOR
         private long runtimeMaxStack;
