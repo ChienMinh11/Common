@@ -20,6 +20,7 @@ namespace ChieChie.Resource
 
         private IDisposable _eventSubscription;
         private readonly List<IResourcePresenter> _activePresenters = new();
+        private readonly Dictionary<IResourceView, ResourceRegenPresenter> _activeRegenPresenters = new();
         public bool IsInitialized { get; private set; }
 
         public ResourceManager(ResourceConfig resourceConfig, IEventService eventService, ISaveSystem saveSystem)
@@ -45,20 +46,62 @@ namespace ChieChie.Resource
 
         public IResourcePresenter RegisterView(string resourceKey, IResourceView view)
         {
-            if (!IsInitialized) return null;
+            if (!IsInitialized)
+            {
+                Debug.LogWarning($"[{nameof(ResourceManager)}] Đang đăng ký View khi chưa Init xong Key: {resourceKey}");
+                return null;
+            }
 
-            var presenter = new ResourcePresenter<long>(_longModel, view, resourceKey, new LongConverter(), _eventService, this);
-            if (presenter != null) _activePresenters.Add(presenter);
+            // Lấy hash của tài nguyên (Sửa lỗi 1)
+            int resourceHash = string.IsNullOrEmpty(resourceKey) ? 0 : Animator.StringToHash(resourceKey);
+
+            // Khởi tạo Presenter với thứ tự tham số chính xác (Sửa lỗi 2)
+            // Hãy điều chỉnh thứ tự này trùng khớp hoàn toàn với Constructor trong ResourcePresenter.cs của bạn
+            var presenter = new ResourcePresenter<long>(
+                _longModel,
+                view,
+                resourceKey,
+                new LongConverter(),
+                _eventService,
+                this
+            );
+
+            if (presenter != null)
+            {
+                _activePresenters.Add(presenter);
+              
+                if (view is IResourceRegenView regenView)
+                {
+                    var regenPresenter = new ResourceRegenPresenter(
+                        regenView,
+                        resourceKey,
+                        this,       
+                        _eventService
+                    );
+            
+                    regenPresenter.Initialize(); 
+                    _activeRegenPresenters[view] = regenPresenter; 
+                }
+       
+            }
+
             return presenter;
         }
 
         public void UnregisterPresenter(IResourcePresenter presenter)
         {
             if (presenter == null) return;
-            if (_activePresenters.Contains(presenter))
+    
+            _activePresenters.Remove(presenter);
+    
+            // Ép kiểu để lấy View ra giải phóng Regen (Sửa lỗi 4, 5, 6 bằng cách thêm property View vào ResourcePresenter)
+            if (presenter is ResourcePresenter<long> longPresenter && longPresenter.View != null)
             {
-                presenter.Cleanup();
-                _activePresenters.Remove(presenter);
+                if (_activeRegenPresenters.TryGetValue(longPresenter.View, out var regenPresenter))
+                {
+                    regenPresenter.Dispose();
+                    _activeRegenPresenters.Remove(longPresenter.View);
+                }
             }
         }
 

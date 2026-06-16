@@ -20,6 +20,7 @@ namespace ChieChie.Resource
 
         private readonly ResourceUpdateQueue _updateQueue;
         private ResourceData _currentResourceData;
+        public IResourceView View => _view;
 
         private readonly CancellationTokenSource _countdownCts;
 
@@ -60,6 +61,8 @@ namespace ChieChie.Resource
 
         private async UniTaskVoid StartInfiniteTimerAsync(CancellationToken token)
         {
+            if (_view == null) return;
+            _currentResourceData = _model.GetResourceData(ResourceHash);
             while (!token.IsCancellationRequested)
             {
                 if (_view == null || (_view is MonoBehaviour monoView && monoView == null))
@@ -127,7 +130,7 @@ namespace ChieChie.Resource
 
                 if (!_infiniteStatus.IsCurrentlyInfinite(ResourceHash))
                 {
-                    _view.SetResourceAmount(newDisplay);
+                    _view.SetResourceAmountWithoutAnimation(newDisplay);
                 }
             }
         }
@@ -153,6 +156,7 @@ namespace ChieChie.Resource
                 }
             }
         }
+        
 
         public void ForceUpdateView()
         {
@@ -179,6 +183,7 @@ namespace ChieChie.Resource
             _view.SetResourceAmount(displayAmount);
             _view.SetResourceName(_currentResourceData.DisplayName);
         }
+      
 
         public void Cleanup()
         {
