@@ -16,29 +16,29 @@ namespace ChieChie.Resource
         private ResourceModel<long> _longModel;
         private InfiniteResourceModel _infiniteModel;
         private readonly IEventService _eventService;
-        private readonly ISaveSystem _saveSystem;
+        private readonly IResourceSaveAdapter _saveAdapter;
 
         private IDisposable _eventSubscription;
         private readonly List<IResourcePresenter> _activePresenters = new();
         private readonly Dictionary<IResourceView, ResourceRegenPresenter> _activeRegenPresenters = new();
         public bool IsInitialized { get; private set; }
 
-        public ResourceManager(ResourceConfig resourceConfig, IEventService eventService, ISaveSystem saveSystem)
+        public ResourceManager(ResourceConfig resourceConfig, IEventService eventService, IResourceSaveAdapter saveAdapter)
         {
             _resourceConfig = resourceConfig;
             _eventService = eventService;
-            _saveSystem = saveSystem;
+            _saveAdapter = saveAdapter;
         }
 
         public UniTask<bool> InitializeAsync(CancellationToken cancellationToken)
         {
-            _longModel = new ResourceModel<long>(new LongConverter(), _eventService, _saveSystem, this);
+            _longModel = new ResourceModel<long>(new LongConverter(), _eventService, _saveAdapter, this);
             _longModel?.Initialize(_resourceConfig);
-            _infiniteModel = new InfiniteResourceModel(_saveSystem, _eventService);
+            _infiniteModel = new InfiniteResourceModel(_saveAdapter, _eventService);
             _infiniteModel.Initialize(_resourceConfig);
 
             _resourceRegenController = new ResourceRegenController();
-            _resourceRegenController.Initialize(this, _saveSystem);
+            _resourceRegenController.Initialize(this, _saveAdapter);
             IsInitialized = true;
             return UniTask.FromResult(true);
         }

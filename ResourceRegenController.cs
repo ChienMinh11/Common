@@ -13,46 +13,31 @@ namespace ChieChie.Resource
         private const string REGEN_NEXT_TIME_KEY_PREFIX = "Resource_Regen_NextTime_";
 
         private IResourceService _resourceService;
-        private ISaveSystem _saveSystem;
+        private IResourceSaveAdapter _saveAdapter;
         private CancellationTokenSource _cts;
         private ResourceConfig _resourceConfig;
 
         private readonly Dictionary<int, bool> _activeStatuses = new();
         private readonly Dictionary<int, DateTime> _nextRegenTimes = new();
 
-        public void Initialize(IResourceService resourceService, ISaveSystem saveSystem)
+        public void Initialize(IResourceService resourceService, IResourceSaveAdapter saveAdapter)
         {
             _resourceService = resourceService;
-            _saveSystem = saveSystem;
+            _saveAdapter = saveAdapter;
             _resourceConfig = _resourceService.GetConfig();
-            
-            if (_resourceConfig == null)return;
+    
+            if (_resourceConfig == null) return;
 
             foreach (var setting in _resourceConfig.GetAllRegenSettings())
             {
                 int hash = setting.HashId;
-                string resKey = setting.ResourceId;
-                
-                string statusKey = REGEN_STATUS_KEY_PREFIX + resKey;
-                _saveSystem.RegisterKey(statusKey);
-                
-                bool isEnabled = _saveSystem.Load(statusKey, setting.IsEnabledByDefault);
+        
+                bool isEnabled = _saveAdapter.LoadRegenStatus(setting, setting.IsEnabledByDefault);
                 _activeStatuses[hash] = isEnabled;
-                
-                string timeKey = REGEN_NEXT_TIME_KEY_PREFIX + resKey;
-                _saveSystem.RegisterKey(timeKey);
-                
-                long savedTicks = _saveSystem.Load<long>(timeKey, 0L);
-                if (savedTicks > 0)
-                {
-                    _nextRegenTimes[hash] = new DateTime(savedTicks, DateTimeKind.Utc);
-                }
-                else
-                {
-                    _nextRegenTimes[hash] = DateTime.UtcNow.AddSeconds(setting.IntervalSeconds);
-                }
+        
+                _nextRegenTimes[hash] = _saveAdapter.LoadNextRegenTime(setting, DateTime.UtcNow.AddSeconds(setting.IntervalSeconds));
             }
-          
+  
             ProcessOfflineRegen();
             
             _cts?.Cancel();
@@ -84,7 +69,7 @@ namespace ChieChie.Resource
                         {
                             _resourceService.AddResource(resKey, setting.RegenAmount);
                             _nextRegenTimes[hash] = _nextRegenTimes[hash].AddSeconds(setting.IntervalSeconds);
-                            _saveSystem.Save(REGEN_NEXT_TIME_KEY_PREFIX + resKey, _nextRegenTimes[hash].Ticks);
+                            _saveAdapter.SaveNextRegenTime(setting, _nextRegenTimes[hash]);
                         }
                     }
                 }
@@ -115,7 +100,7 @@ namespace ChieChie.Resource
                         long totalRegenAmount = extraCycles * setting.RegenAmount;
                         _resourceService.AddResource(resKey, totalRegenAmount);
                         _nextRegenTimes[hash] = nextTime.AddSeconds(extraCycles * setting.IntervalSeconds);
-                        _saveSystem.Save(REGEN_NEXT_TIME_KEY_PREFIX + resKey, _nextRegenTimes[hash].Ticks);
+                        _saveAdapter.SaveNextRegenTime(setting, _nextRegenTimes[hash]);
                     }
                 }
             }
@@ -133,12 +118,12 @@ namespace ChieChie.Resource
                 var setting = _resourceConfig.GetResourceData(hash);
                 if (setting != null)
                 {
-                    _saveSystem.Save(REGEN_STATUS_KEY_PREFIX + setting.ResourceId, isEnabled);
+                    _saveAdapter.SaveRegenStatus(setting, isEnabled);
                     
                     if (isEnabled && setting.HasRegen)
                     {
                         _nextRegenTimes[hash] = DateTime.UtcNow.AddSeconds(setting.IntervalSeconds);
-                        _saveSystem.Save(REGEN_NEXT_TIME_KEY_PREFIX + setting.ResourceId, _nextRegenTimes[hash].Ticks);
+                        _saveAdapter.SaveNextRegenTime(setting, _nextRegenTimes[hash]);
                     }
                 }
             }
@@ -165,7 +150,7 @@ namespace ChieChie.Resource
 
         public void SaveAllRegenTimes()
         {
-            if (_resourceConfig == null || _saveSystem == null) return;
+            if (_resourceConfig == null || _saveAdapter == null) return;
 
             foreach (var setting in _resourceConfig.GetAllRegenSettings())
             {
@@ -175,7 +160,7 @@ namespace ChieChie.Resource
                 {
                     if (_nextRegenTimes.TryGetValue(hash, out DateTime nextTime))
                     {
-                        _saveSystem.Save(REGEN_NEXT_TIME_KEY_PREFIX + setting.ResourceId, nextTime.Ticks);
+                        _saveAdapter.SaveNextRegenTime(setting, _nextRegenTimes[hash]);
                     }
                 }
             }

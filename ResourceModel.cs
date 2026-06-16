@@ -23,18 +23,18 @@ namespace ChieChie.Resource
 
         private readonly INumberConverter<T> _converter;
         private readonly IEventService _eventService;
-        private readonly ISaveSystem _saveSystem;
+        private readonly IResourceSaveAdapter _saveAdapter;
         private readonly IReadOnlyInfiniteStatus _infiniteStatus;
 
         private readonly Dictionary<int, T> _resourceAmounts = new();
         private readonly Dictionary<int, string> _cachedSaveKeys = new();
 
-        public ResourceModel(INumberConverter<T> converter, IEventService eventService, ISaveSystem saveSystem,
+        public ResourceModel(INumberConverter<T> converter, IEventService eventService, IResourceSaveAdapter saveAdapter,
             IReadOnlyInfiniteStatus infiniteStatus)
         {
             this._converter = converter;
             this._eventService = eventService;
-            this._saveSystem = saveSystem;
+            this._saveAdapter = saveAdapter;
             this._infiniteStatus = infiniteStatus;
         }
 
@@ -42,87 +42,42 @@ namespace ChieChie.Resource
         {
             _config = config;
 
-            _saveSystem.RegisterKey(FIRST_INIT_KEY);
-         
             foreach (var resourceData in config.GetAllResources())
             {
-                _cachedSaveKeys[resourceData.HashId] = SAVE_KEY_PREFIX + resourceData.ResourceId;
-                var saveKey = GetSaveKey(resourceData.HashId, resourceData.ResourceId);
-                _saveSystem.RegisterKey(saveKey);
+                _saveAdapter.RegisterResource(resourceData); // Đăng ký qua adapter
             }
 
-            bool isFirstInit = !_saveSystem.Load<bool>(FIRST_INIT_KEY, false);
-
-            if (isFirstInit)
+            if (_saveAdapter.IsFirstInit())
             {
-                // UnityEngine.Debug.Log(
-                //     "[ResourceModel] Khởi tạo lần đầu! Nạp cấu hình mặc định (MaxStack / DefaultAmount) từ Config.");
-
                 foreach (var resourceData in config.GetAllResources())
                 {
-                    long initialAmount = 0;
-
-                    if (resourceData.HasRegen)
-                    {
-                        initialAmount = resourceData.MaxStack;
-                    }
-                    else if (resourceData.DefaultAmount > 0)
-                    {
-                        initialAmount = resourceData.DefaultAmount;
-                    }
+                    long initialAmount = resourceData.HasRegen ? resourceData.MaxStack : resourceData.DefaultAmount;
 
                     var convertedAmt = _converter.FromLong(initialAmount);
                     _resourceAmounts[resourceData.HashId] = convertedAmt;
 
-                    SaveAmount(resourceData.HashId, resourceData.ResourceId, convertedAmt);
+                    _saveAdapter.SaveAmount(resourceData, initialAmount);
                 }
-
-                _saveSystem.Save(FIRST_INIT_KEY, true);
+                _saveAdapter.SetFirstInitComplete();
             }
             else
             {
-                // UnityEngine.Debug.Log(
-                //     "[ResourceModel] Trạng thái game cũ phát hiện. Tiến hành nạp dữ liệu từ File Save.");
-
                 foreach (var resourceData in config.GetAllResources())
                 {
                     long fallbackValue = resourceData.HasRegen ? resourceData.MaxStack : resourceData.DefaultAmount;
-
-                    _resourceAmounts[resourceData.HashId] = LoadAmountWithFallback(resourceData.HashId,
-                        resourceData.ResourceId, fallbackValue);
+                    long savedLong = _saveAdapter.LoadAmount(resourceData, fallbackValue);
+                    
+                    _resourceAmounts[resourceData.HashId] = _converter.FromLong(savedLong);
                 }
             }
         }
+      
+      
 
-        private T LoadAmountWithFallback(int hash, string resourceId, long fallbackValue)
+        private void SaveAmount(ResourceData resourceData, T amount)
         {
-            var saveKey = GetSaveKey(hash, resourceId);
-
-            long savedLong = _saveSystem.Load<long>(saveKey, fallbackValue);
-
-            return _converter.FromLong(savedLong);
-        }
-
-        private string GetSaveKey(int hash, string resourceId)
-        {
-            if (_cachedSaveKeys.TryGetValue(hash, out var key)) return key;
-            string newKey = SAVE_KEY_PREFIX + resourceId;
-            _cachedSaveKeys[hash] = newKey;
-            return newKey;
-        }
-
-        private T LoadAmount(int hash, string resourceId)
-        {
-            var saveKey = GetSaveKey(hash, resourceId);
-            long savedLong = _saveSystem.Load<long>(saveKey, 0L);
-            return _converter.FromLong(savedLong);
-        }
-
-        private void SaveAmount(int hash, string resourceId, T amount)
-        {
-            var saveKey = GetSaveKey(hash, resourceId);
             long longAmount = _converter.ToLong(amount);
-            _saveSystem.Save<long>(saveKey, longAmount);
+            _saveAdapter.SaveAmount(resourceData, longAmount);
         }
 
         public T GetAmount(string resourceId)
@@ -136,6 +91,11 @@ namespace ChieChie.Resource
             if (_converter.IsLessThan(amount, _converter.Zero)) return;
 
             int hash = string.IsNullOrEmpty(resourceId) ? 0 : Animator.StringToHash(resourceId);
+            
+            // Lấy ResourceData từ Config để truyền vào Save Adapter
+            var resourceData = GetResourceData(hash);
+            if (resourceData == null) return;
+
             var currentAmount = _resourceAmounts.TryGetValue(hash, out var amt) ? amt : _converter.Zero;
             var newAmount = _converter.Add(currentAmount, amount);
 
@@ -151,7 +111,9 @@ namespace ChieChie.Resource
             }
 
             _resourceAmounts[hash] = newAmount;
-            SaveAmount(hash, resourceId, newAmount);
+            
+            // SỬA TẠI ĐÂY: Truyền trọn vẹn object resourceData và giá trị mới cho Adapter
+            SaveAmount(resourceData, newAmount);
 
             var changeData = new ResourceChangeData<T>(hash, currentAmount, newAmount, delayUpdate);
             _eventService.Publish(ResourceEventType.ResourceChanged, this, changeData);
@@ -163,6 +125,10 @@ namespace ChieChie.Resource
             if (_converter.IsLessThan(amount, _converter.Zero)) return false;
 
             int hash = string.IsNullOrEmpty(resourceId) ? 0 : Animator.StringToHash(resourceId);
+            
+            // Lấy ResourceData từ Config để truyền vào Save Adapter
+            var resourceData = GetResourceData(hash);
+            if (resourceData == null) return false;
 
             if (_infiniteStatus != null && _infiniteStatus.IsCurrentlyInfinite(hash))
             {
@@ -181,7 +147,9 @@ namespace ChieChie.Resource
 
             var newAmount = _converter.Subtract(currentAmount, amount);
             _resourceAmounts[hash] = newAmount;
-            SaveAmount(hash, resourceId, newAmount);
+            
+            // SỬA TẠI ĐÂY: Truyền trọn vẹn object resourceData và giá trị mới cho Adapter
+            SaveAmount(resourceData, newAmount);
 
             var changeDataNormal = new ResourceChangeData<T>(hash, currentAmount, newAmount);
             _eventService.Publish(ResourceEventType.ResourceChanged, this, changeDataNormal);
@@ -206,7 +174,7 @@ namespace ChieChie.Resource
                 {
                     var newAmount = _converter.FromLong(newMaxStack);
                     _resourceAmounts[hash] = newAmount;
-                    SaveAmount(hash, resourceData.ResourceId, newAmount);
+                    SaveAmount(resourceData, newAmount);
 
                     var changeData = new ResourceChangeData<T>(hash, currentAmount, newAmount);
                     _eventService.Publish(ResourceEventType.ResourceChanged, this, changeData);
