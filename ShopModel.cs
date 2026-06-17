@@ -19,7 +19,7 @@ namespace ChieChie.Shop
         public event Action<ProductID> OnPackResetExternally;
         
         public event Action<ProductID> OnBuySuccessExternal;
-        public event Action<List<ResourceRewardCommand>> OnRequestAddResource;
+        public event Action<List<ShopResourceRewardCommand>> OnRequestAddResource;
 
         public ShopModel(IShopIapBrigde iapBridge, IShopSaveAdapter saveAdapter, ShopConfig shopConfig)
         {
@@ -106,11 +106,11 @@ namespace ChieChie.Shop
 
         private void GrantRewards(List<ShopItemReward> rewards)
         {
-            var resourceCommands = new List<ResourceRewardCommand>();
+            var resourceCommands = new List<ShopResourceRewardCommand>();
 
             foreach (var reward in rewards)
             {
-                resourceCommands.Add(new ResourceRewardCommand
+                resourceCommands.Add(new ShopResourceRewardCommand
                 {
                     ResourceType = (ResourceType)reward.resourceType, 
                     Amount = reward.amount,

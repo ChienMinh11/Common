@@ -14,27 +14,26 @@ namespace ChieChie.Shop
         private ShopModel _shopModel;
         private readonly IShopIapBrigde _iapBridge;
         private readonly IShopSaveAdapter _saveAdapter;
-        private readonly RewardDisplayService _rewardDisplayService;
+       // private readonly RewardDisplayService _rewardDisplayService;
         
         public event Action<ProductID> OnBuySuccess;
-        public event Action<List<ResourceRewardCommand>> OnRequestAddResource;
+        public event Action<List<ShopResourceRewardCommand>> OnRequestAddResource;
         public event Action<ShopNotificationEventData> OnShopRewardsNotificationRequested;
        
         public bool IsInitialized { get; set; }
 
-        public ShopManager(ShopConfig shopConfig, IShopIapBrigde iapBridge, IShopSaveAdapter saveAdapter, 
-           RewardDisplayService rewardDisplayService)
+        public ShopManager(ShopConfig shopConfig, IShopIapBrigde iapBridge, IShopSaveAdapter saveAdapter
+          )
         {
             _config = shopConfig;
             _iapBridge = iapBridge;
             _saveAdapter = saveAdapter; 
-            _rewardDisplayService = rewardDisplayService; 
         }
 
         public UniTask<bool> InitializeAsync(CancellationToken cancellationToken)
         {
             _shopModel = new ShopModel(_iapBridge,_saveAdapter, _config);
-            Presenter = new ShopPresenter(_shopModel,_rewardDisplayService);
+            Presenter = new ShopPresenter(_shopModel);
             
             _shopModel.OnBuySuccessExternal += HandleBuySuccessExternal;
             _shopModel.OnRequestAddResource += HandleRequestAddResourceExternal;
@@ -45,7 +44,7 @@ namespace ChieChie.Shop
         }
 
         private void HandleBuySuccessExternal(ProductID id) => OnBuySuccess?.Invoke(id);
-        private void HandleRequestAddResourceExternal(List<ResourceRewardCommand> cmds) => OnRequestAddResource?.Invoke(cmds);
+        private void HandleRequestAddResourceExternal(List<ShopResourceRewardCommand> cmds) => OnRequestAddResource?.Invoke(cmds);
         private void HandleNotificationRequestedExternal(ShopNotificationEventData data) => OnShopRewardsNotificationRequested?.Invoke(data);
 
         public void Dispose()

@@ -10,7 +10,7 @@ namespace ChieChie.Shop
         void ResetPackTimeLimited(ProductID id);
         
         event Action<ProductID> OnBuySuccess;
-        event Action<List<ResourceRewardCommand>> OnRequestAddResource;
+        event Action<List<ShopResourceRewardCommand>> OnRequestAddResource;
         event Action<ShopNotificationEventData> OnShopRewardsNotificationRequested;
     }
 }

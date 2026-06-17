@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using ChieChie.Core;
-using UnityEngine;
 
 namespace ChieChie.Shop
 {
@@ -126,11 +125,6 @@ namespace ChieChie.Shop
             if (itemData.isOneTimePurchase) return HasOneTimePurchase(productId);
             return false;
         }
-  
-        public void ResetAllPurchases()
-        {
-            ResetOneTimePurchases();
-            ResetAllTimeLimitedPurchases();
-        }
+     
     }
 }

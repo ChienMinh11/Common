@@ -23,10 +23,16 @@ namespace ChieChie.Shop
         public bool isTimeLimited;
     }
     [Serializable]
-    public class ShopItemReward : BaseRewardData
+    public class ShopItemReward
     {
+        public int resourceType; 
+        public long amount;
+        public bool isInfiniteReward;
+        public float infinityDuration;
+
         public Sprite IconReward;
         public Sprite InfinityRewardIcon;
+        
         public bool isInfinite
         {
             get => isInfiniteReward;

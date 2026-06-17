@@ -9,16 +9,13 @@ namespace ChieChie.Shop
     {
         private readonly ShopModel _model;
         private readonly List<IShopView> _activeViews = new List<IShopView>();
-       
-        private readonly RewardDisplayService _rewardDisplayService;
 
         public event Action<ShopNotificationEventData> OnShopRewardsNotificationRequested;
 
-        public ShopPresenter(ShopModel model, RewardDisplayService rewardDisplayService)
+        public ShopPresenter(ShopModel model)
         {
             _model = model;
-            _rewardDisplayService = rewardDisplayService;
-
+            
             _model.OnPurchaseSuccess += HandlePurchaseSuccess;
             _model.OnPurchaseFailed += HandlePurchaseFailed;
             _model.OnPriceUpdated += HandlePriceUpdated;
@@ -121,7 +118,6 @@ namespace ChieChie.Shop
         {
             CleanUpDestroyedViews();
             var eventData = new ShopNotificationEventData(itemData, rewards);
-            // Kích hoạt C# event thay thế EventService
             OnShopRewardsNotificationRequested?.Invoke(eventData);
         }
 
