@@ -1,5 +1,5 @@
+using System;
 using System.Collections.Generic;
-using ChieChie.Core;
 using UnityEngine;
 
 namespace ChieChie.Resource
@@ -15,25 +15,26 @@ namespace ChieChie.Resource
 
     public class ResourceModel<T>
     {
-        private const string SAVE_KEY_PREFIX = "Resource_";
-        private const string FIRST_INIT_KEY = "ResourceFirstInit";
-
         private ResourceConfig _config;
         private IResourceService _resourceService;
 
         private readonly INumberConverter<T> _converter;
-        private readonly IEventService _eventService;
         private readonly IResourceSaveAdapter _saveAdapter;
         private readonly IReadOnlyInfiniteStatus _infiniteStatus;
 
         private readonly Dictionary<int, T> _resourceAmounts = new();
         private readonly Dictionary<int, string> _cachedSaveKeys = new();
 
-        public ResourceModel(INumberConverter<T> converter, IEventService eventService, IResourceSaveAdapter saveAdapter,
+        public event Action<ResourceChangeData<T>> OnResourceChanged;
+        public event Action<ResourceChangeData<T>> OnResourceSpent;
+        public event Action<ResourceChangeData<T>> OnResourceAdded;
+        public event Action<int> OnResourceMaxStackReached;
+        public event Action<int> OnResourceInsufficient;
+
+        public ResourceModel(INumberConverter<T> converter, IResourceSaveAdapter saveAdapter,
             IReadOnlyInfiniteStatus infiniteStatus)
         {
             this._converter = converter;
-            this._eventService = eventService;
             this._saveAdapter = saveAdapter;
             this._infiniteStatus = infiniteStatus;
         }
@@ -44,11 +45,12 @@ namespace ChieChie.Resource
 
             foreach (var resourceData in config.GetAllResources())
             {
-                _saveAdapter.RegisterResource(resourceData); // Đăng ký qua adapter
+                _saveAdapter.RegisterResource(resourceData);
             }
 
             if (_saveAdapter.IsFirstInit())
             {
+                UnityEngine.Debug.Log($"[ResourceModel] khởi tạo lần đầu! Nạp cấu hình mặc định (Max Stack / Defaut Amount) từ Config");
                 foreach (var resourceData in config.GetAllResources())
                 {
                     long initialAmount = resourceData.HasRegen ? resourceData.MaxStack : resourceData.DefaultAmount;
@@ -61,7 +63,9 @@ namespace ChieChie.Resource
                 _saveAdapter.SetFirstInitComplete();
             }
             else
-            {
+            {  
+                
+                Debug.Log($"[ResourceModel] Trạng thái game cũ phát hiện. Tiến hành nạp dữ liệu từ file save");
                 foreach (var resourceData in config.GetAllResources())
                 {
                     long fallbackValue = resourceData.HasRegen ? resourceData.MaxStack : resourceData.DefaultAmount;
@@ -71,8 +75,6 @@ namespace ChieChie.Resource
                 }
             }
         }
-      
-      
 
         private void SaveAmount(ResourceData resourceData, T amount)
         {
@@ -92,7 +94,6 @@ namespace ChieChie.Resource
 
             int hash = string.IsNullOrEmpty(resourceId) ? 0 : Animator.StringToHash(resourceId);
             
-            // Lấy ResourceData từ Config để truyền vào Save Adapter
             var resourceData = GetResourceData(hash);
             if (resourceData == null) return;
 
@@ -106,18 +107,19 @@ namespace ChieChie.Resource
                 if (longNewAmount > maxStack)
                 {
                     newAmount = _converter.FromLong(maxStack);
-                    _eventService.Publish(ResourceEventType.ResourceMaxStackReached, this, hash);
+                    // Invoke Action thay vì Publish
+                    OnResourceMaxStackReached?.Invoke(hash);
                 }
             }
 
             _resourceAmounts[hash] = newAmount;
-            
-            // SỬA TẠI ĐÂY: Truyền trọn vẹn object resourceData và giá trị mới cho Adapter
             SaveAmount(resourceData, newAmount);
 
             var changeData = new ResourceChangeData<T>(hash, currentAmount, newAmount, delayUpdate);
-            _eventService.Publish(ResourceEventType.ResourceChanged, this, changeData);
-            _eventService.Publish(ResourceEventType.ResourceAdded, this, changeData);
+            
+            // Invoke các Action sự kiện tương ứng
+            OnResourceChanged?.Invoke(changeData);
+            OnResourceAdded?.Invoke(changeData);
         }
 
         public bool SpendResource(string resourceId, T amount)
@@ -126,7 +128,6 @@ namespace ChieChie.Resource
 
             int hash = string.IsNullOrEmpty(resourceId) ? 0 : Animator.StringToHash(resourceId);
             
-            // Lấy ResourceData từ Config để truyền vào Save Adapter
             var resourceData = GetResourceData(hash);
             if (resourceData == null) return false;
 
@@ -134,26 +135,24 @@ namespace ChieChie.Resource
             {
                 var currentAmt = _resourceAmounts.TryGetValue(hash, out var amt) ? amt : _converter.Zero;
                 var changeData = new ResourceChangeData<T>(hash, currentAmt, currentAmt);
-                _eventService.Publish(ResourceEventType.ResourceSpent, this, changeData);
+                OnResourceSpent?.Invoke(changeData);
                 return true;
             }
 
             var currentAmount = _resourceAmounts.TryGetValue(hash, out var cAmt) ? cAmt : _converter.Zero;
             if (_converter.IsLessThan(currentAmount, amount))
             {
-                _eventService.Publish(ResourceEventType.ResourceInsufficient, this, hash);
+                OnResourceInsufficient?.Invoke(hash);
                 return false;
             }
 
             var newAmount = _converter.Subtract(currentAmount, amount);
             _resourceAmounts[hash] = newAmount;
-            
-            // SỬA TẠI ĐÂY: Truyền trọn vẹn object resourceData và giá trị mới cho Adapter
             SaveAmount(resourceData, newAmount);
 
             var changeDataNormal = new ResourceChangeData<T>(hash, currentAmount, newAmount);
-            _eventService.Publish(ResourceEventType.ResourceChanged, this, changeDataNormal);
-            _eventService.Publish(ResourceEventType.ResourceSpent, this, changeDataNormal);
+            OnResourceChanged?.Invoke(changeDataNormal);
+            OnResourceSpent?.Invoke(changeDataNormal);
             return true;
         }
 
@@ -177,7 +176,7 @@ namespace ChieChie.Resource
                     SaveAmount(resourceData, newAmount);
 
                     var changeData = new ResourceChangeData<T>(hash, currentAmount, newAmount);
-                    _eventService.Publish(ResourceEventType.ResourceChanged, this, changeData);
+                    OnResourceChanged?.Invoke(changeData);
                 }
             }
 
@@ -188,6 +187,12 @@ namespace ChieChie.Resource
         {
             _resourceAmounts.Clear();
             _cachedSaveKeys.Clear();
+            // Clear sự kiện tránh Memory Leak
+            OnResourceChanged = null;
+            OnResourceSpent = null;
+            OnResourceAdded = null;
+            OnResourceMaxStackReached = null;
+            OnResourceInsufficient = null;
         }
     }
 }

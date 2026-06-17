@@ -1,5 +1,4 @@
 using System;
-using ChieChie.Core;
 
 namespace ChieChie.Resource
 {
@@ -28,5 +27,6 @@ namespace ChieChie.Resource
         bool IsRegenEnabled(string resourceKey);
         DateTime GetNextRegenTime(string resourceKey);
         void SetRegenStatus(string resourceKey, bool isEnabled);
+      
     }
 }

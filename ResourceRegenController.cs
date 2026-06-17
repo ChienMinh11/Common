@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using ChieChie.Core;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 

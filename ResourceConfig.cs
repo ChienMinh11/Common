@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using ChieChie.Core;
 using UnityEngine;
 
 namespace ChieChie.Resource

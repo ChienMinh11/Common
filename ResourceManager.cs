@@ -1,21 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using ChieChie.Core;
 using Cysharp.Threading.Tasks;
-using R3;
-using UnityEngine; // Cần thêm để sử dụng Animator.StringToHash
+using UnityEngine; 
 
 namespace ChieChie.Resource
 {
-    public class ResourceManager : IServiceInitialisable, IResourceService, IReadOnlyInfiniteStatus, IDisposable
+    public class ResourceManager : IResourceService, IReadOnlyInfiniteStatus, IDisposable
     {
         private readonly ResourceConfig _resourceConfig;
         private ResourceRegenController _resourceRegenController;
         
         private ResourceModel<long> _longModel;
         private InfiniteResourceModel _infiniteModel;
-        private readonly IEventService _eventService;
         private readonly IResourceSaveAdapter _saveAdapter;
 
         private IDisposable _eventSubscription;
@@ -23,18 +20,18 @@ namespace ChieChie.Resource
         private readonly Dictionary<IResourceView, ResourceRegenPresenter> _activeRegenPresenters = new();
         public bool IsInitialized { get; private set; }
 
-        public ResourceManager(ResourceConfig resourceConfig, IEventService eventService, IResourceSaveAdapter saveAdapter)
+        public ResourceManager(ResourceConfig resourceConfig, IResourceSaveAdapter saveAdapter)
         {
             _resourceConfig = resourceConfig;
-            _eventService = eventService;
             _saveAdapter = saveAdapter;
         }
 
         public UniTask<bool> InitializeAsync(CancellationToken cancellationToken)
         {
-            _longModel = new ResourceModel<long>(new LongConverter(), _eventService, _saveAdapter, this);
+            _longModel = new ResourceModel<long>(new LongConverter(), _saveAdapter, this);
             _longModel?.Initialize(_resourceConfig);
-            _infiniteModel = new InfiniteResourceModel(_saveAdapter, _eventService);
+    
+            _infiniteModel = new InfiniteResourceModel(_saveAdapter);
             _infiniteModel.Initialize(_resourceConfig);
 
             _resourceRegenController = new ResourceRegenController();
@@ -62,7 +59,6 @@ namespace ChieChie.Resource
                 view,
                 resourceKey,
                 new LongConverter(),
-                _eventService,
                 this
             );
 
@@ -75,8 +71,7 @@ namespace ChieChie.Resource
                     var regenPresenter = new ResourceRegenPresenter(
                         regenView,
                         resourceKey,
-                        this,       
-                        _eventService
+                        this  
                     );
             
                     regenPresenter.Initialize(); 
@@ -160,6 +155,8 @@ namespace ChieChie.Resource
             => IsInitialized ? _infiniteModel.GetRemainingTime(resourceHash) : TimeSpan.Zero;
 
         public ResourceConfig GetConfig() => _resourceConfig;
+        public ResourceModel<long> LongModel => _longModel;
+        public InfiniteResourceModel InfiniteModel => _infiniteModel;
   
         public bool IsRegenEnabled(string resourceKey)
         {

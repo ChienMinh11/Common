@@ -1,8 +1,6 @@
 using System;
 using System.Threading;
-using ChieChie.Core;
 using Cysharp.Threading.Tasks;
-using R3;
 using UnityEngine;
 
 namespace ChieChie.Resource
@@ -14,30 +12,27 @@ namespace ChieChie.Resource
         private readonly string _resourceKey;
         private readonly int _resourceHash;
         
-        private readonly IResourceService _resourceService; 
-        private readonly IEventService _eventService;
-        
+        private readonly ResourceManager _resourceManager; // Thay đổi từ IResourceService sang ResourceManager để lấy Model trực tiếp
         private CancellationTokenSource _cts;
-        private readonly CompositeDisposable _disposableBag = new CompositeDisposable();
 
         public ResourceRegenPresenter(
             IResourceRegenView view, 
             string resourceKey,
-            IResourceService resourceService,
-            IEventService eventService)
+            ResourceManager resourceManager)
         {
             _view = view;
             _resourceKey = resourceKey;
             _resourceHash = string.IsNullOrEmpty(resourceKey) ? 0 : Animator.StringToHash(resourceKey);
-            _resourceService = resourceService;
-            _eventService = eventService;
+            _resourceManager = resourceManager;
         }
 
         public void Initialize()
         {
-            _eventService.Observe<ResourceChangeData<long>, ResourceEventType>(ResourceEventType.ResourceChanged)
-                .Subscribe(OnResourceChanged)
-                .AddTo(_disposableBag); 
+            // Đăng ký trực tiếp vào Action của LongModel
+            if (_resourceManager?.LongModel != null)
+            {
+                _resourceManager.LongModel.OnResourceChanged += OnResourceChanged;
+            }
          
             _cts = new CancellationTokenSource();
             UpdateVisualLoopAsync(_cts.Token).Forget();
@@ -63,24 +58,24 @@ namespace ChieChie.Resource
 
         private void UpdateVisuals()
         {
-            if (_view == null) return;
+            if (_view == null || _resourceManager == null) return;
            
-            if (_resourceService.IsCurrentlyInfinite(_resourceKey))
+            if (_resourceManager.IsCurrentlyInfinite(_resourceKey))
             {
                 _view.SetRegenStatusActive(false);
                 return;
             }
            
-            if (_resourceService.IsAtMaxStack(_resourceKey))
+            if (_resourceManager.IsAtMaxStack(_resourceKey))
             {
                 _view.SetRegenStatusActive(true);
                 _view.SetRegenStatusText("Full");
                 return;
             }
         
-            if (_resourceService.IsRegenEnabled(_resourceKey))
+            if (_resourceManager.IsRegenEnabled(_resourceKey))
             {
-                DateTime nextRegenTime = _resourceService.GetNextRegenTime(_resourceKey);
+                DateTime nextRegenTime = _resourceManager.GetNextRegenTime(_resourceKey);
                 TimeSpan remainingTime = nextRegenTime - DateTime.UtcNow;
                 if (remainingTime < TimeSpan.Zero) remainingTime = TimeSpan.Zero;
                 _view.SetRegenStatusActive(true);
@@ -96,7 +91,12 @@ namespace ChieChie.Resource
         {
             _cts?.Cancel();
             _cts?.Dispose();
-            _disposableBag.Dispose();
+            
+            // Hủy đăng ký Action khi hủy đối tượng
+            if (_resourceManager?.LongModel != null)
+            {
+                _resourceManager.LongModel.OnResourceChanged -= OnResourceChanged;
+            }
         }
     }
 }

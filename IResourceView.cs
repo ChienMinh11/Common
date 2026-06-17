@@ -1,4 +1,3 @@
-using ChieChie.Core;
 using UnityEngine;
 
 namespace ChieChie.Resource

@@ -1,5 +1,3 @@
-using ChieChie.Core;
-
 namespace ChieChie.Resource
 {
     public interface IResourceRegenView : IResourceView

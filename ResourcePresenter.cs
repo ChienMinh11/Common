@@ -1,8 +1,6 @@
 using System;
 using System.Threading;
-using ChieChie.Core;
 using Cysharp.Threading.Tasks;
-using R3;
 using UnityEngine;
 
 namespace ChieChie.Resource
@@ -12,11 +10,7 @@ namespace ChieChie.Resource
         private readonly ResourceModel<T> _model;
         private readonly IResourceView _view;
         private readonly INumberConverter<T> _converter;
-        private readonly IEventService _eventService;
         private readonly IReadOnlyInfiniteStatus _infiniteStatus;
-
-        private IDisposable _resourceChangeSubscription;
-        private IDisposable _resourceInsufficientSubscription;
 
         private readonly ResourceUpdateQueue _updateQueue;
         private ResourceData _currentResourceData;
@@ -28,12 +22,12 @@ namespace ChieChie.Resource
         public int ResourceHash { get; }
         public bool HasPendingUpdates => _updateQueue.HasPendingUpdates;
 
+        // Bỏ IEventService ra khỏi constructor, thay thế bằng việc truyền trực tiếp ResourceManager hoặc lấy model từ manager
         public ResourcePresenter(
             ResourceModel<T> model,
             IResourceView view,
             string resourceKey,
             INumberConverter<T> converter,
-            IEventService eventService,
             IReadOnlyInfiniteStatus infiniteStatus)
         {
             _model = model;
@@ -41,11 +35,12 @@ namespace ChieChie.Resource
             ResourceKey = resourceKey;
             ResourceHash = string.IsNullOrEmpty(resourceKey) ? 0 : Animator.StringToHash(resourceKey);
             _converter = converter;
-            _eventService = eventService;
             _infiniteStatus = infiniteStatus;
             this._updateQueue = new ResourceUpdateQueue();
+            
             SubscribeToEvents();
             UpdateView();
+            
             _countdownCts = new CancellationTokenSource();
             CancellationToken linkedToken = _countdownCts.Token;
             if (view is MonoBehaviour monoView)
@@ -107,13 +102,17 @@ namespace ChieChie.Resource
 
         private void SubscribeToEvents()
         {
-            _resourceChangeSubscription = _eventService.Observe<ResourceChangeData<T>, ResourceEventType>(
-                ResourceEventType.ResourceChanged, _model
-            ).Subscribe(OnResourceChanged);
+            // Sử dụng Action thuần của C# thay thế R3/IEventService
+            _model.OnResourceChanged += OnResourceChanged;
+            _model.OnResourceInsufficient += OnResourceInsufficient;
+        }
 
-            _resourceInsufficientSubscription = _eventService.ObserveEvent(
-                ResourceEventType.ResourceInsufficient, _model
-            ).Subscribe(_ => _view.ShowInsufficientMessage());
+        private void OnResourceInsufficient(int hash)
+        {
+            if (hash == ResourceHash)
+            {
+                _view.ShowInsufficientMessage();
+            }
         }
 
         private void OnResourceChanged(ResourceChangeData<T> changeData)
@@ -188,8 +187,13 @@ namespace ChieChie.Resource
 
         public void Cleanup()
         {
-            _resourceChangeSubscription?.Dispose();
-            _resourceInsufficientSubscription?.Dispose();
+            // CRITICAL: Phải hủy đăng ký sự kiện khi không dùng nữa để tránh Memory Leak
+            if (_model != null)
+            {
+                _model.OnResourceChanged -= OnResourceChanged;
+                _model.OnResourceInsufficient -= OnResourceInsufficient;
+            }
+
             _countdownCts?.Cancel();
             _countdownCts?.Dispose();
             _updateQueue.Clear();

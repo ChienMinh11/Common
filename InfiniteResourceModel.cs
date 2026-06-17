@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using ChieChie.Core;
 using UnityEngine;
 
 namespace ChieChie.Resource
@@ -8,16 +7,17 @@ namespace ChieChie.Resource
     public class InfiniteResourceModel
     {
         private readonly IResourceSaveAdapter _saveAdapter;
-        private readonly IEventService _eventService;
-
         private ResourceConfig _config;
-        
         private readonly Dictionary<int, DateTime> _expirationTimes = new();
 
-        public InfiniteResourceModel(IResourceSaveAdapter saveAdapter, IEventService eventService)
+        // --- CÁC ACTIONS THAY THẾ IEVENTSERVICE ---
+        public event Action<int> OnInfiniteDurationAdded;
+        public event Action<int> OnInfiniteDurationExpired;
+
+        // Bỏ IEventService khỏi constructor
+        public InfiniteResourceModel(IResourceSaveAdapter saveAdapter)
         {
             _saveAdapter = saveAdapter;
-            _eventService = eventService;
         }
      
         public void Initialize(ResourceConfig config)
@@ -45,7 +45,8 @@ namespace ChieChie.Resource
                 _saveAdapter.SaveInfiniteExpiration(resourceData, _expirationTimes[hash]);
             }
             
-            _eventService?.Publish<int, SharedEventType>(SharedEventType.OnInfiniteDurationAdded, hash);
+            // Invoke sự kiện Action
+            OnInfiniteDurationAdded?.Invoke(hash);
         }
 
         public TimeSpan GetRemainingTime(int hash)
@@ -65,7 +66,8 @@ namespace ChieChie.Resource
                         _saveAdapter.SaveInfiniteExpiration(resourceData, DateTime.MinValue);
                     }
                 
-                    _eventService?.Publish<int, SharedEventType>(SharedEventType.OnInfiniteDurationExpired, hash);
+                    // Invoke sự kiện Action khi hết hạn vô hạn
+                    OnInfiniteDurationExpired?.Invoke(hash);
                 }
                 return TimeSpan.Zero;
             }
@@ -73,6 +75,11 @@ namespace ChieChie.Resource
         }
 
         public bool IsInfinite(int hash) => GetRemainingTime(hash) > TimeSpan.Zero;
+
+        public void Cleanup()
+        {
+            OnInfiniteDurationAdded = null;
+            OnInfiniteDurationExpired = null;
+        }
     }
-  
 }

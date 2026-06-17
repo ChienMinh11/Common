@@ -1,5 +1,4 @@
 using System;
-using ChieChie.Core;
 
 namespace ChieChie.Resource
 {
