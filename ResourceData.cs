@@ -22,7 +22,15 @@ namespace ChieChie.Resource
             {
                 if (!_hashId.HasValue)
                 {
-                    _hashId = string.IsNullOrEmpty(Identity.ResourceId) ? 0 : Animator.StringToHash(Identity.ResourceId) ;
+                   
+                    if (Identity != null && !string.IsNullOrEmpty(Identity.ResourceId))
+                    {
+                        _hashId = Animator.StringToHash(Identity.ResourceId);
+                    }
+                    else
+                    {
+                        _hashId = identitySource != null ? Animator.StringToHash(identitySource.name) : 0;
+                    }
                 }
                 return _hashId.Value;
             }

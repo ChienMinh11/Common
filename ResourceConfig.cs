@@ -7,38 +7,55 @@ namespace ChieChie.Resource
     public class ResourceConfig : ScriptableObject, ISerializationCallbackReceiver
     {
         [SerializeField] private List<ResourceData> resourcesList = new List<ResourceData>();
-        private Dictionary<int, ResourceData> resourceMap = new Dictionary<int, ResourceData>();
-        private readonly List<ResourceData> regenResourcesCache = new();
+        
+        // Không dùng Dictionary làm trường lưu trữ trực tiếp nếu không thể bảo đảm tiến trình Deserialize
+        private readonly Dictionary<int, ResourceData> resourceMap = new Dictionary<int, ResourceData>();
+        private readonly List<ResourceData> regenResourcesCache = new List<ResourceData>();
+        private bool isInitialized = false;
 
         public void OnAfterDeserialize()
         {
+            isInitialized = false;
+        }
+
+        public void OnBeforeSerialize() { }
+
+        private void EnsureInitialized()
+        {
+            if (isInitialized && resourceMap.Count > 0) return;
+
             resourceMap.Clear();
             regenResourcesCache.Clear();
-            
+
             foreach (var resource in resourcesList)
             {
-                if (resource != null && !resourceMap.ContainsKey(resource.HashId))
+                if (resource != null)
                 {
-                    resourceMap[resource.HashId] = resource;
-                    
-                    if (resource.HasRegen)
+                    int hash = resource.HashId;
+                    if (!resourceMap.ContainsKey(hash))
                     {
-                        regenResourcesCache.Add(resource);
+                        resourceMap[hash] = resource;
+                        if (resource.HasRegen)
+                        {
+                            regenResourcesCache.Add(resource);
+                        }
                     }
                 }
             }
-        }
-
-        public void OnBeforeSerialize()
-        {
-            // Thường để trống trừ khi bạn muốn đồng bộ ngược từ Dict vào List trong Runtime
+            isInitialized = true;
         }
        
         public ResourceData GetResourceData(int typeHash)
         {
+            EnsureInitialized();
             return resourceMap.TryGetValue(typeHash, out var data) ? data : null;
         }
-        public IReadOnlyList<ResourceData> GetAllRegenSettings() => regenResourcesCache;
+
+        public IReadOnlyList<ResourceData> GetAllRegenSettings()
+        {
+            EnsureInitialized(); 
+            return regenResourcesCache;
+        }
 
         public IReadOnlyList<ResourceData> GetAllResources()
         {

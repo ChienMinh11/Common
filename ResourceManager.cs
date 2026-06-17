@@ -48,12 +48,7 @@ namespace ChieChie.Resource
                 Debug.LogWarning($"[{nameof(ResourceManager)}] Đang đăng ký View khi chưa Init xong Key: {resourceKey}");
                 return null;
             }
-
-            // Lấy hash của tài nguyên (Sửa lỗi 1)
-            int resourceHash = string.IsNullOrEmpty(resourceKey) ? 0 : Animator.StringToHash(resourceKey);
-
-            // Khởi tạo Presenter với thứ tự tham số chính xác (Sửa lỗi 2)
-            // Hãy điều chỉnh thứ tự này trùng khớp hoàn toàn với Constructor trong ResourcePresenter.cs của bạn
+            
             var presenter = new ResourcePresenter<long>(
                 _longModel,
                 view,
@@ -88,8 +83,7 @@ namespace ChieChie.Resource
             if (presenter == null) return;
     
             _activePresenters.Remove(presenter);
-    
-            // Ép kiểu để lấy View ra giải phóng Regen (Sửa lỗi 4, 5, 6 bằng cách thêm property View vào ResourcePresenter)
+
             if (presenter is ResourcePresenter<long> longPresenter && longPresenter.View != null)
             {
                 if (_activeRegenPresenters.TryGetValue(longPresenter.View, out var regenPresenter))

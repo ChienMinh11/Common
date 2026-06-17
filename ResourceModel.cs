@@ -60,7 +60,8 @@ namespace ChieChie.Resource
 
                     _saveAdapter.SaveAmount(resourceData, initialAmount);
                 }
-                _saveAdapter.SetFirstInitComplete();
+                _saveAdapter.SetFirstInitComplete(); 
+                
             }
             else
             {  
