@@ -7,20 +7,13 @@ namespace ChieChie.Shop
 {
     public class ShopStorage
     {
-        private const string ONE_TIME_PURCHASES_KEY = "Shop_OneTimePurchases";
-        private const string TIME_LIMITED_PURCHASES_KEY = "Shop_TimeLimitedPurchases";
-        
-        private readonly ISaveSystem _saveSystem;
+        private readonly IShopSaveAdapter _saveAdapter;
         private readonly HashSet<ProductID> _oneTimePurchases = new HashSet<ProductID>();
         private readonly HashSet<ProductID> _timeLimitedPurchases = new HashSet<ProductID>();
         
-        public ShopStorage(ISaveSystem saveSystem)
+        public ShopStorage(IShopSaveAdapter saveAdapter)
         {
-            this._saveSystem = saveSystem;
-           
-            saveSystem.RegisterKey(ONE_TIME_PURCHASES_KEY);
-            saveSystem.RegisterKey(TIME_LIMITED_PURCHASES_KEY);
-           
+            this._saveAdapter = saveAdapter;
             LoadOneTimePurchases();
             LoadTimeLimitedPurchases();
         }
@@ -29,7 +22,7 @@ namespace ChieChie.Shop
         
         private void LoadOneTimePurchases()
         {
-            var savedData = _saveSystem.Load<string>(ONE_TIME_PURCHASES_KEY, "");
+            var savedData = _saveAdapter.LoadOneTimePurchases();
             if (!string.IsNullOrEmpty(savedData))
             {
                 var items = savedData.Split(',');
@@ -45,9 +38,8 @@ namespace ChieChie.Shop
         
         public void SaveOneTimePurchases()
         {
-            Debug.Log("Lưu các gói mua một lần");
             string saveData = string.Join(",", _oneTimePurchases);
-            _saveSystem.Save<string>(ONE_TIME_PURCHASES_KEY, saveData);
+            _saveAdapter.SaveOneTimePurchases(saveData);
         }
         
         public void AddOneTimePurchase(ProductID productId)
@@ -68,7 +60,6 @@ namespace ChieChie.Shop
         {
             _oneTimePurchases.Clear();
             SaveOneTimePurchases();
-            Debug.Log("Đã đặt lại tất cả các gói mua một lần");
         }
         
         #endregion
@@ -77,7 +68,7 @@ namespace ChieChie.Shop
         
         private void LoadTimeLimitedPurchases()
         {
-            var savedData = _saveSystem.Load<string>(TIME_LIMITED_PURCHASES_KEY, "");
+            var savedData = _saveAdapter.LoadTimeLimitedPurchases();
             if (!string.IsNullOrEmpty(savedData))
             {
                 var items = savedData.Split(',');
@@ -93,9 +84,8 @@ namespace ChieChie.Shop
         
         public void SaveTimeLimitedPurchases()
         {
-            Debug.Log("Lưu các gói mua có thời hạn");
             string saveData = string.Join(",", _timeLimitedPurchases);
-            _saveSystem.Save<string>(TIME_LIMITED_PURCHASES_KEY, saveData);
+            _saveAdapter.SaveTimeLimitedPurchases(saveData);
         }
         
         public void AddTimeLimitedPurchase(ProductID productId)
@@ -118,7 +108,6 @@ namespace ChieChie.Shop
             {
                 _timeLimitedPurchases.Remove(productId);
                 SaveTimeLimitedPurchases();
-                Debug.Log($"Đã đặt lại gói mua có thời hạn: {productId}");
             }
         }
         
@@ -126,25 +115,15 @@ namespace ChieChie.Shop
         {
             _timeLimitedPurchases.Clear();
             SaveTimeLimitedPurchases();
-            Debug.Log("Đã đặt lại tất cả các gói mua có thời hạn");
         }
         
         #endregion
        
         public bool IsPurchaseActive(ProductID productId, ShopItemData itemData)
         {
-            if (itemData == null)
-                return false;
-                
-            if (itemData.isTimeLimited)
-            {
-                return HasTimeLimitedPurchase(productId);
-            }
-            else if (itemData.isOneTimePurchase)
-            {
-                return HasOneTimePurchase(productId);
-            }
-            
+            if (itemData == null) return false;
+            if (itemData.isTimeLimited) return HasTimeLimitedPurchase(productId);
+            if (itemData.isOneTimePurchase) return HasOneTimePurchase(productId);
             return false;
         }
   
@@ -152,7 +131,6 @@ namespace ChieChie.Shop
         {
             ResetOneTimePurchases();
             ResetAllTimeLimitedPurchases();
-            Debug.Log("Đã đặt lại tất cả dữ liệu mua");
         }
     }
 }

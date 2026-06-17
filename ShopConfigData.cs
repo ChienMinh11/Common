@@ -25,6 +25,8 @@ namespace ChieChie.Shop
     [Serializable]
     public class ShopItemReward : BaseRewardData
     {
+        public Sprite IconReward;
+        public Sprite InfinityRewardIcon;
         public bool isInfinite
         {
             get => isInfiniteReward;

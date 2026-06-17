@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using ChieChie.Core;
-using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace ChieChie.Shop
@@ -11,15 +9,14 @@ namespace ChieChie.Shop
     {
         private readonly ShopModel _model;
         private readonly List<IShopView> _activeViews = new List<IShopView>();
-        private readonly IIconProvider  _iconProvider;
-        private readonly IEventService _eventService;
+       
         private readonly RewardDisplayService _rewardDisplayService;
 
-        public ShopPresenter(ShopModel model, IIconProvider iconProvider, IEventService eventService, RewardDisplayService rewardDisplayService)
+        public event Action<ShopNotificationEventData> OnShopRewardsNotificationRequested;
+
+        public ShopPresenter(ShopModel model, RewardDisplayService rewardDisplayService)
         {
             _model = model;
-            _iconProvider = iconProvider;
-            _eventService = eventService;
             _rewardDisplayService = rewardDisplayService;
 
             _model.OnPurchaseSuccess += HandlePurchaseSuccess;
@@ -55,9 +52,28 @@ namespace ChieChie.Shop
 
         public Sprite GetIconResourceReward(ResourceType resourceType, bool isInfinite)
         {
-            if (_iconProvider == null) return null;
-   
-            return _iconProvider.GetRewardIcon(resourceType, isInfinite);
+            var shopItems = _model.GetShopItems();
+
+            foreach (var item in shopItems)
+            {
+                foreach (var reward in item.rewards)
+                {
+                    if ((ResourceType)reward.resourceType == resourceType)
+                    {
+                        if (isInfinite && reward.isInfinite)
+                        {
+                            if (reward.InfinityRewardIcon != null)
+                                return reward.InfinityRewardIcon;
+                        }
+                        else if (!isInfinite && !reward.isInfinite)
+                        {
+                            if (reward.IconReward != null)
+                                return reward.IconReward;
+                        }
+                    }
+                }
+            }
+            return null;
         }
 
         private void CleanUpDestroyedViews()
@@ -77,7 +93,6 @@ namespace ChieChie.Shop
         private void HandlePurchaseSuccess(ProductID productId, string message)
         {
             CleanUpDestroyedViews();
-            
             foreach (var view in _activeViews)
             {
                 view.ShowLoadingIndicator(false);
@@ -105,22 +120,20 @@ namespace ChieChie.Shop
         private void HandleRewardsGranted(ShopItemData itemData, List<ShopItemReward> rewards)
         {
             CleanUpDestroyedViews();
-            if (_eventService != null)
-            {
-                var eventData = new ShopNotificationEventData(itemData, rewards);
-                _eventService.Publish(SharedEventType.OnShopRewardsNotificationRequested, eventData);
-            }
+            var eventData = new ShopNotificationEventData(itemData, rewards);
+            // Kích hoạt C# event thay thế EventService
+            OnShopRewardsNotificationRequested?.Invoke(eventData);
         }
+
         private void HandlePackResetExternally(ProductID productId)
         {
-            
             CleanUpDestroyedViews();
             RefreshShopItemsUI();
         }
+
         public bool IsItemOwned(ProductID productId)
         {
             var items = _model.GetShopItems();
-    
             ShopItemData itemData = null;
             for (int i = 0; i < items.Count; i++)
             {
@@ -133,6 +146,7 @@ namespace ChieChie.Shop
             if (itemData == null) return false;
             return _model.IsItemOwned(productId);
         }
+
         public void RefreshShopItemsUI()
         {
             CleanUpDestroyedViews();
@@ -141,6 +155,7 @@ namespace ChieChie.Shop
                 view.Initialize(_model.GetShopItems(), this);
             }
         }
+
         public void ResetPackAndRefresh(ProductID productId)
         {
             _model.ResetTimeLimitedPack(productId);

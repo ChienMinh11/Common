@@ -11,20 +11,21 @@ namespace ChieChie.Shop
         private readonly ShopConfig _shopConfig;
         private readonly ShopStorage _shopStorage;
         private readonly Dictionary<ProductID, ShopItemData> _shopItemCache;
-        private readonly IEventService  _eventService;
 
         public event Action<ProductID, string> OnPurchaseSuccess;
         public event Action<ProductID, string> OnPurchaseFailed;
         public event Action<ProductID, string> OnPriceUpdated;
         public event Action<ShopItemData, List<ShopItemReward>> OnRewardsGranted;
         public event Action<ProductID> OnPackResetExternally;
+        
+        public event Action<ProductID> OnBuySuccessExternal;
+        public event Action<List<ResourceRewardCommand>> OnRequestAddResource;
 
-        public ShopModel(IShopIapBrigde iapBridge, ISaveSystem saveSystem, ShopConfig shopConfig,IEventService eventService)
+        public ShopModel(IShopIapBrigde iapBridge, IShopSaveAdapter saveAdapter, ShopConfig shopConfig)
         {
             _iapBridge = iapBridge;
             _shopConfig = shopConfig;
-            _eventService = eventService;
-            _shopStorage = new ShopStorage(saveSystem);
+            _shopStorage = new ShopStorage(saveAdapter);
             
             _shopItemCache = new Dictionary<ProductID, ShopItemData>();
             foreach (var item in _shopConfig.ShopItems)
@@ -86,7 +87,7 @@ namespace ChieChie.Shop
             {
                 _shopStorage.AddTimeLimitedPurchase(productId);
             }
-            _eventService.Publish<ProductID,SharedEventType>(SharedEventType.RequestBuySuccess, productId);
+            OnBuySuccessExternal?.Invoke(productId);
             GrantRewards(itemData.rewards);
 
             OnPurchaseSuccess?.Invoke(productId, "Mua hàng thành công!");
@@ -121,10 +122,7 @@ namespace ChieChie.Shop
 
             if (resourceCommands.Count > 0)
             {
-                _eventService.Publish<List<ResourceRewardCommand>, SharedEventType>(
-                    SharedEventType.RequestAddResource,
-                    resourceCommands
-                );
+                OnRequestAddResource?.Invoke(resourceCommands);
             }
             
         }
