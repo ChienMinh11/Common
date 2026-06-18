@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading;
-using ChieChie.Core;
 using Cysharp.Threading.Tasks;
-using R3;
 using UnityEngine;
 using VContainer;
 using VContainer.Unity;
@@ -15,7 +13,6 @@ namespace ChieChie.Booster
         private readonly BoosterDatabase _database;
         private readonly IObjectResolver _resolver;
         private readonly IBoosterResourceContext _resourceContext;
-        private readonly IEventService _eventService; 
 
         private BoosterBehavior[] _activeBoosters;
         private Dictionary<string, BoosterBehavior> _boostersLink;
@@ -23,23 +20,20 @@ namespace ChieChie.Booster
 
         private BoosterBehavior _currentAwaitingBooster;
         private CancellationTokenSource _awaitingCancelTokenSource;
-        private IDisposable _eventSubscription; 
         
         public event Action<string?> OnAwaitingStatusChanged;
         public event Action<string> OnPreBoosterStateChanged;
         public event Action<string> OnBoosterInfinitePassConsumed;
 
-        // Sử dụng Constructor Injection chuẩn C# thay vì hàm [Inject] cũ
+        // Constructor đã loại bỏ IEventService
         public BoosterController(
             BoosterDatabase database,
             IBoosterResourceContext resourceContext, 
-            IObjectResolver resolver, 
-            IEventService eventService)
+            IObjectResolver resolver)
         {
             _database = database;
             _resourceContext = resourceContext;
             _resolver = resolver;
-            _eventService = eventService; 
         }
 
         public bool IsInitialized { get; set; }
@@ -63,7 +57,7 @@ namespace ChieChie.Booster
                 boosterSettings[i].Initialise();
             
                 GameObject boosterBehaviorObj = _resolver.Instantiate(boosterSettings[i].BehaviorPrefab, _behaviorsContainer);
-                boosterBehaviorObj.transform.ResetLocal();
+                boosterBehaviorObj.transform.position = Vector3.zero;
 
                 var boosterBehavior = boosterBehaviorObj.GetComponent<BoosterBehavior>();
                 boosterBehavior.InitialiseSettings(boosterSettings[i]);
@@ -81,16 +75,11 @@ namespace ChieChie.Booster
 
         private void SubscribeInfinityEvents()
         {
-            if (_eventService == null || _eventSubscription != null) return;
-            var expiredObservable = _eventService.Observe<string, SharedEventType>(SharedEventType.OnInfiniteDurationExpired);
-            var addedObservable = _eventService.Observe<string, SharedEventType>(SharedEventType.OnInfiniteDurationAdded);
+            if (_resourceContext == null) return;
             
-            _eventSubscription = Observable.Merge(expiredObservable, addedObservable)
-                .Subscribe(boosterType => 
-                {
-                    UpdatePreBoosterOnInfinityChanged(boosterType);
-                });
-          
+            // Đăng ký trực tiếp sự kiện bằng C# Action Event
+            _resourceContext.OnInfiniteDurationExpired += UpdatePreBoosterOnInfinityChanged;
+            _resourceContext.OnInfiniteDurationAdded += UpdatePreBoosterOnInfinityChanged;
         }
 
         private void UpdatePreBoosterOnInfinityChanged(string boosterType)
@@ -308,7 +297,13 @@ namespace ChieChie.Booster
 
         public void Dispose()
         {
-            _eventSubscription?.Dispose();
+            // Hủy đăng ký sự kiện tránh Memory Leak
+            if (_resourceContext != null)
+            {
+                _resourceContext.OnInfiniteDurationExpired -= UpdatePreBoosterOnInfinityChanged;
+                _resourceContext.OnInfiniteDurationAdded -= UpdatePreBoosterOnInfinityChanged;
+            }
+
             _awaitingCancelTokenSource?.Dispose();
             if (_behaviorsContainer != null)
             {

@@ -1,7 +1,11 @@
+using System;
+
 namespace ChieChie.Booster
 {
     public interface IBoosterResourceContext
     { 
+        event Action<string> OnInfiniteDurationExpired;
+        event Action<string> OnInfiniteDurationAdded;
         bool IsCurrentlyInfinite(string type);
         bool HasEnoughResource(string type, long cost);
         void SpendResource(string type, long cost);
