@@ -3,16 +3,14 @@ using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
-using VContainer;
-using VContainer.Unity;
 
 namespace ChieChie.Booster
 {
-    public class BoosterController : IInitializable, IDisposable, IBoosterService
+    public class BoosterController : IBoosterService
     {
         private readonly BoosterDatabase _database;
-        private readonly IObjectResolver _resolver;
         private readonly IBoosterResourceContext _resourceContext;
+        private readonly IBoosterFactory _boosterFactory;
 
         private BoosterBehavior[] _activeBoosters;
         private Dictionary<string, BoosterBehavior> _boostersLink;
@@ -25,23 +23,17 @@ namespace ChieChie.Booster
         public event Action<string> OnPreBoosterStateChanged;
         public event Action<string> OnBoosterInfinitePassConsumed;
 
-        // Constructor đã loại bỏ IEventService
         public BoosterController(
             BoosterDatabase database,
             IBoosterResourceContext resourceContext, 
-            IObjectResolver resolver)
+            IBoosterFactory boosterFactory)
         {
             _database = database;
             _resourceContext = resourceContext;
-            _resolver = resolver;
+            _boosterFactory = boosterFactory;
         }
 
-        public bool IsInitialized { get; set; }
-        
-        public void Initialize()
-        {
-            InitializeAsync(CancellationToken.None).Forget();
-        }
+        public bool IsInitialized { get; private set; }
 
         public async UniTask<bool> InitializeAsync(CancellationToken cancellationToken)
         {
@@ -56,9 +48,8 @@ namespace ChieChie.Booster
             {
                 boosterSettings[i].Initialise();
             
-                GameObject boosterBehaviorObj = _resolver.Instantiate(boosterSettings[i].BehaviorPrefab, _behaviorsContainer);
-                boosterBehaviorObj.transform.position = Vector3.zero;
-
+                var boosterBehaviorObj =_boosterFactory.CreateBooster(boosterSettings[i], _behaviorsContainer);
+                
                 var boosterBehavior = boosterBehaviorObj.GetComponent<BoosterBehavior>();
                 boosterBehavior.InitialiseSettings(boosterSettings[i]);
 
@@ -77,7 +68,6 @@ namespace ChieChie.Booster
         {
             if (_resourceContext == null) return;
             
-            // Đăng ký trực tiếp sự kiện bằng C# Action Event
             _resourceContext.OnInfiniteDurationExpired += UpdatePreBoosterOnInfinityChanged;
             _resourceContext.OnInfiniteDurationAdded += UpdatePreBoosterOnInfinityChanged;
         }
@@ -295,15 +285,13 @@ namespace ChieChie.Booster
             OnAwaitingStatusChanged?.Invoke(behavior?.Settings.BoosterId);
         }
 
-        public void Dispose()
+        public void CleanUp()
         {
-            // Hủy đăng ký sự kiện tránh Memory Leak
             if (_resourceContext != null)
             {
                 _resourceContext.OnInfiniteDurationExpired -= UpdatePreBoosterOnInfinityChanged;
                 _resourceContext.OnInfiniteDurationAdded -= UpdatePreBoosterOnInfinityChanged;
             }
-
             _awaitingCancelTokenSource?.Dispose();
             if (_behaviorsContainer != null)
             {
