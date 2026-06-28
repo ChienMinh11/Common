@@ -18,7 +18,7 @@ namespace ChieChie.Constracts
         void ProcessPendingUpdate(string resourceKey);
         void ForceUpdateAllView();
 
-        void AddInfiniteDuration(string resourceKey, TimeSpan duration);
+        void AddInfiniteDuration(string resourceKey, TimeSpan duration, bool delayUpdate = false);
         bool IsCurrentlyInfinite(string resourceKey);
         TimeSpan GetRemainingInfiniteTime(string resourceKey);
 
@@ -27,7 +27,7 @@ namespace ChieChie.Constracts
         void SetRegenStatus(string resourceKey, bool isEnabled);
         
         event Action<string> OnInfiniteExpired;
-        event Action<string> OnInfiniteAdded;
+        event Action<string,bool> OnInfiniteAdded;
         
        void OnAppQuit();
 

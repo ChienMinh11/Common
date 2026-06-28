@@ -10,7 +10,7 @@ namespace ChieChie.Resource
         private ResourceConfig _config;
         private readonly Dictionary<string, DateTime> _expirationTimes = new();
 
-        public event Action<string> OnInfiniteDurationAdded;
+        public event Action<string, bool> OnInfiniteDurationAdded;
         public event Action<string> OnInfiniteDurationExpired;
 
         public InfiniteResourceModel(IResourceSaveAdapter saveAdapter)
@@ -33,23 +33,23 @@ namespace ChieChie.Resource
             }
         }
 
-        public void AddDuration(string resourceKey, TimeSpan duration)
+        public void AddDuration(string resourceKey, TimeSpan duration, bool delayUpdate = false)
         {
             if (string.IsNullOrEmpty(resourceKey) || duration <= TimeSpan.Zero) return;
-            
+    
             DateTime now = DateTime.UtcNow;
             DateTime currentExpiration = _expirationTimes.TryGetValue(resourceKey, out var time) ? time : DateTime.MinValue;
             _expirationTimes[resourceKey] = (currentExpiration > now) ? currentExpiration.Add(duration) : now.Add(duration);
-         
+ 
             var resourceData = _config?.GetResourceData(resourceKey);
             if (resourceData != null)
             {
                 _saveAdapter.SaveInfiniteExpiration(resourceData, _expirationTimes[resourceKey]);
             }
-            
-            OnInfiniteDurationAdded?.Invoke(resourceKey);
+    
+            // Truyền thêm flag delayUpdate vào Event công bố
+            OnInfiniteDurationAdded?.Invoke(resourceKey, delayUpdate);
         }
-
         public TimeSpan GetRemainingTime(string resourceKey)
         {
             if (string.IsNullOrEmpty(resourceKey) || !_expirationTimes.TryGetValue(resourceKey, out var expiration)) 

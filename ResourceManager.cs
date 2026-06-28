@@ -21,7 +21,7 @@ namespace ChieChie.Resource
         public bool IsInitialized { get; private set; }
         
         public event Action<string> OnInfiniteExpired;
-        public event Action<string> OnInfiniteAdded;
+        public event Action<string, bool> OnInfiniteAdded;
 
         public ResourceManager(ResourceConfig resourceConfig, IResourceSaveAdapter saveAdapter)
         {
@@ -124,11 +124,14 @@ namespace ChieChie.Resource
             }
         }
 
-        public void AddInfiniteDuration(string resourceKey, TimeSpan duration)
+        public void AddInfiniteDuration(string resourceKey, TimeSpan duration, bool delayUpdate = false)
         {
             if (!IsInitialized) return;
-            _infiniteModel.AddDuration(resourceKey, duration);
-            ForceUpdateAllView();
+            _infiniteModel.AddDuration(resourceKey, duration, delayUpdate);
+            if (!delayUpdate)
+            {
+                ForceUpdateAllView();
+            }
         }
 
         public bool IsCurrentlyInfinite(string resourceKey)
@@ -181,7 +184,7 @@ namespace ChieChie.Resource
         { 
             if (pauseStatus) _resourceRegenController?.SaveAllRegenTimes(); 
         }
-        private void HandleInfiniteDurationAdded(string resourceKey) => OnInfiniteAdded?.Invoke(resourceKey);
+        private void HandleInfiniteDurationAdded(string resourceKey, bool delayUpdate) => OnInfiniteAdded?.Invoke(resourceKey, delayUpdate);
         private void HandleInfiniteDurationExpired(string resourceKey) => OnInfiniteExpired?.Invoke(resourceKey);
 
         public void Dispose()

@@ -21,6 +21,8 @@ namespace ChieChie.Resource
 
         public string ResourceKey { get; }
         public bool HasPendingUpdates => _updateQueue.HasPendingUpdates;
+        private bool _isInfiniteUpdateDelayed = false;
+        private TimeSpan _delayedInfiniteDuration = TimeSpan.Zero;
 
         public ResourcePresenter(
             ResourceModel<T> model,
@@ -58,31 +60,27 @@ namespace ChieChie.Resource
             _currentResourceData = _model.GetResourceData(ResourceKey);
             while (!token.IsCancellationRequested)
             {
-                if (_view == null || (_view is MonoBehaviour monoView && monoView == null))
-                {
-                    break;
-                }
-
-                bool isCurrentlyInfinite = _infiniteStatus.IsCurrentlyInfinite(ResourceKey);
+                if (_view == null || (_view is MonoBehaviour monoView && monoView == null)) break;
+              
+                bool isCurrentlyInfinite = _infiniteStatus.IsCurrentlyInfinite(ResourceKey) && !_isInfiniteUpdateDelayed;
                 var iconToSet = SetIcon(isCurrentlyInfinite);
 
                 _view.SetResourceIcon(iconToSet);
                 _view.SetInfiniteStatus(isCurrentlyInfinite);
+        
                 if (isCurrentlyInfinite)
                 {
                     TimeSpan remaining = _infiniteStatus.GetRemainingInfiniteTime(ResourceKey);
                     _view.UpdateInfinityRemainingTime(TimeFormatter.FormatRemainingTime(remaining));
                 }
-
-                if (!isCurrentlyInfinite)
+                else
                 {
                     string exactKey = _currentResourceData != null ? _currentResourceData.ResourceId : ResourceKey;
                     long displayAmount = _converter.ToLong(_model.GetAmount(exactKey));
                     _view.SetResourceAmount(displayAmount);
                 }
 
-                await UniTask.Delay(TimeSpan.FromSeconds(1), delayTiming: PlayerLoopTiming.Update,
-                    cancellationToken: token);
+                await UniTask.Delay(TimeSpan.FromSeconds(1), delayTiming: PlayerLoopTiming.Update, cancellationToken: token);
             }
         }
 
@@ -102,6 +100,7 @@ namespace ChieChie.Resource
         {
             _model.OnResourceChanged += OnResourceChanged;
             _model.OnResourceInsufficient += OnResourceInsufficient;
+            _infiniteStatus.OnInfiniteAdded += OnInfiniteAddedFromManager;
         }
 
         private void OnResourceInsufficient(string resourceKey)
@@ -131,20 +130,43 @@ namespace ChieChie.Resource
                 }
             }
         }
+        private void OnInfiniteAddedFromManager(string resourceKey, bool delayUpdate)
+        {
+            if (resourceKey != ResourceKey) return;
+
+            if (delayUpdate)
+            {
+                _isInfiniteUpdateDelayed = true;
+                _updateQueue.EnqueueUpdate(0, _converter.ToLong(_model.GetAmount(ResourceKey)));
+            }
+            else
+            {
+                _isInfiniteUpdateDelayed = false;
+            }
+        }
 
         public void ProcessPendingUpdates()
         {
+           
+            _isInfiniteUpdateDelayed = false;
+
             var update = _updateQueue.ProcessNextUpdate(ResourceKey);
             if (update != null)
             {
                 var data = _model.GetResourceData(ResourceKey);
                 if (data != null)
                 {
-                    _view.SetResourceAmount(update.Amount);
                     bool isCurrentlyInfinite = _infiniteStatus.IsCurrentlyInfinite(ResourceKey);
+                  
+                    if (!isCurrentlyInfinite)
+                    {
+                        _view.SetResourceAmount(update.Amount);
+                    }
+            
                     Sprite iconToSet = SetIcon(isCurrentlyInfinite);
                     _view.SetResourceIcon(iconToSet);
                     _view.SetResourceName(data.DisplayName);
+                    _view.SetInfiniteStatus(isCurrentlyInfinite);
 
                     if (data.MaxStack > 0 && update.Amount >= data.MaxStack)
                     {
@@ -187,7 +209,7 @@ namespace ChieChie.Resource
                 _model.OnResourceChanged -= OnResourceChanged;
                 _model.OnResourceInsufficient -= OnResourceInsufficient;
             }
-
+            _infiniteStatus.OnInfiniteAdded -= OnInfiniteAddedFromManager;
             _countdownCts?.Cancel();
             _countdownCts?.Dispose();
             _updateQueue.Clear();
