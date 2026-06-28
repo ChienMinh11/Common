@@ -15,36 +15,34 @@ namespace ChieChie.Profile
     {
         public bool IsInitialized { get; private set; }
         
-        private const string AVATARS_KEY = "player_avatars";
-        
         private Dictionary<int, AvatarModel> _avatars = new Dictionary<int, AvatarModel>();
         private Dictionary<int, Sprite> _avatarSprites = new Dictionary<int, Sprite>();
         
-        private readonly ISaveSystem _saveSystem;
+        private readonly IProfileSaveAdapter _saveAdapter;
         private readonly IEventService _eventService;
-        private readonly AvatarDatabase _avatarDatabase;
+        private readonly AvatarConfig _avatarConfig;
         
         public AvatarPresenter(
-            ISaveSystem saveSystem, 
+            IProfileSaveAdapter saveAdapter, 
             IEventService eventService, 
-            AvatarDatabase avatarDatabase)
+            AvatarConfig avatarConfig)
         {
-            _saveSystem = saveSystem;
+            _saveAdapter = saveAdapter;
             _eventService = eventService;
-            _avatarDatabase = avatarDatabase;
+            _avatarConfig = avatarConfig;
         }
         
         public bool Initialize()
         {
             Debug.Log("[AvatarPresenter] Initializing...");
             
-            if (_avatarDatabase == null)
+            if (_avatarConfig == null)
             {
-                Debug.LogError("[AvatarPresenter] Avatar database is not assigned!");
+                Debug.LogError("[AvatarPresenter] Avatar config is not assigned!");
                 return false;
             }
             
-            _saveSystem.RegisterKey<Dictionary<int, AvatarModel>>(AVATARS_KEY, () => _avatars);
+            _saveAdapter.RegisterAvatarsKey(() => _avatars);
         
             LoadAvatars();
             
@@ -55,17 +53,17 @@ namespace ChieChie.Profile
         
         private void LoadAvatars()
         {
-            var savedAvatars = _saveSystem.Load<Dictionary<int, AvatarModel>>(AVATARS_KEY);
+            var savedAvatars = _saveAdapter.LoadAvatars();
             
             if (savedAvatars == null || savedAvatars.Count == 0)
             {
-                _avatars = _avatarDatabase.GetDefaultAvatarInfoDictionary();
-                _saveSystem.Save(AVATARS_KEY, _avatars);
+                _avatars = _avatarConfig.GetDefaultAvatarInfoDictionary();
+                _saveAdapter.SaveAvatars(_avatars);
             }
             else
             {
                 _avatars = savedAvatars;
-                foreach (var avatarData in _avatarDatabase.Avatars)
+                foreach (var avatarData in _avatarConfig.Avatars)
                 {
                     if (!_avatars.ContainsKey(avatarData.Id))
                     {
@@ -74,10 +72,10 @@ namespace ChieChie.Profile
                     }
                 }
                 
-                _saveSystem.Save(AVATARS_KEY, _avatars);
+                _saveAdapter.SaveAvatars(_avatars);
             }
             
-            foreach (var avatarData in _avatarDatabase.Avatars)
+            foreach (var avatarData in _avatarConfig.Avatars)
             {
                 if (avatarData.AvatarSprite != null)
                 {
@@ -136,7 +134,7 @@ namespace ChieChie.Profile
                 if (avatar.IsUnlocked) return false; 
                 
                 avatar.IsUnlocked = true;
-                _saveSystem.Save(AVATARS_KEY, _avatars);
+                _saveAdapter.SaveAvatars(_avatars);
                 _eventService.Publish<AvatarModel, AvatarEventType>(AvatarEventType.AvatarUnlocked, avatar);
                 return true;
             }
@@ -148,7 +146,7 @@ namespace ChieChie.Profile
             if (!_avatars.ContainsKey(newAvatar.Id))
             {
                 _avatars[newAvatar.Id] = newAvatar;
-                _saveSystem.Save(AVATARS_KEY, _avatars);
+                _saveAdapter.SaveAvatars(_avatars);
                 _eventService.PublishEvent<AvatarEventType>(AvatarEventType.AvatarListUpdated);
             }
         }
@@ -168,7 +166,7 @@ namespace ChieChie.Profile
     
             if (anyUnlocked)
             {
-                _saveSystem.Save(AVATARS_KEY, _avatars);
+                _saveAdapter.SaveAvatars(_avatars);
                 _eventService.PublishEvent<AvatarEventType>(AvatarEventType.AvatarListUpdated);
             }
         }

@@ -14,11 +14,9 @@ namespace ChieChie.Profile
     
     public class ProfilePresenter
     {
-        private const string PROFILE_DATA_KEY = "player_profile_data";
-        
         private ProfileModel _currentProfile;
         private readonly IAvatarPresenter _avatarPresenter;
-        private readonly ISaveSystem _saveSystem;
+        private readonly IProfileSaveAdapter _saveAdapter;
         private readonly IEventService _eventService;
         
         private string _defaultPlayerName = "Player";
@@ -27,13 +25,13 @@ namespace ChieChie.Profile
         public ProfileModel CurrentProfile => _currentProfile;
         
         public ProfilePresenter(
-            ISaveSystem saveSystem, 
+            IProfileSaveAdapter saveAdapter, 
             IEventService eventService, 
             IAvatarPresenter avatarPresenter,
             string defaultPlayerName = "Player",
             int defaultAvatarId = 0)
         {
-            _saveSystem = saveSystem;
+            _saveAdapter = saveAdapter;
             _eventService = eventService;
             _avatarPresenter = avatarPresenter;
             _defaultPlayerName = defaultPlayerName;
@@ -46,7 +44,7 @@ namespace ChieChie.Profile
         {
             Debug.Log("[ProfilePresenter] Initializing...");
             
-            _saveSystem.RegisterKey<ProfileModel>(PROFILE_DATA_KEY, () => _currentProfile);
+            _saveAdapter.RegisterProfileKey(() => _currentProfile);
             _avatarPresenter.Initialize();
             _avatarPresenter.UnlockAllAvatars();
 
@@ -57,7 +55,7 @@ namespace ChieChie.Profile
         
         private void LoadProfile()
         {
-            var savedProfile = _saveSystem.Load<ProfileModel>(PROFILE_DATA_KEY);
+            var savedProfile = _saveAdapter.LoadProfile();
             
             if (savedProfile == null)
             {
@@ -87,7 +85,7 @@ namespace ChieChie.Profile
         private void SaveProfile()
         {
             _currentProfile.UpdateLastModified();
-            _saveSystem.Save(PROFILE_DATA_KEY, _currentProfile);
+            _saveAdapter.SaveProfile(_currentProfile);
         }
 
         public bool ChangePlayerName(string newName)
@@ -98,7 +96,6 @@ namespace ChieChie.Profile
             if (newName.Length > 20)
                 newName = newName.Substring(0, 20);
     
-            var oldName = _currentProfile.PlayerName;
             _currentProfile.PlayerName = newName;
 
             SaveProfile();
@@ -115,7 +112,6 @@ namespace ChieChie.Profile
             if (avatar == null || !avatar.IsUnlocked)
                 return false;
 
-            var oldAvatarId = _currentProfile.AvatarId;
             _currentProfile.AvatarId = avatarId;
 
             SaveProfile();

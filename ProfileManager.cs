@@ -5,39 +5,36 @@ using UnityEngine;
 
 namespace ChieChie.Profile
 {
-
-    
-    public class ProfileManager:IProfileService
+    public class ProfileManager : IProfileService
     { 
         public bool IsInitialized { get; private set; }
-        [SerializeField] private AvatarDatabase avatarDatabase;
+        private ProfileDatabase _database;
         private ProfilePresenter _profilePresenter;
         private AvatarPresenter _avatarPresenter;
   
-        private ISaveSystem _saveSystem;
-        private IEventService _eventService;
+        private readonly IProfileSaveAdapter _saveAdapter;
+        private readonly IEventService _eventService;
 
         public ProfilePresenter ProfilePresenter => _profilePresenter;
         public AvatarPresenter AvatarPresenter => _avatarPresenter;
 
-        public ProfileManager(ISaveSystem saveSystem, IEventService eventService)
+        public ProfileManager(ProfileDatabase database,IProfileSaveAdapter saveAdapter, IEventService eventService)
         {
-            _saveSystem = saveSystem;
+            _database = database;
+            _saveAdapter = saveAdapter;
             _eventService = eventService;
         }
         
-      
         public UniTask<bool> InitializeAsync(CancellationToken cancellationToken)
         {
             Debug.Log("[ProfileManager] Initializing...");
 
-            _avatarPresenter = new AvatarPresenter(_saveSystem, _eventService, avatarDatabase);
-            _profilePresenter = new ProfilePresenter(_saveSystem, _eventService, _avatarPresenter);
+            _avatarPresenter = new AvatarPresenter(_saveAdapter, _eventService, _database.AvatarConfig);
+            _profilePresenter = new ProfilePresenter(_saveAdapter, _eventService, _avatarPresenter);
  
             IsInitialized = true;
             Debug.Log("[ProfileManager] Initialized successfully.");
             return UniTask.FromResult(true);
         }
-    
     }
 }
