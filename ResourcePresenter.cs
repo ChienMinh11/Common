@@ -22,6 +22,7 @@ namespace ChieChie.Resource
         public string ResourceKey { get; }
         public bool HasPendingUpdates => _updateQueue.HasPendingUpdates;
         private bool _isInfiniteUpdateDelayed = false;
+        public bool IsInfiniteUpdateDelayed => _isInfiniteUpdateDelayed;
         private TimeSpan _delayedInfiniteDuration = TimeSpan.Zero;
 
         public ResourcePresenter(
@@ -75,9 +76,12 @@ namespace ChieChie.Resource
                 }
                 else
                 {
-                    string exactKey = _currentResourceData != null ? _currentResourceData.ResourceId : ResourceKey;
-                    long displayAmount = _converter.ToLong(_model.GetAmount(exactKey));
-                    _view.SetResourceAmount(displayAmount);
+                    if (!HasPendingUpdates)
+                    {
+                        string exactKey = _currentResourceData != null ? _currentResourceData.ResourceId : ResourceKey;
+                        long displayAmount = _converter.ToLong(_model.GetAmount(exactKey));
+                        _view.SetResourceAmount(displayAmount);
+                    }
                 }
 
                 await UniTask.Delay(TimeSpan.FromSeconds(1), delayTiming: PlayerLoopTiming.Update, cancellationToken: token);

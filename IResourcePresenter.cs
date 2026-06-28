@@ -5,6 +5,7 @@ namespace ChieChie.Constracts
     {
         string ResourceKey { get; }
         bool HasPendingUpdates { get; }
+        bool IsInfiniteUpdateDelayed { get; }
         void ProcessPendingUpdates();
         void ForceUpdateView();
         void Cleanup();

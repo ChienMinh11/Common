@@ -165,11 +165,38 @@ namespace ChieChie.Resource
             if (_resourceRegenController == null) return;
             _resourceRegenController.SetRegenStatus(resourceKey, isEnabled);
         }
+        public bool IsInfiniteDisplayDelayed(string resourceKey)
+        {
+            if (!IsInitialized) return false;
+            
+            for (int i = 0; i < _activePresenters.Count; i++)
+            {
+                var presenter = _activePresenters[i];
+                if (presenter.ResourceKey == resourceKey)
+                {
+                    if (presenter is ResourcePresenter<long> longPresenter)
+                    {
+                        if (longPresenter.IsInfiniteUpdateDelayed)
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            return false;
+        }
 
         public void ProcessPendingUpdate(string resourceKey)
         {
             if (!IsInitialized) return;
-            _activePresenters.Find(p => p.ResourceKey == resourceKey)?.ProcessPendingUpdates();
+            for (int i = 0; i < _activePresenters.Count; i++)
+            {
+                if (_activePresenters[i].ResourceKey == resourceKey)
+                {
+                    _activePresenters[i].ProcessPendingUpdates();
+                }
+            }
         }
 
         public void ForceUpdateAllView()

@@ -54,20 +54,22 @@ namespace ChieChie.Resource
         private void UpdateVisuals()
         {
             if (_view == null || _resourceManager == null) return;
-           
-            if (_resourceManager.IsCurrentlyInfinite(_resourceKey))
+          
+            bool isInfiniteDelayed = _resourceManager.IsInfiniteDisplayDelayed(_resourceKey);
+
+            if (_resourceManager.IsCurrentlyInfinite(_resourceKey) && !isInfiniteDelayed)
             {
                 _view.SetRegenStatusActive(false);
                 return;
             }
-           
+   
             if (_resourceManager.IsAtMaxStack(_resourceKey))
             {
                 _view.SetRegenStatusActive(true);
                 _view.SetRegenStatusText("Full");
                 return;
             }
-        
+
             if (_resourceManager.IsRegenEnabled(_resourceKey))
             {
                 DateTime nextRegenTime = _resourceManager.GetNextRegenTime(_resourceKey);
