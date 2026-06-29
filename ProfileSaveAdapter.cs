@@ -28,6 +28,16 @@ namespace Game.DependencyInjection
             _saveSystem.RegisterKey<Dictionary<int, AvatarModel>>(AVATARS_KEY, getAvatarsCallback);
         }
 
+        public void RegisterFramesKey(Func<Dictionary<int, FrameModel>> getFramesCallback)
+        {
+            
+        }
+
+        public void RegisterBadgesKey(Func<Dictionary<int, BadgeModel>> getBadgesCallback)
+        {
+            
+        }
+
         public ProfileModel LoadProfile()
         {
             return _saveSystem.Load<ProfileModel>(PROFILE_DATA_KEY);
@@ -46,6 +56,26 @@ namespace Game.DependencyInjection
         public void SaveAvatars(Dictionary<int, AvatarModel> avatars)
         {
             _saveSystem.Save(AVATARS_KEY, avatars);
+        }
+
+        public Dictionary<int, FrameModel> LoadFrames()
+        {
+            return null;
+        }
+
+        public void SaveFrames(Dictionary<int, FrameModel> frames)
+        {
+           
+        }
+
+        public Dictionary<int, BadgeModel> LoadBadges()
+        {
+            return null;
+        }
+
+        public void SaveBadges(Dictionary<int, BadgeModel> badges)
+        {
+            
         }
     }
 }

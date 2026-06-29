@@ -7,6 +7,10 @@ namespace ChieChie.Profile
     public class ProfileDatabase : ScriptableObject
     {
         [SerializeField] private AvatarConfig avatarConfig;
+        [SerializeField] private FrameConfig frameConfig;
+        [SerializeField] private BadgeConfig badgeConfig;
        public AvatarConfig AvatarConfig => avatarConfig;
+       public FrameConfig FrameConfig => frameConfig;
+       public BadgeConfig BadgeConfig => badgeConfig;
     }
 }
