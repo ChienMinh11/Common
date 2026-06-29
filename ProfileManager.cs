@@ -10,11 +10,7 @@ namespace ChieChie.Profile
         private ProfileDatabase _database;
         private ProfilePresenter _profilePresenter;
         private AvatarPresenter _avatarPresenter;
-  
         private readonly IProfileSaveAdapter _saveAdapter;
-
-        public ProfilePresenter ProfilePresenter => _profilePresenter;
-        public AvatarPresenter AvatarPresenter => _avatarPresenter;
 
         public ProfileManager(ProfileDatabase database, IProfileSaveAdapter saveAdapter)
         {
@@ -24,25 +20,25 @@ namespace ChieChie.Profile
         
         public UniTask<bool> InitializeAsync(CancellationToken cancellationToken)
         {
-            Debug.Log("[ProfileManager] Initializing...");
-
-            // Loại bỏ hoàn toàn _eventService tại đây
             _avatarPresenter = new AvatarPresenter(_saveAdapter, _database.AvatarConfig);
             _profilePresenter = new ProfilePresenter(_saveAdapter, _avatarPresenter);
  
             IsInitialized = true;
-            Debug.Log("[ProfileManager] Initialized successfully.");
             return UniTask.FromResult(true);
         }
 
-        public ProfilePresenter GetProfilePresenter()
+        // Quản lý việc đăng ký View tập trung tại đây
+        public void RegisterView(IProfileView view)
         {
-            return _profilePresenter;
+            _profilePresenter.BindView(view);
         }
 
-        public IAvatarPresenter GetAvatarPresenter()
+        public void UnregisterView()
         {
-            return _avatarPresenter;
+            _profilePresenter.UnbindView();
         }
+
+        public ProfilePresenter GetProfilePresenter() => _profilePresenter;
+        public IAvatarPresenter GetAvatarPresenter() => _avatarPresenter;
     }
 }

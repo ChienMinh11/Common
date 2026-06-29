@@ -1,149 +1,149 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace ChieChie.Profile
 {
     public class ProfilePresenter
     {
-        public event Action<ProfileModel> OnProfileLoaded;
-        public event Action<string> OnProfileNameChanged;
-        public event Action<int> OnProfileAvatarChanged;
-        public event Action<ProfileModel> OnProfileDataChanged;
+        // Sự kiện thông báo khi trạng thái "Thay đổi tạm thời" trên UI biến động
+        public event Action OnStateChanged;
 
         private ProfileModel _currentProfile;
         private readonly IAvatarPresenter _avatarPresenter;
         private readonly IProfileSaveAdapter _saveAdapter;
         
-        private string _defaultPlayerName = "Player";
-        private int _defaultAvatarId = 0;
-        
-        public ProfileModel CurrentProfile => _currentProfile;
-        
-        public ProfilePresenter(
-            IProfileSaveAdapter saveAdapter, 
-            IAvatarPresenter avatarPresenter,
-            string defaultPlayerName = "Player",
-            int defaultAvatarId = 0)
+        private IProfileView _boundView;
+
+        private string _tempPlayerName;
+        private int _tempAvatarId;
+        private string _originalPlayerName;
+        private int _originalAvatarId;
+
+        public ProfilePresenter(IProfileSaveAdapter saveAdapter, IAvatarPresenter avatarPresenter)
         {
             _saveAdapter = saveAdapter;
             _avatarPresenter = avatarPresenter;
-            _defaultPlayerName = defaultPlayerName;
-            _defaultAvatarId = defaultAvatarId;
-            
             Initialize();
         }
-        
-        private bool Initialize()
+
+        private void Initialize()
         {
-            Debug.Log("[ProfilePresenter] Initializing...");
-            
             _saveAdapter.RegisterProfileKey(() => _currentProfile);
             _avatarPresenter.Initialize();
             _avatarPresenter.UnlockAllAvatars();
-
             LoadProfile();
-            Debug.Log("[ProfilePresenter] Initialized successfully.");
-            return true;
         }
-        
+
         private void LoadProfile()
         {
-            var savedProfile = _saveAdapter.LoadProfile();
-            
-            if (savedProfile == null)
+            _currentProfile = _saveAdapter.LoadProfile() ?? new ProfileModel();
+            if (_avatarPresenter.GetAvatar(_currentProfile.AvatarId) == null)
             {
-                _currentProfile = new ProfileModel
-                {
-                    PlayerName = _defaultPlayerName,
-                    AvatarId = _defaultAvatarId,
-                    CreationDate = DateTime.Now,
-                    LastModified = DateTime.Now
-                };
-               
-                SaveProfile();
+                _currentProfile.AvatarId = 0;
+                _saveAdapter.SaveProfile(_currentProfile);
             }
-            else
-            {
-                _currentProfile = savedProfile;
-
-                if (_avatarPresenter.GetAvatar(_currentProfile.AvatarId) == null)
-                {
-                    _currentProfile.AvatarId = _defaultAvatarId;
-                    SaveProfile();
-                }
-            }
-            OnProfileLoaded?.Invoke(_currentProfile);
-        }
-        
-        private void SaveProfile()
-        {
-            _currentProfile.UpdateLastModified();
-            _saveAdapter.SaveProfile(_currentProfile);
         }
 
-        public bool ChangePlayerName(string newName)
+        public void BindView(IProfileView view)
         {
-            if (string.IsNullOrWhiteSpace(newName))
-                return false;
-   
-            if (newName.Length > 20)
-                newName = newName.Substring(0, 20);
-    
-            _currentProfile.PlayerName = newName;
+            UnbindView();
+            _boundView = view;
 
-            SaveProfile();
+            if (_boundView == null) return;
 
-            OnProfileNameChanged?.Invoke(newName);
-            OnProfileDataChanged?.Invoke(_currentProfile);
+            _tempPlayerName = _currentProfile.PlayerName;
+            _originalPlayerName = _tempPlayerName;
+            _tempAvatarId = _currentProfile.AvatarId;
+            _originalAvatarId = _tempAvatarId;
+
+            _boundView.OnTemporaryNameChanged += HandleTemporaryNameChanged;
+            _boundView.OnAvatarSelected += HandleAvatarSelected;
             
-            return true;
+            _avatarPresenter.OnAvatarListUpdated += RefreshAvatarGrid;
+            _avatarPresenter.OnAvatarUnlocked += HandleAvatarUnlocked;
+
+            _boundView.ShowProfileData(_tempPlayerName, _avatarPresenter.GetAvatarSprite(_tempAvatarId));
+            RefreshAvatarGrid();
+            
+            // Kích hoạt cập nhật trạng thái nút bấm ban đầu (Sẽ là false)
+            OnStateChanged?.Invoke();
         }
 
-        public bool ChangePlayerAvatar(int avatarId)
+        public void UnbindView()
+        {
+            if (_boundView == null) return;
+
+            _boundView.OnTemporaryNameChanged -= HandleTemporaryNameChanged;
+            _boundView.OnAvatarSelected -= HandleAvatarSelected;
+
+            _avatarPresenter.OnAvatarListUpdated -= RefreshAvatarGrid;
+            _avatarPresenter.OnAvatarUnlocked -= HandleAvatarUnlocked;
+
+            _boundView = null;
+        }
+
+        private void HandleTemporaryNameChanged(string newName)
+        {
+            if (string.IsNullOrWhiteSpace(newName)) return;
+            _tempPlayerName = newName.Length > 20 ? newName.Substring(0, 20) : newName;
+            
+            _boundView.UpdatePlayerNameDisplay(_tempPlayerName);
+            
+            // Bắn sự kiện báo dữ liệu tạm thời đã thay đổi
+            OnStateChanged?.Invoke();
+        }
+
+        private void HandleAvatarSelected(int avatarId)
         {
             var avatar = _avatarPresenter.GetAvatar(avatarId);
-            if (avatar == null || !avatar.IsUnlocked)
-                return false;
+            if (avatar == null || !avatar.IsUnlocked) return;
 
-            _currentProfile.AvatarId = avatarId;
-
-            SaveProfile();
-
-            OnProfileAvatarChanged?.Invoke(avatarId);
-            OnProfileDataChanged?.Invoke(_currentProfile);
+            _tempAvatarId = avatarId;
+            _boundView.UpdateAvatarDisplay(avatarId, _avatarPresenter.GetAvatarSprite(avatarId));
             
-            return true;
+            // Bắn sự kiện báo dữ liệu tạm thời đã thay đổi
+            OnStateChanged?.Invoke();
         }
 
-        public void ResetProfile()
+        public void HandleSaveRequested()
         {
-            _currentProfile = new ProfileModel
+            _currentProfile.PlayerName = _tempPlayerName;
+            _currentProfile.AvatarId = _tempAvatarId;
+            _currentProfile.UpdateLastModified();
+            
+            _saveAdapter.SaveProfile(_currentProfile);
+            
+            _originalPlayerName = _tempPlayerName;
+            _originalAvatarId = _tempAvatarId;
+            
+            // Lưu xong thì trạng thái thay đổi quay về bằng không -> nút Save tự khóa lại
+            OnStateChanged?.Invoke();
+        }
+
+        private void HandleAvatarUnlocked(AvatarModel avatar)
+        {
+            RefreshAvatarGrid();
+        }
+
+        private void RefreshAvatarGrid()
+        {
+            if (_boundView == null) return;
+            
+            var allAvatars = _avatarPresenter.GetAllAvatars();
+            var avatarSprites = new Dictionary<int, Sprite>();
+            foreach (var avatar in allAvatars)
             {
-                PlayerName = _defaultPlayerName,
-                AvatarId = _defaultAvatarId,
-                CreationDate = DateTime.Now,
-                LastModified = DateTime.Now
-            };
-            
-            SaveProfile();
-   
-            OnProfileLoaded?.Invoke(_currentProfile);
-            OnProfileDataChanged?.Invoke(_currentProfile);
-        }
- 
-        public string GetPlayerName()
-        {
-            return _currentProfile.PlayerName;
+                var sprite = _avatarPresenter.GetAvatarSprite(avatar.Id);
+                if (sprite != null) avatarSprites[avatar.Id] = sprite;
+            }
+            _boundView.PopulateAvatarGrid(allAvatars, avatarSprites);
+            _boundView.UpdateAvatarDisplay(_tempAvatarId, _avatarPresenter.GetAvatarSprite(_tempAvatarId));
         }
 
-        public int GetCurrentAvatarId()
+        public bool HasChanges() 
         {
-            return _currentProfile.AvatarId;
-        }
-
-        public Sprite GetCurrentAvatarSprite()
-        {
-            return _avatarPresenter.GetAvatarSprite(_currentProfile.AvatarId);
+            return _tempAvatarId != _originalAvatarId || _tempPlayerName != _originalPlayerName;
         }
     }
 }
