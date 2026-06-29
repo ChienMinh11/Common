@@ -112,23 +112,8 @@ namespace Game.GamePlay
         private void OnEditNameButtonClicked()
         {
             OnEditNameRequested?.Invoke();
-            OpenInputPopupAsync().Forget(); 
+          
         }
-
-        private async UniTaskVoid OpenInputPopupAsync()
-        {
-            if (_popupController == null) return;
-
-            await _popupController.ShowPopup("PopupProfileInputText");
-            var inputTextPopup = _popupController.GetPopup<PopupProfileInputText>("PopupProfileInputText");
-            if (inputTextPopup != null)
-            {
-                inputTextPopup.SetTittleText("Edit Player Name");
-                inputTextPopup.SetInputText(_cachedPlayerName);
-                inputTextPopup.SetContinueCallback(OnNameInputComplete);
-            }
-        }
-
         private void OnNameInputComplete(string newName)
         {
             OnTemporaryNameChanged?.Invoke(newName);

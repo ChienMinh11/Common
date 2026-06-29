@@ -56,19 +56,15 @@ namespace Game.GamePlay
             if (_profileManager != null)
             {
                 _profileManager.OnStateChanged -= UpdateSaveButtonState;
-                _profileManager.UnregisterView();
+                _profileManager.UnregisterView(profileView); 
             }
         }
 
-        public void OnClickClose()
+        private void OnClickClose()
         {
-            if (_profileManager != null && _profileManager.HasChanges()) 
+            if (_profileManager != null)
             {
-                _popup?.ShowPopup("PopupProfileMessage");
-            }
-            else
-            {
-                OnClose();
+                _profileManager.RequestClose(); 
             }
         }
 

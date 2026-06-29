@@ -83,7 +83,7 @@ namespace ChieChie.Profile
             _boundView = null;
         }
 
-        private void HandleTemporaryNameChanged(string newName)
+        public void HandleTemporaryNameChanged(string newName)
         {
             if (string.IsNullOrWhiteSpace(newName)) return;
             _tempPlayerName = newName.Length > 20 ? newName.Substring(0, 20) : newName;

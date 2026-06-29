@@ -12,8 +12,9 @@ namespace ChieChie.Profile
         private ProfilePresenter _profilePresenter;
         private AvatarPresenter _avatarPresenter;
         private readonly IProfileSaveAdapter _saveAdapter;
-
-        // Triển khai event và method từ IProfileService thay vì expose Presenter
+        public event Action OnCloseRequested;
+        public event Action OnEditNameRequested;
+       
         public event Action OnStateChanged
         {
             add => _profilePresenter.OnStateChanged += value;
@@ -38,11 +39,31 @@ namespace ChieChie.Profile
         public void RegisterView(IProfileView view)
         {
             _profilePresenter.BindView(view);
+            view.OnCloseRequested += HandleCloseRequested;
+            view.OnEditNameRequested += HandleEditNameRequested;
         }
 
-        public void UnregisterView()
+        public void UnregisterView(IProfileView view)
         {
+            if (view != null)
+            {
+                view.OnCloseRequested -= HandleCloseRequested;
+                view.OnEditNameRequested -= HandleEditNameRequested;
+            }
             _profilePresenter.UnbindView();
+            
+        }
+        private void HandleCloseRequested() => OnCloseRequested?.Invoke();
+        private void HandleEditNameRequested() => OnEditNameRequested?.Invoke();
+
+        public void RequestClose()
+        {
+            OnCloseRequested?.Invoke();
+        }
+
+        public void ChangeTemporaryName(string newName)
+        {
+            _profilePresenter.HandleTemporaryNameChanged(newName); 
         }
 
         public bool HasChanges() => _profilePresenter.HasChanges();
