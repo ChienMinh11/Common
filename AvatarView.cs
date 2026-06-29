@@ -6,7 +6,7 @@ using UnityEngine.UI;
 
 namespace Game.GamePlay
 {
-        public class AvatarView : MonoBehaviour, IAvatarView
+        public class AvatarView : MonoBehaviour
     {
         [SerializeField] private Image avatarImage;
         [SerializeField] private TextMeshProUGUI avatarNameText;

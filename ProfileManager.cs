@@ -12,7 +12,10 @@ namespace ChieChie.Profile
         private ProfileDatabase _database;
         private ProfilePresenter _profilePresenter;
         private AvatarPresenter _avatarPresenter;
+        private FramePresenter _framePresenter; // Thêm mới
+        private BadgePresenter _badgePresenter; // Thêm mới
         private readonly IProfileSaveAdapter _saveAdapter;
+        
         public event Action OnCloseRequested;
         public event Action OnEditNameRequested;
        
@@ -36,7 +39,11 @@ namespace ChieChie.Profile
         public UniTask<bool> InitializeAsync(CancellationToken cancellationToken)
         {
             _avatarPresenter = new AvatarPresenter(_saveAdapter, _database.AvatarConfig);
-            _profilePresenter = new ProfilePresenter(_saveAdapter, _avatarPresenter);
+            _framePresenter = new FramePresenter(_saveAdapter, _database.FrameConfig); // Khởi tạo Frame Presenter
+            _badgePresenter = new BadgePresenter(_saveAdapter, _database.BadgeConfig); // Khởi tạo Badge Presenter
+            
+            // Truyền tất cả Presenter vào ProfilePresenter để kết nối dữ liệu
+            _profilePresenter = new ProfilePresenter(_saveAdapter, _avatarPresenter, _framePresenter, _badgePresenter);
  
             IsInitialized = true;
             return UniTask.FromResult(true);
@@ -57,23 +64,13 @@ namespace ChieChie.Profile
                 view.OnEditNameRequested -= HandleEditNameRequested;
             }
             _profilePresenter.UnbindView();
-            
         }
+        
         private void HandleCloseRequested() => OnCloseRequested?.Invoke();
         private void HandleEditNameRequested() => OnEditNameRequested?.Invoke();
-
-        public void RequestClose()
-        {
-            OnCloseRequested?.Invoke();
-        }
-
-        public void ChangeTemporaryName(string newName)
-        {
-            _profilePresenter.HandleTemporaryNameChanged(newName); 
-        }
-
+        public void RequestClose() => OnCloseRequested?.Invoke();
+        public void ChangeTemporaryName(string newName) => _profilePresenter.HandleTemporaryNameChanged(newName);
         public bool HasChanges() => _profilePresenter.HasChanges();
-        
         public void HandleSaveRequested() => _profilePresenter.HandleSaveRequested();
     }
 }
