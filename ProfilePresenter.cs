@@ -60,10 +60,14 @@ namespace ChieChie.Profile
         private void LoadProfile()
         {
             _currentProfile = _saveAdapter.LoadProfile() ?? new ProfileModel();
-            
+    
             if (_avatarPresenter.GetAvatar(_currentProfile.AvatarId) == null) _currentProfile.AvatarId = 0;
             if (_framePresenter.GetFrame(_currentProfile.FrameId) == null) _currentProfile.FrameId = 0;
-            if (_badgePresenter.GetBadge(_currentProfile.BadgeId) == null) _currentProfile.BadgeId = 0;
+           
+            if (_currentProfile.BadgeId != -1 && _badgePresenter.GetBadge(_currentProfile.BadgeId) == null) 
+            {
+                _currentProfile.BadgeId = -1;
+            }
 
             _saveAdapter.SaveProfile(_currentProfile);
         }
@@ -158,8 +162,17 @@ namespace ChieChie.Profile
             OnStateChanged?.Invoke();
         }
 
-        private void HandleBadgeSelected(int badgeId) // Thêm mới
+        private void HandleBadgeSelected(int badgeId)
         {
+           
+            if (_tempBadgeId == badgeId)
+            {
+                _tempBadgeId = -1; 
+                _boundView.UpdateBadgeDisplay(_tempBadgeId, null); 
+                OnStateChanged?.Invoke();
+                return;
+            }
+
             var badge = _badgePresenter.GetBadge(badgeId);
             if (badge == null || !badge.IsUnlocked) return;
 
@@ -174,8 +187,8 @@ namespace ChieChie.Profile
             {
                 _currentProfile.PlayerName = _tempPlayerName;
                 _currentProfile.AvatarId = _tempAvatarId;
-                _currentProfile.FrameId = _tempFrameId; // Thêm mới
-                _currentProfile.BadgeId = _tempBadgeId; // Thêm mới
+                _currentProfile.FrameId = _tempFrameId;
+                _currentProfile.BadgeId = _tempBadgeId;
                 _currentProfile.UpdateLastModified();
                 
                 _saveAdapter.SaveProfile(_currentProfile);

@@ -81,11 +81,16 @@ namespace Game.GamePlay
 
         public void ShowProfileData(string playerName, Sprite avatarSprite, Sprite frameSprite, Sprite badgeSprite)
         {
-            _cachedPlayerName = playerName; //
+            _cachedPlayerName = playerName; 
             UpdatePlayerNameDisplay(playerName);
-            if (avatarImage != null && avatarSprite != null) avatarImage.sprite = avatarSprite; //
+            if (avatarImage != null && avatarSprite != null) avatarImage.sprite = avatarSprite; 
             if (frameImage != null && frameSprite != null) frameImage.sprite = frameSprite; 
-            if (badgeImage != null && badgeSprite != null) badgeImage.sprite = badgeSprite; 
+    
+            if (badgeImage != null)
+            {
+                badgeImage.sprite = badgeSprite;
+                badgeImage.gameObject.SetActive(badgeSprite != null);
+            }
         }
 
         public void UpdatePlayerNameDisplay(string name)
@@ -117,7 +122,12 @@ namespace Game.GamePlay
         public void UpdateBadgeDisplay(int badgeId, Sprite badgeSprite) 
         {
             _currentBadgeId = badgeId;
-            if (badgeImage != null && badgeSprite != null) badgeImage.sprite = badgeSprite;
+            if (badgeImage != null)
+            {
+                badgeImage.sprite = badgeSprite;
+                badgeImage.gameObject.SetActive(badgeSprite != null);
+            }
+    
             foreach (var item in _badgeItems)
             {
                 if (item != null) item.SetSelected(item.GetBadgeId() == _currentBadgeId);

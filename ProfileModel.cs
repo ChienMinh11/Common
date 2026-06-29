@@ -7,8 +7,8 @@ namespace ChieChie.Profile
     {
         public string PlayerName;
         public int AvatarId;
-        public int FrameId;  // Thêm mới
-        public int BadgeId;  // Thêm mới
+        public int FrameId;
+        public int BadgeId; 
         public DateTime CreationDate;
         public DateTime LastModified;
         
@@ -16,8 +16,8 @@ namespace ChieChie.Profile
         {
             PlayerName = "You";
             AvatarId = 0; 
-            FrameId = 0;   // Mặc định ban đầu
-            BadgeId = 0;   // Mặc định ban đầu
+            FrameId = 0;  
+            BadgeId = -1;  
             CreationDate = DateTime.Now;
             LastModified = DateTime.Now;
         }
@@ -28,8 +28,8 @@ namespace ChieChie.Profile
             {
                 PlayerName = this.PlayerName,
                 AvatarId = this.AvatarId,
-                FrameId = this.FrameId,   // Thêm mới
-                BadgeId = this.BadgeId,   // Thêm mới
+                FrameId = this.FrameId,   
+                BadgeId = this.BadgeId,
                 CreationDate = this.CreationDate,
                 LastModified = DateTime.Now
             };
