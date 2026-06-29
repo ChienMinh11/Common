@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace ChieChie.Profile
+namespace ChieChie.Constracts
 {
     // Struct trung gian chỉ chứa thông tin hiển thị thuần túy cho View
     public struct AvatarDisplayData

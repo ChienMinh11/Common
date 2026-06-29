@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using ChieChie.Constracts;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -19,6 +20,11 @@ namespace ChieChie.Profile
         {
             add => _profilePresenter.OnStateChanged += value;
             remove => _profilePresenter.OnStateChanged -= value;
+        }
+        public event Action<bool> OnSaveCompleted
+        {
+            add => _profilePresenter.OnSaveCompleted += value;
+            remove => _profilePresenter.OnSaveCompleted -= value;
         }
 
         public ProfileManager(ProfileDatabase database, IProfileSaveAdapter saveAdapter)

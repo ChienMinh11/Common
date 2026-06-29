@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using ChieChie.Constracts;
 using UnityEngine;
 
 namespace ChieChie.Profile
@@ -8,6 +9,7 @@ namespace ChieChie.Profile
     {
         // Sự kiện thông báo khi trạng thái "Thay đổi tạm thời" trên UI biến động
         public event Action OnStateChanged;
+        public event Action<bool> OnSaveCompleted;
 
         private ProfileModel _currentProfile;
         private readonly IAvatarPresenter _avatarPresenter;
@@ -108,17 +110,27 @@ namespace ChieChie.Profile
 
         public void HandleSaveRequested()
         {
-            _currentProfile.PlayerName = _tempPlayerName;
-            _currentProfile.AvatarId = _tempAvatarId;
-            _currentProfile.UpdateLastModified();
-            
-            _saveAdapter.SaveProfile(_currentProfile);
-            
-            _originalPlayerName = _tempPlayerName;
-            _originalAvatarId = _tempAvatarId;
-            
-            // Lưu xong thì trạng thái thay đổi quay về bằng không -> nút Save tự khóa lại
-            OnStateChanged?.Invoke();
+            try 
+            {
+                _currentProfile.PlayerName = _tempPlayerName;
+                _currentProfile.AvatarId = _tempAvatarId;
+                _currentProfile.UpdateLastModified();
+                
+                _saveAdapter.SaveProfile(_currentProfile);
+                
+                _originalPlayerName = _tempPlayerName;
+                _originalAvatarId = _tempAvatarId;
+                
+                OnStateChanged?.Invoke();
+                
+                // Bắn sự kiện báo lưu thành công
+                OnSaveCompleted?.Invoke(true); 
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ProfilePresenter] Save failed: {ex.Message}");
+                OnSaveCompleted?.Invoke(false); // Lưu thất bại
+            }
         }
 
         private void HandleAvatarUnlocked(AvatarModel avatar)

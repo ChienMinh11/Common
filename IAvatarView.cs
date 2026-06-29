@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace ChieChie.Profile
+namespace ChieChie.Constracts
 {
     public interface IAvatarView
     {
