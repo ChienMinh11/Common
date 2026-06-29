@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -5,6 +6,9 @@ namespace ChieChie.Profile
 {
     public interface IAvatarPresenter
     {
+        event Action OnAvatarListUpdated;
+        event Action<AvatarModel> OnAvatarUnlocked;
+
         bool Initialize();
         List<AvatarModel> GetAllAvatars();
         List<AvatarModel> GetUnlockedAvatars();

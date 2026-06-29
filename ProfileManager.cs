@@ -1,5 +1,4 @@
 using System.Threading;
-using ChieChie.Core;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -13,28 +12,37 @@ namespace ChieChie.Profile
         private AvatarPresenter _avatarPresenter;
   
         private readonly IProfileSaveAdapter _saveAdapter;
-        private readonly IEventService _eventService;
 
         public ProfilePresenter ProfilePresenter => _profilePresenter;
         public AvatarPresenter AvatarPresenter => _avatarPresenter;
 
-        public ProfileManager(ProfileDatabase database,IProfileSaveAdapter saveAdapter, IEventService eventService)
+        public ProfileManager(ProfileDatabase database, IProfileSaveAdapter saveAdapter)
         {
             _database = database;
             _saveAdapter = saveAdapter;
-            _eventService = eventService;
         }
         
         public UniTask<bool> InitializeAsync(CancellationToken cancellationToken)
         {
             Debug.Log("[ProfileManager] Initializing...");
 
-            _avatarPresenter = new AvatarPresenter(_saveAdapter, _eventService, _database.AvatarConfig);
-            _profilePresenter = new ProfilePresenter(_saveAdapter, _eventService, _avatarPresenter);
+            // Loại bỏ hoàn toàn _eventService tại đây
+            _avatarPresenter = new AvatarPresenter(_saveAdapter, _database.AvatarConfig);
+            _profilePresenter = new ProfilePresenter(_saveAdapter, _avatarPresenter);
  
             IsInitialized = true;
             Debug.Log("[ProfileManager] Initialized successfully.");
             return UniTask.FromResult(true);
+        }
+
+        public ProfilePresenter GetProfilePresenter()
+        {
+            return _profilePresenter;
+        }
+
+        public IAvatarPresenter GetAvatarPresenter()
+        {
+            return _avatarPresenter;
         }
     }
 }

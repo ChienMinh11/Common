@@ -1,34 +1,27 @@
+using System;
 using System.Collections.Generic;
-using ChieChie.Core;
 using UnityEngine;
 
 namespace ChieChie.Profile
 {
-    public enum AvatarEventType
-    {
-        AvatarChanged,
-        AvatarListUpdated,
-        AvatarUnlocked
-    }
-    
     public class AvatarPresenter : IAvatarPresenter
     {
+        public event Action OnAvatarListUpdated;
+        public event Action<AvatarModel> OnAvatarUnlocked;
+
         public bool IsInitialized { get; private set; }
         
         private Dictionary<int, AvatarModel> _avatars = new Dictionary<int, AvatarModel>();
         private Dictionary<int, Sprite> _avatarSprites = new Dictionary<int, Sprite>();
         
         private readonly IProfileSaveAdapter _saveAdapter;
-        private readonly IEventService _eventService;
         private readonly AvatarConfig _avatarConfig;
         
         public AvatarPresenter(
             IProfileSaveAdapter saveAdapter, 
-            IEventService eventService, 
             AvatarConfig avatarConfig)
         {
             _saveAdapter = saveAdapter;
-            _eventService = eventService;
             _avatarConfig = avatarConfig;
         }
         
@@ -83,7 +76,7 @@ namespace ChieChie.Profile
                 }
             }
             
-            _eventService.PublishEvent<AvatarEventType>(AvatarEventType.AvatarListUpdated);
+            OnAvatarListUpdated?.Invoke();
         }
         
         public List<AvatarModel> GetAllAvatars()
@@ -135,7 +128,7 @@ namespace ChieChie.Profile
                 
                 avatar.IsUnlocked = true;
                 _saveAdapter.SaveAvatars(_avatars);
-                _eventService.Publish<AvatarModel, AvatarEventType>(AvatarEventType.AvatarUnlocked, avatar);
+                OnAvatarUnlocked?.Invoke(avatar);
                 return true;
             }
             return false;
@@ -147,7 +140,7 @@ namespace ChieChie.Profile
             {
                 _avatars[newAvatar.Id] = newAvatar;
                 _saveAdapter.SaveAvatars(_avatars);
-                _eventService.PublishEvent<AvatarEventType>(AvatarEventType.AvatarListUpdated);
+                OnAvatarListUpdated?.Invoke();
             }
         }
         
@@ -160,14 +153,14 @@ namespace ChieChie.Profile
                 {
                     avatar.IsUnlocked = true;
                     anyUnlocked = true;
-                    _eventService.Publish<AvatarModel, AvatarEventType>(AvatarEventType.AvatarUnlocked, avatar);
+                    OnAvatarUnlocked?.Invoke(avatar);
                 }
             }
     
             if (anyUnlocked)
             {
                 _saveAdapter.SaveAvatars(_avatars);
-                _eventService.PublishEvent<AvatarEventType>(AvatarEventType.AvatarListUpdated);
+                OnAvatarListUpdated?.Invoke();
             }
         }
 

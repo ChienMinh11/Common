@@ -1,23 +1,18 @@
 using System;
-using ChieChie.Core;
 using UnityEngine;
 
 namespace ChieChie.Profile
 {
-   public enum ProfileEventType
-    {
-        ProfileLoaded,
-        ProfileNameChanged,
-        ProfileAvatarChanged,
-        ProfileDataChanged
-    }
-    
     public class ProfilePresenter
     {
+        public event Action<ProfileModel> OnProfileLoaded;
+        public event Action<string> OnProfileNameChanged;
+        public event Action<int> OnProfileAvatarChanged;
+        public event Action<ProfileModel> OnProfileDataChanged;
+
         private ProfileModel _currentProfile;
         private readonly IAvatarPresenter _avatarPresenter;
         private readonly IProfileSaveAdapter _saveAdapter;
-        private readonly IEventService _eventService;
         
         private string _defaultPlayerName = "Player";
         private int _defaultAvatarId = 0;
@@ -26,13 +21,11 @@ namespace ChieChie.Profile
         
         public ProfilePresenter(
             IProfileSaveAdapter saveAdapter, 
-            IEventService eventService, 
             IAvatarPresenter avatarPresenter,
             string defaultPlayerName = "Player",
             int defaultAvatarId = 0)
         {
             _saveAdapter = saveAdapter;
-            _eventService = eventService;
             _avatarPresenter = avatarPresenter;
             _defaultPlayerName = defaultPlayerName;
             _defaultAvatarId = defaultAvatarId;
@@ -79,7 +72,7 @@ namespace ChieChie.Profile
                     SaveProfile();
                 }
             }
-            _eventService.Publish<ProfileModel, ProfileEventType>(ProfileEventType.ProfileLoaded, _currentProfile);
+            OnProfileLoaded?.Invoke(_currentProfile);
         }
         
         private void SaveProfile()
@@ -100,8 +93,8 @@ namespace ChieChie.Profile
 
             SaveProfile();
 
-            _eventService.Publish<string, ProfileEventType>(ProfileEventType.ProfileNameChanged, newName);
-            _eventService.Publish<ProfileModel, ProfileEventType>(ProfileEventType.ProfileDataChanged, _currentProfile);
+            OnProfileNameChanged?.Invoke(newName);
+            OnProfileDataChanged?.Invoke(_currentProfile);
             
             return true;
         }
@@ -116,8 +109,8 @@ namespace ChieChie.Profile
 
             SaveProfile();
 
-            _eventService.Publish<int, ProfileEventType>(ProfileEventType.ProfileAvatarChanged, avatarId);
-            _eventService.Publish<ProfileModel, ProfileEventType>(ProfileEventType.ProfileDataChanged, _currentProfile);
+            OnProfileAvatarChanged?.Invoke(avatarId);
+            OnProfileDataChanged?.Invoke(_currentProfile);
             
             return true;
         }
@@ -134,8 +127,8 @@ namespace ChieChie.Profile
             
             SaveProfile();
    
-            _eventService.Publish<ProfileModel, ProfileEventType>(ProfileEventType.ProfileLoaded, _currentProfile);
-            _eventService.Publish<ProfileModel, ProfileEventType>(ProfileEventType.ProfileDataChanged, _currentProfile);
+            OnProfileLoaded?.Invoke(_currentProfile);
+            OnProfileDataChanged?.Invoke(_currentProfile);
         }
  
         public string GetPlayerName()
