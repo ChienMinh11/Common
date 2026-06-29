@@ -5,8 +5,8 @@ namespace ChieChie.Profile
 {
     public interface IAvatarView
     {
-        void DisplayAvatar(AvatarModel avatarInfo, Sprite avatarSprite, bool isSelected);
-        void UpdateAvatarList(List<AvatarModel> avatars);
+        void DisplayAvatar(int id, string name, Sprite avatarSprite, bool isSelected, bool isUnlocked);
+        void UpdateAvatarList(List<int> avatarIds);
         void SetAvatarLockState(int avatarId, bool isUnlocked);
     }
 }

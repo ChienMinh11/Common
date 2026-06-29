@@ -131,13 +131,15 @@ namespace ChieChie.Profile
             if (_boundView == null) return;
             
             var allAvatars = _avatarPresenter.GetAllAvatars();
-            var avatarSprites = new Dictionary<int, Sprite>();
+            var displayDataList = new List<AvatarDisplayData>();
+
             foreach (var avatar in allAvatars)
             {
                 var sprite = _avatarPresenter.GetAvatarSprite(avatar.Id);
-                if (sprite != null) avatarSprites[avatar.Id] = sprite;
+                displayDataList.Add(new AvatarDisplayData(avatar.Id, avatar.Name, sprite, avatar.IsUnlocked));
             }
-            _boundView.PopulateAvatarGrid(allAvatars, avatarSprites);
+
+            _boundView.PopulateAvatarGrid(displayDataList);
             _boundView.UpdateAvatarDisplay(_tempAvatarId, _avatarPresenter.GetAvatarSprite(_tempAvatarId));
         }
 

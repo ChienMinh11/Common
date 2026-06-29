@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -11,6 +12,13 @@ namespace ChieChie.Profile
         private ProfilePresenter _profilePresenter;
         private AvatarPresenter _avatarPresenter;
         private readonly IProfileSaveAdapter _saveAdapter;
+
+        // Triển khai event và method từ IProfileService thay vì expose Presenter
+        public event Action OnStateChanged
+        {
+            add => _profilePresenter.OnStateChanged += value;
+            remove => _profilePresenter.OnStateChanged -= value;
+        }
 
         public ProfileManager(ProfileDatabase database, IProfileSaveAdapter saveAdapter)
         {
@@ -27,7 +35,6 @@ namespace ChieChie.Profile
             return UniTask.FromResult(true);
         }
 
-        // Quản lý việc đăng ký View tập trung tại đây
         public void RegisterView(IProfileView view)
         {
             _profilePresenter.BindView(view);
@@ -38,7 +45,8 @@ namespace ChieChie.Profile
             _profilePresenter.UnbindView();
         }
 
-        public ProfilePresenter GetProfilePresenter() => _profilePresenter;
-        public IAvatarPresenter GetAvatarPresenter() => _avatarPresenter;
+        public bool HasChanges() => _profilePresenter.HasChanges();
+        
+        public void HandleSaveRequested() => _profilePresenter.HandleSaveRequested();
     }
 }
