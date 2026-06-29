@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using ChieChie.Profile;
+using ChieChie.Constracts;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -62,13 +62,7 @@ namespace Game.GamePlay
         {
             throw new System.NotImplementedException();
         }
-
-        public void UpdateAvatarList(List<AvatarModel> avatars)
-        {
-            // Cette méthode n'est pas applicable pour un seul élément d'avatar
-            // Elle serait utilisée par un conteneur d'avatars
-        }
-        
+      
         public void SetAvatarLockState(int avatarId, bool isUnlocked)
         {
             if (avatarId != _avatarId) return;

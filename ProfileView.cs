@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
+using ChieChie.Constracts;
 using ChieChie.Core;
-using ChieChie.Profile;
 using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;

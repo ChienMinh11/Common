@@ -1,5 +1,5 @@
+using ChieChie.Constracts;
 using ChieChie.Core;
-using ChieChie.Profile;
 using UnityEngine;
 using UnityEngine.UI;
 using VContainer;
