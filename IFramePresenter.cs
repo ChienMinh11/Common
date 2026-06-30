@@ -17,5 +17,6 @@ namespace ChieChie.Profile
         void UnlockAllFrames();
         bool IsFrameUnlocked(int frameId);
         GameObject GetFramePrefab(int frameId);
+        bool LockFrame(int frameId);
     }
 }

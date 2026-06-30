@@ -47,7 +47,7 @@ namespace ChieChie.Profile
         private void LoadAvatars()
         {
             var savedAvatars = _saveAdapter.LoadAvatars();
-            
+    
             if (savedAvatars == null || savedAvatars.Count == 0)
             {
                 _avatars = _avatarConfig.GetDefaultAvatarInfoDictionary();
@@ -63,11 +63,15 @@ namespace ChieChie.Profile
                         AvatarModel newAvatar = avatarData.ToAvatarInfo();
                         _avatars[avatarData.Id] = newAvatar;
                     }
+                    else if (avatarData.LockByDefault)
+                    {
+                        _avatars[avatarData.Id].IsUnlocked = false;
+                    }
                 }
-                
+
                 _saveAdapter.SaveAvatars(_avatars);
             }
-            
+
             foreach (var avatarData in _avatarConfig.Avatars)
             {
                 if (avatarData.AvatarSprite != null)
@@ -129,6 +133,33 @@ namespace ChieChie.Profile
                 avatar.IsUnlocked = true;
                 _saveAdapter.SaveAvatars(_avatars);
                 OnAvatarUnlocked?.Invoke(avatar);
+                return true;
+            }
+            return false;
+        }
+        public bool LockAvatar(int avatarId)
+        {
+            if (_avatars.TryGetValue(avatarId, out var avatar))
+            {
+                if (!avatar.IsUnlocked) return false; 
+                avatar.IsUnlocked = false;
+                var currentProfile = _saveAdapter.LoadProfile();
+                if (currentProfile != null && currentProfile.AvatarId == avatarId)
+                {
+                    int fallbackId = 0;
+                    foreach (var pair in _avatars)
+                    {
+                        if (pair.Value.IsUnlocked)
+                        {
+                            fallbackId = pair.Key;
+                            break;
+                        }
+                    }
+                    currentProfile.AvatarId = fallbackId;
+                    _saveAdapter.SaveProfile(currentProfile);
+                }
+                _saveAdapter.SaveAvatars(_avatars);
+                OnAvatarListUpdated?.Invoke(); 
                 return true;
             }
             return false;

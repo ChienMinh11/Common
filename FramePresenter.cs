@@ -42,7 +42,7 @@ namespace ChieChie.Profile
         private void LoadFrames()
         {
             var savedFrames = _saveAdapter.LoadFrames();
-            
+    
             if (savedFrames == null || savedFrames.Count == 0)
             {
                 _frames = _frameConfig.GetDefaultFrameInfoDictionary();
@@ -56,6 +56,10 @@ namespace ChieChie.Profile
                     if (!_frames.ContainsKey(frameData.Id))
                     {
                         _frames[frameData.Id] = frameData.ToFrameInfo();
+                    }
+                    else if (frameData.LockByDefault)
+                    {
+                        _frames[frameData.Id].IsUnlocked = false;
                     }
                 }
                 _saveAdapter.SaveFrames(_frames);
@@ -88,6 +92,37 @@ namespace ChieChie.Profile
         public Sprite GetFrameSprite(int frameId) // Giờ là lấy Icon tĩnh cho Grid
         {
             return _frameIcons.TryGetValue(frameId, out var sprite) ? sprite : null;
+        }
+        public bool LockFrame(int frameId)
+        {
+            if (_frames.TryGetValue(frameId, out var frame))
+            {
+                if (!frame.IsUnlocked) return false; 
+        
+                frame.IsUnlocked = false;
+                var currentProfile = _saveAdapter.LoadProfile();
+                if (currentProfile != null && currentProfile.FrameId == frameId)
+                {
+                    int fallbackId = 0;
+            
+                    foreach (var pair in _frames)
+                    {
+                        if (pair.Value.IsUnlocked)
+                        {
+                            fallbackId = pair.Key;
+                            break;
+                        }
+                    }
+            
+                    currentProfile.FrameId = fallbackId;
+                    _saveAdapter.SaveProfile(currentProfile);
+                }
+
+                _saveAdapter.SaveFrames(_frames);
+                OnFrameListUpdated?.Invoke(); 
+                return true;
+            }
+            return false;
         }
 
         public bool UnlockFrame(int frameId)

@@ -8,21 +8,22 @@ namespace ChieChie.Profile
         [Header("Frame Information")]
         [SerializeField] private int id;
         [SerializeField] private string displayName;
-        [SerializeField] private Sprite frameIcon; // Icon tĩnh dùng cho Grid danh sách
-        [SerializeField] private GameObject framePrefab; // Prefab chứa Effect/Spine hiển thị chính
-        [SerializeField] private bool unlockedByDefault;
-        [SerializeField] private string unlockCondition;
+        [SerializeField] private Sprite frameIcon; 
+        [SerializeField] private GameObject framePrefab; 
+        [SerializeField] private bool lockByDefault;
+        
 
         public int Id => id;
         public string DisplayName => displayName;
         public Sprite FrameIcon => frameIcon;
-        public GameObject FramePrefab => framePrefab; // Property mới
-        public bool UnlockedByDefault => unlockedByDefault;
-        public string UnlockCondition => unlockCondition;
+        public GameObject FramePrefab => framePrefab; 
+        public bool LockByDefault => lockByDefault;
+      
 
         public FrameModel ToFrameInfo()
         {
-            return new FrameModel(id, displayName, unlockedByDefault);
+            bool initialUnlocked = lockByDefault;
+            return new FrameModel(id, displayName, initialUnlocked);
         }
     }
 }

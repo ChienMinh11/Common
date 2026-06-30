@@ -46,27 +46,27 @@ namespace ChieChie.Profile
         {
             _saveAdapter.RegisterProfileKey(() => _currentProfile);
             _avatarPresenter.Initialize();
-            _avatarPresenter.UnlockAllAvatars();
-
-            _framePresenter.Initialize(); // Khởi tạo Frame
-            _framePresenter.UnlockAllFrames();
-
-            _badgePresenter.Initialize(); // Khởi tạo Badge
-            _badgePresenter.UnlockAllBadges();
-
+            _framePresenter.Initialize(); 
+            _badgePresenter.Initialize();
             LoadProfile();
         }
 
         private void LoadProfile()
         {
             _currentProfile = _saveAdapter.LoadProfile() ?? new ProfileModel();
-    
-            if (_avatarPresenter.GetAvatar(_currentProfile.AvatarId) == null) _currentProfile.AvatarId = 0;
-            if (_framePresenter.GetFrame(_currentProfile.FrameId) == null) _currentProfile.FrameId = 0;
-           
-            if (_currentProfile.BadgeId != -1 && _badgePresenter.GetBadge(_currentProfile.BadgeId) == null) 
+            var currentAvatar = _avatarPresenter.GetAvatar(_currentProfile.AvatarId);
+            if (currentAvatar == null || !currentAvatar.IsUnlocked) _currentProfile.AvatarId = 0;
+
+            var currentFrame = _framePresenter.GetFrame(_currentProfile.FrameId);
+            if (currentFrame == null || !currentFrame.IsUnlocked) _currentProfile.FrameId = 0;
+   
+            if (_currentProfile.BadgeId != -1)
             {
-                _currentProfile.BadgeId = -1;
+                var currentBadge = _badgePresenter.GetBadge(_currentProfile.BadgeId);
+                if (currentBadge == null || !currentBadge.IsUnlocked)
+                {
+                    _currentProfile.BadgeId = -1;
+                }
             }
 
             _saveAdapter.SaveProfile(_currentProfile);

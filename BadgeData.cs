@@ -11,19 +11,20 @@ namespace ChieChie.Profile
         [SerializeField] private string displayName;
         [SerializeField] private Sprite badgeIcon;
         [SerializeField] private GameObject badgePrefab;
-        [SerializeField] private bool unlockedByDefault;
-        [SerializeField] private string unlockCondition;
+        [SerializeField] private bool lockByDefault;
+      
 
         public int Id => id;
         public string DisplayName => displayName;
         public GameObject BadgePrefab => badgePrefab;
         public Sprite BadgeIcon => badgeIcon;
-        public bool UnlockedByDefault => unlockedByDefault;
-        public string UnlockCondition => unlockCondition;
+        public bool LockByDefault => lockByDefault;
+    
 
         public BadgeModel ToBadgeInfo()
         {
-            return new BadgeModel(id, displayName, unlockedByDefault);
+            bool initialUnlocked = lockByDefault;
+            return new BadgeModel(id, displayName, initialUnlocked);
         }
     }
 }

@@ -17,5 +17,6 @@ namespace ChieChie.Profile
         bool UnlockBadge(int badgeId);
         void UnlockAllBadges();
         bool IsBadgeUnlocked(int badgeId);
+        bool LockBadge(int badgeId);
     }
 }

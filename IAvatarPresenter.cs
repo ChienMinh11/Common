@@ -18,5 +18,6 @@ namespace ChieChie.Profile
         void AddAvatar(AvatarModel newAvatar);
         void UnlockAllAvatars();
         bool IsAvatarUnlocked(int avatarId);
+        bool LockAvatar(int avatarId);
     }
 }

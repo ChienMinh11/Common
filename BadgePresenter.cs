@@ -42,7 +42,7 @@ namespace ChieChie.Profile
         private void LoadBadges()
         {
             var savedBadges = _saveAdapter.LoadBadges();
-            
+    
             if (savedBadges == null || savedBadges.Count == 0)
             {
                 _badges = _badgeConfig.GetDefaultBadgeInfoDictionary();
@@ -56,6 +56,10 @@ namespace ChieChie.Profile
                     if (!_badges.ContainsKey(badgeData.Id))
                     {
                         _badges[badgeData.Id] = badgeData.ToBadgeInfo();
+                    }
+                    else if (badgeData.LockByDefault)
+                    {
+                        _badges[badgeData.Id].IsUnlocked = false;
                     }
                 }
                 _saveAdapter.SaveBadges(_badges);
@@ -88,6 +92,26 @@ namespace ChieChie.Profile
         {
             return _badgePrefabs.TryGetValue(frameId, out var prefab) ? prefab : null;
         }
+        public bool LockBadge(int badgeId)
+        {
+            if (_badges.TryGetValue(badgeId, out var badge))
+            {
+                if (!badge.IsUnlocked) return false; 
+        
+                badge.IsUnlocked = false;
+                var currentProfile = _saveAdapter.LoadProfile();
+                if (currentProfile != null && currentProfile.BadgeId == badgeId)
+                {
+                    currentProfile.BadgeId = -1;
+                    _saveAdapter.SaveProfile(currentProfile);
+                }
+
+                _saveAdapter.SaveBadges(_badges);
+                OnBadgeListUpdated?.Invoke();
+                return true;
+            }
+            return false;
+        }
 
         public bool UnlockBadge(int badgeId)
         {
@@ -102,6 +126,7 @@ namespace ChieChie.Profile
             }
             return false;
         }
+        
         
         public void UnlockAllBadges()
         {

@@ -15,5 +15,19 @@ namespace ChieChie.Constracts
         void HandleSaveRequested();
         void RequestClose();
         void ChangeTemporaryName(string newName);
+      
+        bool UnlockAvatar(int avatarId);
+        bool LockAvatar(int avatarId);
+        bool IsAvatarUnlocked(int avatarId);
+
+        bool UnlockFrame(int frameId);
+        bool LockFrame(int frameId);
+        bool IsFrameUnlocked(int frameId);
+
+        bool UnlockBadge(int badgeId);
+        bool LockBadge(int badgeId);
+        bool IsBadgeUnlocked(int badgeId);
+        
+        
     }
 }

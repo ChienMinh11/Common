@@ -9,18 +9,18 @@ namespace ChieChie.Profile
         [SerializeField] private int id;
         [SerializeField] private string displayName;
         [SerializeField] private Sprite avatarSprite;
-        [SerializeField] private bool unlockedByDefault;
-        [SerializeField] private string unlockCondition;
-
+        [SerializeField] private bool lockByDefault;
+  
         public int Id => id;
         public string DisplayName => displayName;
         public Sprite AvatarSprite => avatarSprite;
-        public bool UnlockedByDefault => unlockedByDefault;
-        public string UnlockCondition => unlockCondition;
+        public bool LockByDefault => lockByDefault;
+      
 
         public AvatarModel ToAvatarInfo()
         {
-            return new AvatarModel(id, displayName, "", UnlockedByDefault, unlockCondition);
+            bool initialUnlocked = lockByDefault;
+            return new AvatarModel(id, displayName, "", initialUnlocked);
         }
     }
 }

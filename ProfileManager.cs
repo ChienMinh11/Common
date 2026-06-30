@@ -72,5 +72,20 @@ namespace ChieChie.Profile
         public void ChangeTemporaryName(string newName) => _profilePresenter.HandleTemporaryNameChanged(newName);
         public bool HasChanges() => _profilePresenter.HasChanges();
         public void HandleSaveRequested() => _profilePresenter.HandleSaveRequested();
+        
+        // --- IMPLEMENTATION LOCK/UNLOCK FOR AVATAR ---
+        public bool UnlockAvatar(int avatarId) => _avatarPresenter.UnlockAvatar(avatarId);
+        public bool LockAvatar(int avatarId) => _avatarPresenter.LockAvatar(avatarId);
+        public bool IsAvatarUnlocked(int avatarId) => _avatarPresenter.IsAvatarUnlocked(avatarId);
+
+        // --- IMPLEMENTATION LOCK/UNLOCK FOR FRAME ---
+        public bool UnlockFrame(int frameId) => _framePresenter.UnlockFrame(frameId);
+        public bool LockFrame(int frameId) => _framePresenter.LockFrame(frameId);
+        public bool IsFrameUnlocked(int frameId) => _framePresenter.IsFrameUnlocked(frameId);
+
+        // --- IMPLEMENTATION LOCK/UNLOCK FOR BADGE ---
+        public bool UnlockBadge(int badgeId) => _badgePresenter.UnlockBadge(badgeId);
+        public bool LockBadge(int badgeId) => _badgePresenter.LockBadge(badgeId);
+        public bool IsBadgeUnlocked(int badgeId) => _badgePresenter.IsBadgeUnlocked(badgeId);
     }
 }
