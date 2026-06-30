@@ -1,4 +1,5 @@
 using System;
+using System.Net.Sockets;
 using System.Threading;
 using ChieChie.Constracts;
 using Cysharp.Threading.Tasks;
@@ -6,11 +7,12 @@ using UnityEngine;
 
 namespace ChieChie.Profile
 {
-    public class ProfileManager : IProfileService
+    public class ProfileManager : IProfileService, IDisposable
     { 
         public bool IsInitialized { get; private set; }
         private ProfileDatabase _database;
         private ProfilePresenter _profilePresenter;
+        private SimpleProfilePresenter _simpleProfilePresenter;
         private AvatarPresenter _avatarPresenter;
         private FramePresenter _framePresenter; // Thêm mới
         private BadgePresenter _badgePresenter; // Thêm mới
@@ -44,6 +46,7 @@ namespace ChieChie.Profile
             
             // Truyền tất cả Presenter vào ProfilePresenter để kết nối dữ liệu
             _profilePresenter = new ProfilePresenter(_saveAdapter, _avatarPresenter, _framePresenter, _badgePresenter);
+            _simpleProfilePresenter = new SimpleProfilePresenter(this, _saveAdapter, _database);
  
             IsInitialized = true;
             return UniTask.FromResult(true);
@@ -65,7 +68,16 @@ namespace ChieChie.Profile
             }
             _profilePresenter.UnbindView();
         }
-        
+
+        public void RegisterSimpleView(ISimpleProfileView view)
+        {
+            _simpleProfilePresenter.RegisterView(view);
+        }
+
+        public void UnregisterSimpleView(ISimpleProfileView view)
+        {
+            _simpleProfilePresenter.UnregisterView(view);
+        }
         private void HandleCloseRequested() => OnCloseRequested?.Invoke();
         private void HandleEditNameRequested() => OnEditNameRequested?.Invoke();
         public void RequestClose() => OnCloseRequested?.Invoke();
@@ -92,5 +104,9 @@ namespace ChieChie.Profile
         public bool EquipAvatar(int avatarId) => _profilePresenter.EquipAvatarDirect(avatarId);
         public bool EquipFrame(int frameId) => _profilePresenter.EquipFrameDirect(frameId);
         public bool EquipBadge(int badgeId) => _profilePresenter.EquipBadgeDirect(badgeId);
+        public void Dispose()
+        {
+            _simpleProfilePresenter.CleanUp();
+        }
     }
 }
