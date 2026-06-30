@@ -11,7 +11,7 @@ namespace ChieChie.GamePass
         public int index;
         public int requiredAmount;
         public List<PassRewardData> freePassrewards = new List<PassRewardData>();
-        public List<PassRewardData> PremiumPassrewards = new List<PassRewardData>();
+        public List<PassRewardData> premiumPassrewards = new List<PassRewardData>();
 
     }
 

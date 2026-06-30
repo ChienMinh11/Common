@@ -3,32 +3,29 @@ using System.Collections.Generic;
 
 namespace ChieChie.GamePass
 {
-    [Serializable]
-    public class PassModel 
+    public class PassModel
     {
-        public string currentEventId;         // ID của mùa giải hiện tại
-        public int currentPoints;             // Số điểm tích lũy hiện tại trong Tier
-        public int currentTierIndex;          // Cấp độ Tier hiện tại (Bắt đầu từ 0)
-        public bool isPremiumUnlocked;        // Đã mua Premium Pass chưa?
+        private readonly PassDatabase _database;
+        private readonly IPassSaveAdapter _passSaveAdapter;
+        private readonly PassEventScheduler _eventScheduler;
         
-        // Danh sách lưu các Tier đã nhận thưởng
-        public HashSet<int> claimedFreeTiers = new HashSet<int>();
-        public HashSet<int> claimedPremiumTiers = new HashSet<int>();
-
-        // Điểm thừa và số lần nhận thưởng của hũ Bonus Bank sau khi Max Cấp
-        public int bonusPoints;
-        public int claimedBonusCount;
-
-        public void Reset(string eventId)
+        public PassModel(PassDatabase database, IPassSaveAdapter passSaveAdapter, PassEventScheduler eventScheduler)
         {
-            currentEventId = eventId;
-            currentPoints = 0;
-            currentTierIndex = 0;
-            isPremiumUnlocked = false;
-            claimedFreeTiers.Clear();
-            claimedPremiumTiers.Clear();
-            bonusPoints = 0;
-            claimedBonusCount = 0;
+            _database = database;
+            _passSaveAdapter = passSaveAdapter;
+            _eventScheduler = eventScheduler;
+            Initialize();
+        }
+        
+        public void Initialize()
+        {
+         
+           
+        }
+
+        public void Cleanup()
+        {
+          
         }
     }
 }

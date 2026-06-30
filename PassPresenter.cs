@@ -1,73 +1,52 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace ChieChie.GamePass
 {
-    public class PassPresenter : IDisposable
+    public class PassPresenter
     {
-        private readonly IPassView _view;
-        private readonly IPassService _passService;
-        private bool _isActive;
-
-        public PassPresenter(IPassView view, IPassService passService)
+        private readonly PassModel _model;
+        private readonly List<IPassView> _activeViews = new List<IPassView>();
+        public PassPresenter(PassModel model)
         {
-            _view = view;
-            _passService = passService;
+           _model = model;
+           Initialize();
         }
 
         public void Initialize()
         {
-            if (_isActive) return;
-            _isActive = true;
-            PassManager.OnPassDataChanged += UpdateView;
-            UpdateView();
-        }
-
-        public void Disable()
-        {
-            if (!_isActive) return;
-            _isActive = false;
-
-            PassManager.OnPassDataChanged -= UpdateView;
-        }
-
-        public void UpdateView()
-        {
-            if (!_passService.IsInitialized) return;
          
-            TimeSpan remaining = _passService.Scheduler.GetRemainingTime(DateTime.UtcNow);
-            string timeStr = remaining == TimeSpan.Zero 
-                ? "Sự kiện đã kết thúc" 
-                : $"{remaining.Days} ngày {remaining.Hours} giờ";
-
-            _view.RefreshPassUI(_passService.Model, _passService.Database, timeStr);
+           
         }
-
-        public void OnClaimRewardClicked(int tierIndex, bool isPremium)
+        
+        public void RegisterView(IPassView view)
         {
-            if (_passService.CanClaimReward(tierIndex, isPremium))
+            CleanUpDestroyedViews();
+            if (!_activeViews.Contains(view))
             {
-                _passService.ClaimReward(tierIndex, isPremium);
-               
+                _activeViews.Add(view);
             }
         }
 
-        public void OnClaimBonusClicked()
+        public void UnregisterView(IPassView view)
         {
-            if (_passService.CanClaimBonus())
+            if (_activeViews.Contains(view))
             {
-                _passService.ClaimBonus();
+                _activeViews.Remove(view);
             }
         }
-
-        public void OnBuyPremiumClicked()
+        private void CleanUpDestroyedViews()
         {
-            _passService.BuyPremium();
+            _activeViews.RemoveAll(view => 
+                view == null || (view is MonoBehaviour mb && mb == null)
+            );
         }
 
-        public void Dispose()
+        public void Cleanup()
         {
-            Disable();
+          
         }
+
     }
 }
