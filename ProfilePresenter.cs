@@ -106,8 +106,8 @@ namespace ChieChie.Profile
             _boundView.ShowProfileData(
                 _tempPlayerName, 
                 _avatarPresenter.GetAvatarSprite(_tempAvatarId),
-                _framePresenter.GetFrameSprite(_tempFrameId),
-                _badgePresenter.GetBadgeSprite(_tempBadgeId)
+                _framePresenter.GetFramePrefab(_tempFrameId),  // Thay GetFrameSprite thành GetFramePrefab
+                _badgePresenter.GetBadgePrefab(_tempBadgeId)   // Thay GetBadgeSprite thành GetBadgePrefab
             );
 
             // Đổ dữ liệu vào các Grid lựa chọn danh sách
@@ -152,13 +152,13 @@ namespace ChieChie.Profile
             OnStateChanged?.Invoke();
         }
 
-        private void HandleFrameSelected(int frameId) // Thêm mới
+        private void HandleFrameSelected(int frameId)
         {
             var frame = _framePresenter.GetFrame(frameId);
             if (frame == null || !frame.IsUnlocked) return;
 
             _tempFrameId = frameId;
-            _boundView.UpdateFrameDisplay(frameId, _framePresenter.GetFrameSprite(frameId));
+            _boundView.UpdateFrameDisplay(frameId, _framePresenter.GetFramePrefab(frameId)); // Truyền Prefab
             OnStateChanged?.Invoke();
         }
 
@@ -177,7 +177,7 @@ namespace ChieChie.Profile
             if (badge == null || !badge.IsUnlocked) return;
 
             _tempBadgeId = badgeId;
-            _boundView.UpdateBadgeDisplay(badgeId, _badgePresenter.GetBadgeSprite(badgeId));
+            _boundView.UpdateBadgeDisplay(badgeId, _badgePresenter.GetBadgePrefab(badgeId));
             OnStateChanged?.Invoke();
         }
 
@@ -222,7 +222,7 @@ namespace ChieChie.Profile
             _boundView.UpdateAvatarDisplay(_tempAvatarId, _avatarPresenter.GetAvatarSprite(_tempAvatarId));
         }
 
-        private void RefreshFrameGrid() // Thêm mới
+        private void RefreshFrameGrid()
         {
             if (_boundView == null) return;
             var allFrames = _framePresenter.GetAllFrames();
@@ -230,13 +230,16 @@ namespace ChieChie.Profile
             foreach (var frame in allFrames)
             {
                 var sprite = _framePresenter.GetFrameSprite(frame.Id);
-                displayDataList.Add(new FrameDisplayData(frame.Id, frame.Name, sprite, frame.IsUnlocked));
+                var prefab = _framePresenter.GetFramePrefab(frame.Id); // Lấy thêm Prefab hiệu ứng
+        
+                // Thêm prefab vào hàm khởi tạo dữ liệu hiển thị
+                displayDataList.Add(new FrameDisplayData(frame.Id, frame.Name, sprite, prefab, frame.IsUnlocked));
             }
             _boundView.PopulateFrameGrid(displayDataList);
-            _boundView.UpdateFrameDisplay(_tempFrameId, _framePresenter.GetFrameSprite(_tempFrameId));
+            _boundView.UpdateFrameDisplay(_tempFrameId, _framePresenter.GetFramePrefab(_tempFrameId));
         }
 
-        private void RefreshBadgeGrid() // Thêm mới
+        private void RefreshBadgeGrid()
         {
             if (_boundView == null) return;
             var allBadges = _badgePresenter.GetAllBadges();
@@ -244,10 +247,12 @@ namespace ChieChie.Profile
             foreach (var badge in allBadges)
             {
                 var sprite = _badgePresenter.GetBadgeSprite(badge.Id);
-                displayDataList.Add(new BadgeDisplayData(badge.Id, badge.Name, sprite, badge.IsUnlocked));
+                var prefab = _badgePresenter.GetBadgePrefab(badge.Id); // Lấy thêm Prefab hiệu ứng
+        
+                displayDataList.Add(new BadgeDisplayData(badge.Id, badge.Name, sprite, prefab, badge.IsUnlocked));
             }
             _boundView.PopulateBadgeGrid(displayDataList);
-            _boundView.UpdateBadgeDisplay(_tempBadgeId, _badgePresenter.GetBadgeSprite(_tempBadgeId));
+            _boundView.UpdateBadgeDisplay(_tempBadgeId, _badgePresenter.GetBadgePrefab(_tempBadgeId));
         }
 
         public bool HasChanges() 

@@ -25,14 +25,17 @@ namespace ChieChie.Constracts
     {
         public int Id;
         public string Name;
-        public Sprite Sprite;
+        public Sprite Icon;
+        public GameObject Prefab; // THÊM MỚI
+
         public bool IsUnlocked;
 
-        public FrameDisplayData(int id, string name, Sprite sprite, bool isUnlocked)
+        public FrameDisplayData(int id, string name, Sprite icon, GameObject prefab, bool isUnlocked)
         {
             Id = id;
             Name = name;
-            Sprite = sprite;
+            Icon = icon;
+            Prefab = prefab; // THÊM MỚI
             IsUnlocked = isUnlocked;
         }
     }
@@ -42,14 +45,16 @@ namespace ChieChie.Constracts
     {
         public int Id;
         public string Name;
-        public Sprite Sprite;
+        public Sprite Icon;
+        public GameObject Prefab;
         public bool IsUnlocked;
 
-        public BadgeDisplayData(int id, string name, Sprite sprite, bool isUnlocked)
+        public BadgeDisplayData(int id, string name, Sprite icon, GameObject prefab, bool isUnlocked)
         {
             Id = id;
             Name = name;
-            Sprite = sprite;
+            Icon = icon;
+            Prefab = prefab; 
             IsUnlocked = isUnlocked;
         }
     }
@@ -64,15 +69,16 @@ namespace ChieChie.Constracts
         event Action OnSaveRequested;
         event Action OnCloseRequested;
    
-        void ShowProfileData(string playerName, Sprite avatarSprite, Sprite frameSprite, Sprite badgeSprite); // Cập nhật
+        void ShowProfileData(string playerName, Sprite avatarSprite, GameObject framePrefab, GameObject badgePrefab);
         void UpdatePlayerNameDisplay(string name);
         void UpdateAvatarDisplay(int avatarId, Sprite avatarSprite);
-        void UpdateFrameDisplay(int frameId, Sprite frameSprite); // Thêm mới
-        void UpdateBadgeDisplay(int badgeId, Sprite badgeSprite); // Thêm mới
+        void UpdateFrameDisplay(int frameId, GameObject framePrefab); // Nhận vào Prefab
+        void UpdateBadgeDisplay(int badgeId, GameObject badgePrefab); // Nhận vào Prefab
+        
         
         void PopulateAvatarGrid(List<AvatarDisplayData> avatars); 
-        void PopulateFrameGrid(List<FrameDisplayData> frames);   // Thêm mới
-        void PopulateBadgeGrid(List<BadgeDisplayData> badges);   // Thêm mới
+        void PopulateFrameGrid(List<FrameDisplayData> frames);   
+        void PopulateBadgeGrid(List<BadgeDisplayData> badges);   
         void SetSaveButtonInteractable(bool interactable);
     }
 }

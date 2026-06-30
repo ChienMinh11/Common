@@ -13,6 +13,7 @@ namespace ChieChie.Profile
         List<BadgeModel> GetAllBadges();
         BadgeModel GetBadge(int badgeId);
         Sprite GetBadgeSprite(int badgeId);
+        GameObject GetBadgePrefab(int frameId);
         bool UnlockBadge(int badgeId);
         void UnlockAllBadges();
         bool IsBadgeUnlocked(int badgeId);

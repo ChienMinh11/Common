@@ -12,7 +12,8 @@ namespace ChieChie.Profile
         public bool IsInitialized { get; private set; }
         
         private Dictionary<int, BadgeModel> _badges = new Dictionary<int, BadgeModel>();
-        private Dictionary<int, Sprite> _badgeSprites = new Dictionary<int, Sprite>();
+        private Dictionary<int, Sprite> _badgeIcons = new Dictionary<int, Sprite>();
+        private Dictionary<int, GameObject> _badgePrefabs = new Dictionary<int, GameObject>();
         
         private readonly IProfileSaveAdapter _saveAdapter;
         private readonly BadgeConfig _badgeConfig;
@@ -62,10 +63,8 @@ namespace ChieChie.Profile
             
             foreach (var badgeData in _badgeConfig.Badges)
             {
-                if (badgeData.BadgeSprite != null)
-                {
-                    _badgeSprites[badgeData.Id] = badgeData.BadgeSprite;
-                }
+                if (badgeData.BadgeIcon != null) _badgeIcons[badgeData.Id] =  badgeData.BadgeIcon;
+                if (badgeData.BadgePrefab != null) _badgePrefabs[badgeData.Id] =  badgeData.BadgePrefab;
             }
             
             OnBadgeListUpdated?.Invoke();
@@ -83,7 +82,11 @@ namespace ChieChie.Profile
      
         public Sprite GetBadgeSprite(int badgeId)
         {
-            return _badgeSprites.TryGetValue(badgeId, out var sprite) ? sprite : null;
+            return _badgeIcons.TryGetValue(badgeId, out var sprite) ? sprite : null;
+        }
+        public GameObject GetBadgePrefab(int frameId)
+        {
+            return _badgePrefabs.TryGetValue(frameId, out var prefab) ? prefab : null;
         }
 
         public bool UnlockBadge(int badgeId)

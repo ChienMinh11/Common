@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace ChieChie.Profile
 {
@@ -8,13 +9,15 @@ namespace ChieChie.Profile
         [Header("Badge Information")]
         [SerializeField] private int id;
         [SerializeField] private string displayName;
-        [SerializeField] private Sprite badgeSprite;
+        [SerializeField] private Sprite badgeIcon;
+        [SerializeField] private GameObject badgePrefab;
         [SerializeField] private bool unlockedByDefault;
         [SerializeField] private string unlockCondition;
 
         public int Id => id;
         public string DisplayName => displayName;
-        public Sprite BadgeSprite => badgeSprite;
+        public GameObject BadgePrefab => badgePrefab;
+        public Sprite BadgeIcon => badgeIcon;
         public bool UnlockedByDefault => unlockedByDefault;
         public string UnlockCondition => unlockCondition;
 

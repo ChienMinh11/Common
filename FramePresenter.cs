@@ -12,7 +12,8 @@ namespace ChieChie.Profile
         public bool IsInitialized { get; private set; }
         
         private Dictionary<int, FrameModel> _frames = new Dictionary<int, FrameModel>();
-        private Dictionary<int, Sprite> _frameSprites = new Dictionary<int, Sprite>();
+        private Dictionary<int, Sprite> _frameIcons = new Dictionary<int, Sprite>();
+        private Dictionary<int, GameObject> _framePrefabs = new Dictionary<int, GameObject>();
         
         private readonly IProfileSaveAdapter _saveAdapter;
         private readonly FrameConfig _frameConfig;
@@ -62,10 +63,8 @@ namespace ChieChie.Profile
             
             foreach (var frameData in _frameConfig.Frames)
             {
-                if (frameData.FrameSprite != null)
-                {
-                    _frameSprites[frameData.Id] = frameData.FrameSprite;
-                }
+                if (frameData.FrameIcon != null) _frameIcons[frameData.Id] = frameData.FrameIcon;
+                if (frameData.FramePrefab != null) _framePrefabs[frameData.Id] = frameData.FramePrefab;
             }
             
             OnFrameListUpdated?.Invoke();
@@ -81,9 +80,14 @@ namespace ChieChie.Profile
             return _frames.TryGetValue(frameId, out var frame) ? frame : null;
         }
      
-        public Sprite GetFrameSprite(int frameId)
+        public GameObject GetFramePrefab(int frameId)
         {
-            return _frameSprites.TryGetValue(frameId, out var sprite) ? sprite : null;
+            return _framePrefabs.TryGetValue(frameId, out var prefab) ? prefab : null;
+        }
+
+        public Sprite GetFrameSprite(int frameId) // Giờ là lấy Icon tĩnh cho Grid
+        {
+            return _frameIcons.TryGetValue(frameId, out var sprite) ? sprite : null;
         }
 
         public bool UnlockFrame(int frameId)
