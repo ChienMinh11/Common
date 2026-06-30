@@ -87,5 +87,10 @@ namespace ChieChie.Profile
         public bool UnlockBadge(int badgeId) => _badgePresenter.UnlockBadge(badgeId);
         public bool LockBadge(int badgeId) => _badgePresenter.LockBadge(badgeId);
         public bool IsBadgeUnlocked(int badgeId) => _badgePresenter.IsBadgeUnlocked(badgeId);
+        
+        // --- THÊM MỚI: IMPLEMENTATION EQUIP FOR AVATAR, FRAME, BADGE ---
+        public bool EquipAvatar(int avatarId) => _profilePresenter.EquipAvatarDirect(avatarId);
+        public bool EquipFrame(int frameId) => _profilePresenter.EquipFrameDirect(frameId);
+        public bool EquipBadge(int badgeId) => _profilePresenter.EquipBadgeDirect(badgeId);
     }
 }

@@ -28,6 +28,10 @@ namespace ChieChie.Constracts
         bool LockBadge(int badgeId);
         bool IsBadgeUnlocked(int badgeId);
         
+        bool EquipAvatar(int avatarId);
+        bool EquipFrame(int frameId);
+        bool EquipBadge(int badgeId);
+        
         
     }
 }

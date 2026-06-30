@@ -76,13 +76,11 @@ namespace ChieChie.Profile
         {
             UnbindView();
             _boundView = view;
-
             if (_boundView == null) return;
-
-            // Gán dữ liệu tạm thời ban đầu
+            LoadProfile(); 
             _tempPlayerName = _currentProfile.PlayerName;
             _originalPlayerName = _tempPlayerName;
-            
+    
             _tempAvatarId = _currentProfile.AvatarId;
             _originalAvatarId = _tempAvatarId;
 
@@ -92,29 +90,26 @@ namespace ChieChie.Profile
             _tempBadgeId = _currentProfile.BadgeId;
             _originalBadgeId = _tempBadgeId;
 
-            // Đăng ký sự kiện từ View
             _boundView.OnTemporaryNameChanged += HandleTemporaryNameChanged;
             _boundView.OnAvatarSelected += HandleAvatarSelected;
-            _boundView.OnFrameSelected += HandleFrameSelected; // Thêm mới
-            _boundView.OnBadgeSelected += HandleBadgeSelected; // Thêm mới
-            
+            _boundView.OnFrameSelected += HandleFrameSelected; 
+            _boundView.OnBadgeSelected += HandleBadgeSelected; 
+    
             _avatarPresenter.OnAvatarListUpdated += RefreshAvatarGrid;
-            _framePresenter.OnFrameListUpdated += RefreshFrameGrid; // Thêm mới
-            _badgePresenter.OnBadgeListUpdated += RefreshBadgeGrid; // Thêm mới
+            _framePresenter.OnFrameListUpdated += RefreshFrameGrid; 
+            _badgePresenter.OnBadgeListUpdated += RefreshBadgeGrid; 
 
-            // Hiển thị dữ liệu chính lên khung Profile của View
             _boundView.ShowProfileData(
                 _tempPlayerName, 
                 _avatarPresenter.GetAvatarSprite(_tempAvatarId),
-                _framePresenter.GetFramePrefab(_tempFrameId),  // Thay GetFrameSprite thành GetFramePrefab
-                _badgePresenter.GetBadgePrefab(_tempBadgeId)   // Thay GetBadgeSprite thành GetBadgePrefab
+                _framePresenter.GetFramePrefab(_tempFrameId),  
+                _badgePresenter.GetBadgePrefab(_tempBadgeId)   
             );
-
-            // Đổ dữ liệu vào các Grid lựa chọn danh sách
+         
             RefreshAvatarGrid();
             RefreshFrameGrid();
             RefreshBadgeGrid();
-            
+    
             OnStateChanged?.Invoke();
         }
 
@@ -211,6 +206,11 @@ namespace ChieChie.Profile
         private void RefreshAvatarGrid()
         {
             if (_boundView == null) return;
+            var currentAvatar = _avatarPresenter.GetAvatar(_tempAvatarId);
+            if (currentAvatar == null || !currentAvatar.IsUnlocked)
+            {
+                _tempAvatarId = _currentProfile.AvatarId; 
+            }
             var allAvatars = _avatarPresenter.GetAllAvatars();
             var displayDataList = new List<AvatarDisplayData>();
             foreach (var avatar in allAvatars)
@@ -225,14 +225,17 @@ namespace ChieChie.Profile
         private void RefreshFrameGrid()
         {
             if (_boundView == null) return;
+            var currentFrame = _framePresenter.GetFrame(_tempFrameId);
+            if (currentFrame == null || !currentFrame.IsUnlocked)
+            {
+                _tempFrameId = _currentProfile.FrameId;
+            }
             var allFrames = _framePresenter.GetAllFrames();
             var displayDataList = new List<FrameDisplayData>();
             foreach (var frame in allFrames)
             {
                 var sprite = _framePresenter.GetFrameSprite(frame.Id);
-                var prefab = _framePresenter.GetFramePrefab(frame.Id); // Lấy thêm Prefab hiệu ứng
-        
-                // Thêm prefab vào hàm khởi tạo dữ liệu hiển thị
+                var prefab = _framePresenter.GetFramePrefab(frame.Id);
                 displayDataList.Add(new FrameDisplayData(frame.Id, frame.Name, sprite, prefab, frame.IsUnlocked));
             }
             _boundView.PopulateFrameGrid(displayDataList);
@@ -242,25 +245,110 @@ namespace ChieChie.Profile
         private void RefreshBadgeGrid()
         {
             if (_boundView == null) return;
+        
+            if (_tempBadgeId != -1)
+            {
+                var currentBadge = _badgePresenter.GetBadge(_tempBadgeId);
+                if (currentBadge == null || !currentBadge.IsUnlocked)
+                {
+                    _tempBadgeId = _currentProfile.BadgeId; 
+                }
+            }
             var allBadges = _badgePresenter.GetAllBadges();
             var displayDataList = new List<BadgeDisplayData>();
             foreach (var badge in allBadges)
             {
                 var sprite = _badgePresenter.GetBadgeSprite(badge.Id);
-                var prefab = _badgePresenter.GetBadgePrefab(badge.Id); // Lấy thêm Prefab hiệu ứng
-        
+                var prefab = _badgePresenter.GetBadgePrefab(badge.Id);
                 displayDataList.Add(new BadgeDisplayData(badge.Id, badge.Name, sprite, prefab, badge.IsUnlocked));
             }
             _boundView.PopulateBadgeGrid(displayDataList);
             _boundView.UpdateBadgeDisplay(_tempBadgeId, _badgePresenter.GetBadgePrefab(_tempBadgeId));
+        }
+        
+        public bool EquipAvatarDirect(int avatarId)
+        {
+            var avatar = _avatarPresenter.GetAvatar(avatarId);
+            if (avatar == null || !avatar.IsUnlocked) return false;
+
+            _currentProfile.AvatarId = avatarId;
+            _currentProfile.UpdateLastModified();
+            _saveAdapter.SaveProfile(_currentProfile);
+
+            if (_boundView != null)
+            {
+                _tempAvatarId = avatarId;
+                _originalAvatarId = avatarId;
+                _boundView.UpdateAvatarDisplay(avatarId, _avatarPresenter.GetAvatarSprite(avatarId));
+            }
+            
+            OnStateChanged?.Invoke();
+            return true;
+        }
+
+        public bool EquipFrameDirect(int frameId)
+        {
+            var frame = _framePresenter.GetFrame(frameId);
+            if (frame == null || !frame.IsUnlocked) return false;
+
+            _currentProfile.FrameId = frameId;
+            _currentProfile.UpdateLastModified();
+            _saveAdapter.SaveProfile(_currentProfile);
+
+            if (_boundView != null)
+            {
+                _tempFrameId = frameId;
+                _originalFrameId = frameId;
+                _boundView.UpdateFrameDisplay(frameId, _framePresenter.GetFramePrefab(frameId));
+            }
+
+            OnStateChanged?.Invoke();
+            return true;
+        }
+
+        public bool EquipBadgeDirect(int badgeId)
+        {
+            // Nếu badgeId = -1 tức là tháo Badge
+            if (badgeId == -1)
+            {
+                _currentProfile.BadgeId = -1;
+                _currentProfile.UpdateLastModified();
+                _saveAdapter.SaveProfile(_currentProfile);
+
+                if (_boundView != null)
+                {
+                    _tempBadgeId = -1;
+                    _originalBadgeId = -1;
+                    _boundView.UpdateBadgeDisplay(-1, null);
+                }
+                OnStateChanged?.Invoke();
+                return true;
+            }
+
+            var badge = _badgePresenter.GetBadge(badgeId);
+            if (badge == null || !badge.IsUnlocked) return false;
+
+            _currentProfile.BadgeId = badgeId;
+            _currentProfile.UpdateLastModified();
+            _saveAdapter.SaveProfile(_currentProfile);
+
+            if (_boundView != null)
+            {
+                _tempBadgeId = badgeId;
+                _originalBadgeId = badgeId;
+                _boundView.UpdateBadgeDisplay(badgeId, _badgePresenter.GetBadgePrefab(badgeId));
+            }
+
+            OnStateChanged?.Invoke();
+            return true;
         }
 
         public bool HasChanges() 
         {
             return _tempAvatarId != _originalAvatarId || 
                    _tempPlayerName != _originalPlayerName ||
-                   _tempFrameId != _originalFrameId || // Thêm kiểm tra đổi Frame
-                   _tempBadgeId != _originalBadgeId;   // Thêm kiểm tra đổi Badge
+                   _tempFrameId != _originalFrameId ||
+                   _tempBadgeId != _originalBadgeId;  
         }
     }
 }
