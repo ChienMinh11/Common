@@ -1,19 +1,22 @@
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace ChieChie.GamePass
 {
-    public class IPassService : MonoBehaviour
+    public interface IPassService 
     {
-        // Start is called once before the first execution of Update after the MonoBehaviour is created
-        void Start()
-        {
-        
-        }
+        bool IsInitialized { get; }
+        PassModel Model { get; }
+        PassEventScheduler Scheduler { get; }
+        PassDatabase Database { get; }
 
-        // Update is called once per frame
-        void Update()
-        {
-        
-        }
+        UniTask<bool> InitializeAsync(CancellationToken cancellationToken);
+        void AddPoints(int amount);
+        bool CanClaimReward(int tierIndex, bool isPremium);
+        void ClaimReward(int tierIndex, bool isPremium);
+        bool CanClaimBonus();
+        void ClaimBonus();
+        void BuyPremium();
     }
 }

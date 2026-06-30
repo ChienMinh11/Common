@@ -2,8 +2,9 @@ using UnityEngine;
 
 namespace ChieChie.GamePass
 {
-    public class IPassSaveAdapter
+    public interface IPassSaveAdapter
     {
-       
+        void SaveData(PassModel model);
+        PassModel LoadData();
     }
 }
