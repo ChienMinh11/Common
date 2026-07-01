@@ -79,10 +79,13 @@ namespace ChieChie.GamePass
                     FreeRewards = item.freePassrewards, 
                     PremiumRewards = item.premiumPassrewards,
                     FreeState = _model.GetMilestoneState(item.index, false),
-                    PremiumState = _model.GetMilestoneState(item.index, true)
+                    PremiumState = _model.GetMilestoneState(item.index, true),
+                    // Gán thêm ở đây
+                    CustomIconFreePass = item.customIconFreePass,
+                    CustomIconPremiumPass = item.customIconPremiumPass
                 });
             }
-      
+
             foreach (var bonusItem in _sortedBonusItemsCache)
             {
                 viewData.BonusMilestones.Add(new BonusMilestoneUIData
@@ -90,7 +93,9 @@ namespace ChieChie.GamePass
                     Index = bonusItem.index,
                     RequiredExp = bonusItem.expRequied,
                     Rewards = bonusItem.bonusPassrewards, 
-                    State = _model.GetBonusMilestoneState(bonusItem.index)
+                    State = _model.GetBonusMilestoneState(bonusItem.index),
+                    // Gán thêm ở đây
+                    BonusIcon = bonusItem.bonusIcon
                 });
             }
 

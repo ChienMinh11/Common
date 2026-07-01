@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace ChieChie.GamePass
 {
@@ -27,13 +28,13 @@ namespace ChieChie.GamePass
             }
         }
         
-        [SerializeField] private long _amount;
-        [SerializeField] private bool _isInfiniteReward;
-        [SerializeField] private float _infinityDuration;
+        [SerializeField] private long amount;
+        [SerializeField] private bool isInfiniteReward;
+        [SerializeField] private float infinityDuration;
 
-        public long Amount => _amount;
-        public bool IsInfiniteReward => _isInfiniteReward;
-        public float InfinityDuration => _infinityDuration;
+        public long Amount => amount;
+        public bool IsInfiniteReward => isInfiniteReward;
+        public float InfinityDuration => infinityDuration;
 
         public Sprite IconReward
         {

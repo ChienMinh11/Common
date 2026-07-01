@@ -8,5 +8,6 @@ namespace ChieChie.GamePass
     {
        void RegisterView(IPassView view);
        void UnregisterView(IPassView view);
+       void AddExp(int amount);
     }
 }

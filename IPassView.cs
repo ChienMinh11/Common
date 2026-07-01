@@ -10,9 +10,9 @@ namespace ChieChie.GamePass
         public int CurrentMilestoneIndex;
         public bool IsPremiumUnlocked;
         public List<MilestoneUIData> Milestones;
-
         public List<BonusMilestoneUIData> BonusMilestones; 
         public int TotalBonusExpEarned; 
+        
     }
     public class BonusMilestoneUIData
     {
@@ -20,6 +20,7 @@ namespace ChieChie.GamePass
         public int RequiredExp;
         public List<PassRewardData> Rewards;
         public MilestoneState State;
+        public UnityEngine.GameObject BonusIcon;
     }
 
     public class MilestoneUIData
@@ -30,6 +31,8 @@ namespace ChieChie.GamePass
         public List<PassRewardData> PremiumRewards;
         public MilestoneState FreeState;
         public MilestoneState PremiumState;
+        public UnityEngine.GameObject CustomIconFreePass;
+        public UnityEngine.GameObject CustomIconPremiumPass;
     }
 
     public interface IPassView 

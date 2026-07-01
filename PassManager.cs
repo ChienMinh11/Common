@@ -36,6 +36,9 @@ namespace ChieChie.GamePass
 
         public void RegisterView(IPassView view)=> _passPresenter.RegisterView(view);
         public void UnregisterView(IPassView view) => _passPresenter.UnregisterView(view);
-     
+        public void AddExp(int amount)
+        {
+           _passModel.AddExp(amount);
+        }
     }
 }
