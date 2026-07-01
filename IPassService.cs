@@ -18,6 +18,7 @@ namespace ChieChie.GamePass
 
        void CheckEventUpdate();
        DateTime EventEndTime {get; }
+       void ActiveNewEvent();
 
     }
 }

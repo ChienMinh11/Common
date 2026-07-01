@@ -82,5 +82,7 @@ namespace ChieChie.GamePass
             }
             _passModel.Initialize();
         }
+        
+        public void ActiveNewEvent() => _passModel.ActivateNewEventManual();
     }
 }
