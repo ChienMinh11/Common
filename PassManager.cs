@@ -23,7 +23,7 @@ namespace ChieChie.GamePass
         public UniTask<bool> InitializeAsync(CancellationToken cancellationToken)
         {
             _passModel = new PassModel(_passDatabase, _passSaveAdapter, _passSchedule);
-            _passPresenter = new PassPresenter(_passModel,_passDatabase);
+            _passPresenter = new PassPresenter(_passModel);
             IsInitialized = true;
             return UniTask.FromResult(true);
         }
