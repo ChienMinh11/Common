@@ -9,6 +9,7 @@ namespace ChieChie.GamePass
     public interface IPassService 
     { 
         event Action<List<PassRewardData>> OnRewardsClaimed;
+        
         List<PassRewardData> GetAndClearAutoClaimedRewards();
        void RegisterView(IPassView view);
        void UnregisterView(IPassView view);
@@ -19,6 +20,7 @@ namespace ChieChie.GamePass
        void CheckEventUpdate();
        DateTime EventEndTime {get; }
        void ActiveNewEvent();
+       void RefreshData();
 
     }
 }

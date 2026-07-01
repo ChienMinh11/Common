@@ -34,71 +34,48 @@ namespace ChieChie.GamePass
             CacheStaticDatabaseData();
             Initialize();
         }
-        
-        /// <summary>
-        /// Hàm khởi tạo khi mới vào game - CHỈ check AutoClaim nếu hết hạn, KHÔNG tự ý mở event mới
-        /// </summary>
+
         public void Initialize()
         {
             _saveData = _passSaveAdapter.LoadData() ?? new PassSaveData();
-
-            // Nếu trong máy đang có một event đang chạy
             if (!string.IsNullOrEmpty(_saveData.currentEventId))
             {
-                // Cập nhật scheduler tạm thời theo ID cũ để lấy thời gian kết thúc (endTime) của chính event đó
-                // Giả định đặt scheduler về tháng của event cũ để biết chính xác khi nào nó hết hạn
                 if (DateTime.TryParseExact(_saveData.currentEventId.Replace("GamePass_", ""), "yyyyMM", 
                     System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTime eventMonth))
                 {
                     var startTemp = new DateTime(eventMonth.Year, eventMonth.Month, 1, 0, 0, 0, DateTimeKind.Utc);
                     var endTemp = startTemp.AddMonths(1).AddSeconds(-1);
-
-                    // NẾU THỜI GIAN THỰC TẾ ĐÃ VƯỢT QUA THỜI GIAN KẾT THÚC CỦA EVENT CŨ
+                 
                     if (_timeProvider.UtcNow > endTemp)
                     {
-                        // 1. Tự động gom hết quà chưa nhận của event cũ
-                        AutoClaimedRewards = ProcessAutoClaimUnclaimedRewards(_saveData);
-
-                        // 2. Clear trắng data cũ, đưa ID về empty để đánh dấu trạng thái "Chờ kích hoạt event mới"
+                       AutoClaimedRewards = ProcessAutoClaimUnclaimedRewards(_saveData);
                         _saveData = new PassSaveData { currentEventId = string.Empty };
                         _passSaveAdapter.SaveData(_saveData);
                     }
                 }
             }
-
-            // Đồng bộ trạng thái của Scheduler trùng khớp với những gì đang chạy trong SaveData
+          
             SyncSchedulerWithSaveData();
+            OnDataChanged?.Invoke();
         }
-
-        /// <summary>
-        /// Lệnh MANUAL kích hoạt Event mới từ bên ngoài
-        /// </summary>
+      
         public void ActivateNewEventManual()
         {
-            // 1. Tính toán lịch trình mới dựa trên thời gian hiện tại
             _eventScheduler.UpdateMonthlySchedule(_timeProvider);
-
-            // Nếu event mới này trùng với event đã kết thúc (vừa được clear về rỗng), hoặc là lần đầu tiên mở
+          
             if (_saveData.currentEventId != _eventScheduler.eventId)
             {
-                // Nếu trước đó người chơi chưa từng vào game để AutoClaim (ví dụ offline cả tháng), 
-                // thì gom quà một lần nữa cho chắc chắn trước khi ghi đè ID mới.
                 if (!string.IsNullOrEmpty(_saveData.currentEventId))
                 {
                     AutoClaimedRewards = ProcessAutoClaimUnclaimedRewards(_saveData);
                 }
-
-                // Khởi tạo tiến trình mới tinh cho Event mới
                 _saveData = new PassSaveData { currentEventId = _eventScheduler.eventId };
                 _passSaveAdapter.SaveData(_saveData);
             }
 
             OnDataChanged?.Invoke();
         }
-
-        /// <summary>
-        /// Hàm đồng bộ Scheduler theo SaveData để UI hiển thị đúng (nếu event rỗng hoặc hết hạn thì isActive = false)
-        /// </summary>
+    
         private void SyncSchedulerWithSaveData()
         {
             if (string.IsNullOrEmpty(_saveData.currentEventId))
@@ -330,6 +307,11 @@ namespace ChieChie.GamePass
             return true;
         }
         public DateTime EventEndTime => _eventScheduler.endTime;
+
+        public void RefreshData()
+        {
+            OnDataChanged?.Invoke();
+        }
 
         public void Cleanup()
         {

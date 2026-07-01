@@ -84,5 +84,9 @@ namespace ChieChie.GamePass
         }
         
         public void ActiveNewEvent() => _passModel.ActivateNewEventManual();
+        public void RefreshData()
+        {
+            _passModel.RefreshData();
+        }
     }
 }
