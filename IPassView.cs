@@ -3,7 +3,6 @@ using System.Collections.Generic;
 
 namespace ChieChie.GamePass
 {
-    // DTO chứa toàn bộ dữ liệu cần để vẽ UI vẽ lên, View chỉ việc đọc thông tin này ra hiển thị
     public class PassViewData
     {
         public string RemainingTimeStr;
@@ -11,9 +10,16 @@ namespace ChieChie.GamePass
         public int CurrentMilestoneIndex;
         public bool IsPremiumUnlocked;
         public List<MilestoneUIData> Milestones;
-        public int AvailableBonusClaims;
-        public int BonusProgressCurrent;
-        public int BonusProgressMax;
+
+        public List<BonusMilestoneUIData> BonusMilestones; 
+        public int TotalBonusExpEarned; 
+    }
+    public class BonusMilestoneUIData
+    {
+        public int Index;
+        public int RequiredExp;
+        public List<PassRewardData> Rewards;
+        public MilestoneState State;
     }
 
     public class MilestoneUIData
@@ -28,13 +34,16 @@ namespace ChieChie.GamePass
 
     public interface IPassView 
     {
-        // View cung cấp các Event click từ UI để Presenter lắng nghe thông qua interface
-        event Action<int, bool> OnClaimRewardClicked; // Index, IsPremium
-        event Action OnClaimBonusClicked;
+        event Action<int, bool> OnClaimRewardClicked;
+        event Action<int> OnClaimBonusClicked; 
         event Action OnBuyPremiumClicked;
 
-        // Hàm để Presenter đẩy dữ liệu mới nhất bắt View cập nhật giao diện
         void RefreshUI(PassViewData viewData);
-        void ShowRewardAnimation(List<PassRewardData> rewards);
+    }
+    public enum MilestoneState
+    {
+        Locked,
+        ReadyToClaim,
+        Claimed
     }
 }

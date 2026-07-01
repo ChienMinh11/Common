@@ -5,12 +5,12 @@ namespace ChieChie.GamePass
 {
     public class PassSaveData
     {
-        public string currentEventId;       // ID của mùa giải hiện tại
-        public int currentExp;              // Điểm kinh nghiệm hiện tại
-        public bool isPremiumUnlocked;      // Đã mua Premium Pass chưa
-        public List<int> claimedFreeMilestones = new List<int>();    // Mốc Free đã nhận
-        public List<int> claimedPremiumMilestones = new List<int>(); // Mốc Premium đã nhận
-        public int bonusClaimedCount;       // Số lần đã nhận thưởng mốc Bonus
+        public string currentEventId;
+        public int currentExp;
+        public bool isPremiumUnlocked;
+        public List<int> claimedFreeMilestones = new List<int>();
+        public List<int> claimedPremiumMilestones = new List<int>();
+        public List<int> claimedBonusMilestones = new List<int>();
     }
 
     public interface IPassSaveAdapter

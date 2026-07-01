@@ -26,10 +26,7 @@ namespace ChieChie.GamePass
                 return string.Empty;
             }
         }
-
-
-
-        [SerializeField] Sprite chestIcon;
+        
         [SerializeField] private long _amount;
         [SerializeField] private bool _isInfiniteReward;
         [SerializeField] private float _infinityDuration;
@@ -37,8 +34,6 @@ namespace ChieChie.GamePass
         public long Amount => _amount;
         public bool IsInfiniteReward => _isInfiniteReward;
         public float InfinityDuration => _infinityDuration;
-
-        public bool UseChestIcon => chestIcon != null;
 
         public Sprite IconReward
         {

@@ -61,83 +61,86 @@ namespace ChieChie.GamePass
             OnDataChanged?.Invoke();
         }
 
-        // Tính toán xem người chơi đang ở cấp độ (Milestone Index) nào dựa trên Exp hiện tại
         public int GetCurrentMilestoneIndex()
         {
             int exp = _saveData.currentExp;
             int currentMilestone = 0;
-
             foreach (var item in _database.PassItems)
             {
                 if (exp >= item.requiredAmount)
                 {
                     currentMilestone = item.index;
-                    exp -= item.requiredAmount; // Trừ lượng exp cần thiết của mốc đó
+                    exp -= item.requiredAmount;
                 }
-                else
-                {
-                    break;
-                }
+                else break;
             }
             return currentMilestone;
         }
 
-        // Lấy Exp thừa để tính toán mốc Bonus
+        // Lấy lượng Exp dư ra sau khi đã trừ đi toàn bộ yêu cầu của các mốc Pass thông thường
         public int GetBonusExp()
         {
-            int totalRequired = _database.PassItems.Sum(item => item.requiredAmount);
-            int bonusExp = _saveData.currentExp - totalRequired;
+            int totalRequiredNormal = _database.PassItems.Sum(item => item.requiredAmount);
+            int bonusExp = _saveData.currentExp - totalRequiredNormal;
             return Math.Max(0, bonusExp);
         }
-
-        // Kiểm tra trạng thái của một mốc cụ thể
-        public MilestoneState GetMilestoneState(int index, bool isPremium)
+        // Kiểm tra trạng thái của một mốc Bonus cụ thể theo Index
+        public MilestoneState GetBonusMilestoneState(int index)
         {
-            int currentMilestone = GetCurrentMilestoneIndex();
-            
-            if (isPremium && !_saveData.isPremiumUnlocked)
-                return MilestoneState.Locked; // Chưa mua Premium
+            // Nếu đã nằm trong danh sách đã nhận -> Claimed
+            if (_saveData.claimedBonusMilestones.Contains(index))
+                return MilestoneState.Claimed;
 
-            var claimedList = isPremium ? _saveData.claimedPremiumMilestones : _saveData.claimedFreeMilestones;
-            if (claimedList.Contains(index))
-                return MilestoneState.Claimed; // Đã nhận
+            // Tìm thông tin cấu hình mốc Bonus này trong Database
+            var bonusItem = _database.BonusPassItems.FirstOrDefault(b => b.index == index);
+            if (bonusItem == null) return MilestoneState.Locked;
 
-            if (currentMilestone >= index)
-                return MilestoneState.ReadyToClaim; // Đủ cấp, chờ nhận
+            int bonusExp = GetBonusExp();
 
-            return MilestoneState.Locked; // Chưa đủ cấp
+            // Điều kiện 1: Đủ điểm yêu cầu của mốc Bonus đó
+            bool hasEnoughExp = bonusExp >= bonusItem.requiredAmount;
+
+            // Điều kiện 2: Phải mở tuần tự (Mốc đầu tiên index == 0, hoặc mốc (index - 1) đã nằm trong danh sách Claimed)
+            bool isPreviousClaimed = index == 0 || _saveData.claimedBonusMilestones.Contains(index - 1);
+
+            if (hasEnoughExp && isPreviousClaimed)
+            {
+                return MilestoneState.ReadyToClaim;
+            }
+
+            return MilestoneState.Locked;
         }
 
-        // Logic Nhận quà mốc thông thường
-        public bool ClaimReward(int index, bool isPremium)
+        // Thực hiện logic nhận thưởng mốc Bonus
+        public bool ClaimBonusReward(int index)
         {
-            if (GetMilestoneState(index, isPremium) != MilestoneState.ReadyToClaim) 
+            if (GetBonusMilestoneState(index) != MilestoneState.ReadyToClaim) 
                 return false;
 
-            if (isPremium) _saveData.claimedPremiumMilestones.Add(index);
-            else _saveData.claimedFreeMilestones.Add(index);
-
+            _saveData.claimedBonusMilestones.Add(index);
             _passSaveAdapter.SaveData(_saveData);
             OnDataChanged?.Invoke();
             return true;
         }
-
-        // Kiểm tra số lượng quà Bonus có thể nhận (Infinite Loop giống Royal Match)
-        public int GetAvailableBonusClaims()
+        
+        
+        public MilestoneState GetMilestoneState(int index, bool isPremium)
         {
-            if (_database.BonusPassItems.Count == 0) return 0;
-            int bonusExp = GetBonusExp();
-            int required = _database.BonusPassItems[0].requiredAmount; // Thường mốc bonus chỉ có 1 cấu hình lặp lại
-            
-            int totalEarnedBonus = bonusExp / required;
-            return Math.Max(0, totalEarnedBonus - _saveData.bonusClaimedCount);
+            int currentMilestone = GetCurrentMilestoneIndex();
+            if (isPremium && !_saveData.isPremiumUnlocked) return MilestoneState.Locked;
+
+            var claimedList = isPremium ? _saveData.claimedPremiumMilestones : _saveData.claimedFreeMilestones;
+            if (claimedList.Contains(index)) return MilestoneState.Claimed;
+            if (currentMilestone >= index) return MilestoneState.ReadyToClaim;
+
+            return MilestoneState.Locked;
         }
 
-        public bool ClaimBonusReward()
+        public bool ClaimReward(int index, bool isPremium)
         {
-            if (GetAvailableBonusClaims() <= 0) return false;
-
-            _saveData.bonusClaimedCount++;
+            if (GetMilestoneState(index, isPremium) != MilestoneState.ReadyToClaim) return false;
+            if (isPremium) _saveData.claimedPremiumMilestones.Add(index);
+            else _saveData.claimedFreeMilestones.Add(index);
             _passSaveAdapter.SaveData(_saveData);
             OnDataChanged?.Invoke();
             return true;
@@ -149,10 +152,5 @@ namespace ChieChie.GamePass
         }
     }
 
-    public enum MilestoneState
-    {
-        Locked,
-        ReadyToClaim,
-        Claimed
-    }
+   
 }

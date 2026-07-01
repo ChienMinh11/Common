@@ -10,9 +10,12 @@ namespace ChieChie.GamePass
     {
         public int index;
         public int requiredAmount;
+        public GameObject customIconFreePass;
+        public GameObject customIconPremiumPass;
         public List<PassRewardData> freePassrewards = new List<PassRewardData>();
         public List<PassRewardData> premiumPassrewards = new List<PassRewardData>();
-
+       public bool UseCustomIconFreePass => customIconFreePass != null;
+        public bool UseCustomIconPremiumPass => customIconPremiumPass != null;
     }
 
 }
