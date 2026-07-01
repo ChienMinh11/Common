@@ -10,16 +10,23 @@ namespace ChieChie.GamePass
         private readonly PassDatabase _database;
         private readonly List<IPassView> _activeViews = new List<IPassView>();
 
+        // --- CACHE VARIABLES ---
+        private List<PassBonusData> _sortedBonusItemsCache;
+        // -
+
         public PassPresenter(PassModel model, PassDatabase database)
         {
-           _model = model;
-           _database = database;
-           Initialize();
+            _model = model;
+            _database = database;
+            Initialize();
         }
 
-        public void Initialize()
+        private void Initialize()
         {
             _model.OnDataChanged += HandleModelDataChanged;
+
+            // Cache lại danh sách đã sắp xếp ngay từ đầu, loại bỏ OrderBy trong runtime
+            _sortedBonusItemsCache = _database.BonusPassItems.OrderBy(b => b.index).ToList();
         }
 
         public void RegisterView(IPassView view)
@@ -29,9 +36,9 @@ namespace ChieChie.GamePass
             {
                 _activeViews.Add(view);
                 view.OnClaimRewardClicked += HandleClaimReward;
-                view.OnClaimBonusClicked += HandleClaimBonus; 
+                view.OnClaimBonusClicked += HandleClaimBonus;
                 view.OnBuyPremiumClicked += HandleBuyPremium;
-                
+
                 view.RefreshUI(UpdateViewData());
             }
         }
@@ -75,21 +82,21 @@ namespace ChieChie.GamePass
                 {
                     Index = item.index,
                     RequiredExp = item.expRequired,
-                    FreeRewards = item.freePassrewards,
+                    FreeRewards = item.freePassrewards, // Tham chiếu trực tiếp, an toàn
                     PremiumRewards = item.premiumPassrewards,
                     FreeState = _model.GetMilestoneState(item.index, false),
                     PremiumState = _model.GetMilestoneState(item.index, true)
                 });
             }
 
-            var sortedBonusItems = _database.BonusPassItems.OrderBy(b => b.index);
-            foreach (var bonusItem in sortedBonusItems)
+            // Tối ưu: Duyệt qua danh sách đã được cache thay vì gọi OrderBy() liên tục
+            foreach (var bonusItem in _sortedBonusItemsCache)
             {
                 viewData.BonusMilestones.Add(new BonusMilestoneUIData
                 {
                     Index = bonusItem.index,
                     RequiredExp = bonusItem.expRequied,
-                    Rewards = bonusItem.bonusPassrewards,
+                    Rewards = bonusItem.bonusPassrewards, // Tham chiếu trực tiếp, an toàn
                     State = _model.GetBonusMilestoneState(bonusItem.index)
                 });
             }

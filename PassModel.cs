@@ -11,6 +11,11 @@ namespace ChieChie.GamePass
         private readonly PassEventScheduler _eventScheduler;
         
         private PassSaveData _saveData;
+        
+        // --- CACHE VARIABLES ---
+        private int _totalRequiredNormalExp;
+        private Dictionary<int, PassBonusData> _bonusItemsCache;
+        // -----------------------
 
         // Sự kiện thông báo khi dữ liệu Game Pass thay đổi (Ví dụ: tăng điểm, nhận quà)
         public event Action OnDataChanged;
@@ -25,7 +30,10 @@ namespace ChieChie.GamePass
             _passSaveAdapter = passSaveAdapter;
             _eventScheduler = eventScheduler;
             Initialize();
+            CacheStaticDatabaseData();
         }
+        
+        
         
         public void Initialize()
         {
@@ -39,6 +47,25 @@ namespace ChieChie.GamePass
             {
                 _saveData = new PassSaveData { currentEventId = _eventScheduler.eventId };
                 _passSaveAdapter.SaveData(_saveData);
+            }
+        }
+        private void CacheStaticDatabaseData()
+        {
+            // 1. Cache tổng EXP mốc thường thay vì dùng .Sum() liên tục
+            _totalRequiredNormalExp = 0;
+            foreach (var item in _database.PassItems)
+            {
+                _totalRequiredNormalExp += item.expRequired;
+            }
+
+            // 2. Cache Dictionary cho các mốc Bonus thay vì dùng .FirstOrDefault()
+            _bonusItemsCache = new Dictionary<int, PassBonusData>();
+            foreach (var bonusItem in _database.BonusPassItems)
+            {
+                if (!_bonusItemsCache.ContainsKey(bonusItem.index))
+                {
+                    _bonusItemsCache.Add(bonusItem.index, bonusItem);
+                }
             }
         }
 
@@ -80,27 +107,20 @@ namespace ChieChie.GamePass
         // Lấy lượng Exp dư ra sau khi đã trừ đi toàn bộ yêu cầu của các mốc Pass thông thường
         public int GetBonusExp()
         {
-            int totalRequiredNormal = _database.PassItems.Sum(item => item.expRequired);
-            int bonusExp = _saveData.currentExp - totalRequiredNormal;
+            int bonusExp = _saveData.currentExp - _totalRequiredNormalExp;
             return Math.Max(0, bonusExp);
         }
         // Kiểm tra trạng thái của một mốc Bonus cụ thể theo Index
         public MilestoneState GetBonusMilestoneState(int index)
         {
-            // Nếu đã nằm trong danh sách đã nhận -> Claimed
             if (_saveData.claimedBonusMilestones.Contains(index))
                 return MilestoneState.Claimed;
 
-            // Tìm thông tin cấu hình mốc Bonus này trong Database
-            var bonusItem = _database.BonusPassItems.FirstOrDefault(b => b.index == index);
-            if (bonusItem == null) return MilestoneState.Locked;
+            if (!_bonusItemsCache.TryGetValue(index, out var bonusItem)) 
+                return MilestoneState.Locked;
 
             int bonusExp = GetBonusExp();
-
-            // Điều kiện 1: Đủ điểm yêu cầu của mốc Bonus đó
             bool hasEnoughExp = bonusExp >= bonusItem.expRequied;
-
-            // Điều kiện 2: Phải mở tuần tự (Mốc đầu tiên index == 0, hoặc mốc (index - 1) đã nằm trong danh sách Claimed)
             bool isPreviousClaimed = index == 0 || _saveData.claimedBonusMilestones.Contains(index - 1);
 
             if (hasEnoughExp && isPreviousClaimed)
