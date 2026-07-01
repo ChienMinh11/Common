@@ -76,11 +76,10 @@ namespace ChieChie.GamePass
                 {
                     Index = item.index,
                     RequiredExp = item.expRequired,
-                    FreeRewards = item.freePassrewards, 
-                    PremiumRewards = item.premiumPassrewards,
+                    FreeRewards = _model.GetFinalRewards(item.index, false, false, item.freePassrewards), 
+                    PremiumRewards = _model.GetFinalRewards(item.index, true, false, item.premiumPassrewards),
                     FreeState = _model.GetMilestoneState(item.index, false),
                     PremiumState = _model.GetMilestoneState(item.index, true),
-                    // Gán thêm ở đây
                     CustomIconFreePass = item.customIconFreePass,
                     CustomIconPremiumPass = item.customIconPremiumPass
                 });
@@ -92,7 +91,7 @@ namespace ChieChie.GamePass
                 {
                     Index = bonusItem.index,
                     RequiredExp = bonusItem.expRequied,
-                    Rewards = bonusItem.bonusPassrewards, 
+                    Rewards = _model.GetFinalRewards(bonusItem.index, false, true, bonusItem.bonusPassrewards), 
                     State = _model.GetBonusMilestoneState(bonusItem.index),
                     BonusIcon = bonusItem.bonusIcon
                 });

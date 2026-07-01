@@ -14,11 +14,13 @@ namespace ChieChie.GamePass
         private Dictionary<int, PassBonusData> _bonusItemsCache;
  
         public event Action OnDataChanged;
+        public event Action<List<PassRewardData>> OnRewardsClaimed;
 
         public int CurrentExp => _saveData.currentExp;
         public bool IsPremiumUnlocked => _saveData.isPremiumUnlocked;
         public string EventId => _eventScheduler.eventId;
         public List<PassRewardData> AutoClaimedRewards { get; private set; } = new List<PassRewardData>();
+        private readonly List<IPassRewardModifier> _rewardModifiers = new List<IPassRewardModifier>();
 
         public PassModel(PassDatabase database, IPassSaveAdapter passSaveAdapter, PassEventScheduler eventScheduler)
         {
@@ -63,6 +65,24 @@ namespace ChieChie.GamePass
                 }
             }
         }
+        
+        public void RegisterModifier(IPassRewardModifier modifier)
+        {
+            if (!_rewardModifiers.Contains(modifier))
+            {
+                _rewardModifiers.Add(modifier);
+                OnDataChanged?.Invoke(); 
+            }
+        }
+
+        public void UnregisterModifier(IPassRewardModifier modifier)
+        {
+            if (_rewardModifiers.Remove(modifier))
+            {
+                OnDataChanged?.Invoke();
+            }
+        }
+        
         private List<PassRewardData> ProcessAutoClaimUnclaimedRewards(PassSaveData oldData)
         {
             var rewards = new List<PassRewardData>();
@@ -84,11 +104,13 @@ namespace ChieChie.GamePass
                 {
                     if (!oldData.claimedFreeMilestones.Contains(item.index))
                     {
-                        rewards.AddRange(item.freePassrewards);
+                        // SỬA Ở ĐÂY: Lấy qua bộ lọc
+                        rewards.AddRange(GetFinalRewards(item.index, false, false, item.freePassrewards));
                     }
                     if (oldData.isPremiumUnlocked && !oldData.claimedPremiumMilestones.Contains(item.index))
                     {
-                        rewards.AddRange(item.premiumPassrewards);
+                        // SỬA Ở ĐÂY: Lấy qua bộ lọc
+                        rewards.AddRange(GetFinalRewards(item.index, true, false, item.premiumPassrewards));
                     }
                 }
             }
@@ -105,12 +127,24 @@ namespace ChieChie.GamePass
 
                 if (hasEnoughExp && isPreviousClaimed)
                 {
-                    rewards.AddRange(bonusItem.bonusPassrewards);
+                    rewards.AddRange(GetFinalRewards(bonusItem.index, false, true, bonusItem.bonusPassrewards));
                     oldClaimedBonus.Add(bonusItem.index);
                 }
             }
 
             return rewards;
+        }
+        public List<PassRewardData> GetFinalRewards(int index, bool isPremium, bool isBonus, List<PassRewardData> originalRewards)
+        {
+            var finalRewards = originalRewards;
+            foreach (var modifier in _rewardModifiers)
+            {
+                if (modifier.ShouldReplaceReward(index, isPremium, isBonus))
+                {
+                    finalRewards = modifier.GetReplacedRewards(index, isPremium, isBonus, finalRewards);
+                }
+            }
+            return finalRewards;
         }
 
         public void AddExp(int amount)
@@ -174,10 +208,17 @@ namespace ChieChie.GamePass
 
         public bool ClaimBonusReward(int index)
         {
-            if (GetBonusMilestoneState(index) != MilestoneState.ReadyToClaim) 
+            if (GetBonusMilestoneState(index) != MilestoneState.ReadyToClaim)
                 return false;
 
             _saveData.claimedBonusMilestones.Add(index);
+ 
+            if (_bonusItemsCache.TryGetValue(index, out var bonusItem))
+            {
+                var finalRewards = GetFinalRewards(index, false, true, bonusItem.bonusPassrewards);
+                OnRewardsClaimed?.Invoke(finalRewards);
+            }
+
             _passSaveAdapter.SaveData(_saveData);
             OnDataChanged?.Invoke();
             return true;
@@ -198,8 +239,23 @@ namespace ChieChie.GamePass
         public bool ClaimReward(int index, bool isPremium)
         {
             if (GetMilestoneState(index, isPremium) != MilestoneState.ReadyToClaim) return false;
+            
             if (isPremium) _saveData.claimedPremiumMilestones.Add(index);
             else _saveData.claimedFreeMilestones.Add(index);
+            
+            // XỬ LÝ TẠI ĐÂY: Lấy quà gốc
+            var originalRewards = isPremium ? _database.PassItems.FirstOrDefault(i => i.index == index)?.premiumPassrewards 
+                : _database.PassItems.FirstOrDefault(i => i.index == index)?.freePassrewards;
+
+            if (originalRewards != null)
+            {
+                // Chạy qua hàm GetFinalRewards đã làm ở bước trước để lấy quà sau khi replace
+                var finalRewards = GetFinalRewards(index, isPremium, false, originalRewards);
+                
+                // Bắn event ra bên ngoài xử lý add quà
+                OnRewardsClaimed?.Invoke(finalRewards);
+            }
+          
             _passSaveAdapter.SaveData(_saveData);
             OnDataChanged?.Invoke();
             return true;
