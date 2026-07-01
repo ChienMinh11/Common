@@ -74,7 +74,7 @@ namespace ChieChie.GamePass
                 viewData.Milestones.Add(new MilestoneUIData
                 {
                     Index = item.index,
-                    RequiredExp = item.requiredAmount,
+                    RequiredExp = item.expRequired,
                     FreeRewards = item.freePassrewards,
                     PremiumRewards = item.premiumPassrewards,
                     FreeState = _model.GetMilestoneState(item.index, false),
@@ -88,7 +88,7 @@ namespace ChieChie.GamePass
                 viewData.BonusMilestones.Add(new BonusMilestoneUIData
                 {
                     Index = bonusItem.index,
-                    RequiredExp = bonusItem.requiredAmount,
+                    RequiredExp = bonusItem.expRequied,
                     Rewards = bonusItem.bonusPassrewards,
                     State = _model.GetBonusMilestoneState(bonusItem.index)
                 });

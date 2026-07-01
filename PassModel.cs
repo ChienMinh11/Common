@@ -67,10 +67,10 @@ namespace ChieChie.GamePass
             int currentMilestone = 0;
             foreach (var item in _database.PassItems)
             {
-                if (exp >= item.requiredAmount)
+                if (exp >= item.expRequired)
                 {
                     currentMilestone = item.index;
-                    exp -= item.requiredAmount;
+                    exp -= item.expRequired;
                 }
                 else break;
             }
@@ -80,7 +80,7 @@ namespace ChieChie.GamePass
         // Lấy lượng Exp dư ra sau khi đã trừ đi toàn bộ yêu cầu của các mốc Pass thông thường
         public int GetBonusExp()
         {
-            int totalRequiredNormal = _database.PassItems.Sum(item => item.requiredAmount);
+            int totalRequiredNormal = _database.PassItems.Sum(item => item.expRequired);
             int bonusExp = _saveData.currentExp - totalRequiredNormal;
             return Math.Max(0, bonusExp);
         }
@@ -98,7 +98,7 @@ namespace ChieChie.GamePass
             int bonusExp = GetBonusExp();
 
             // Điều kiện 1: Đủ điểm yêu cầu của mốc Bonus đó
-            bool hasEnoughExp = bonusExp >= bonusItem.requiredAmount;
+            bool hasEnoughExp = bonusExp >= bonusItem.expRequied;
 
             // Điều kiện 2: Phải mở tuần tự (Mốc đầu tiên index == 0, hoặc mốc (index - 1) đã nằm trong danh sách Claimed)
             bool isPreviousClaimed = index == 0 || _saveData.claimedBonusMilestones.Contains(index - 1);

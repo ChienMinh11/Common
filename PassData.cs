@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using ChieChie.Constracts;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace ChieChie.GamePass
 {
@@ -9,7 +10,7 @@ namespace ChieChie.GamePass
     public class PassData: ScriptableObject
     {
         public int index;
-        public int requiredAmount;
+        public int expRequired;
         public GameObject customIconFreePass;
         public GameObject customIconPremiumPass;
         public List<PassRewardData> freePassrewards = new List<PassRewardData>();

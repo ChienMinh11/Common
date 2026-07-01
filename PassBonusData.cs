@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace ChieChie.GamePass
 {
@@ -7,7 +8,7 @@ namespace ChieChie.GamePass
     public class PassBonusData: ScriptableObject
     {
         public int index;
-        public int requiredAmount;
+        public int expRequied;
         public GameObject bonusIcon;
         public List<PassRewardData> bonusPassrewards = new List<PassRewardData>();
         public bool UseBonusIcon => bonusIcon != null;
