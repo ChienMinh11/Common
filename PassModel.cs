@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using ChieChie.Constracts;
 
 namespace ChieChie.GamePass
 {
@@ -22,18 +23,21 @@ namespace ChieChie.GamePass
         public List<PassRewardData> AutoClaimedRewards { get; private set; } = new List<PassRewardData>();
         private readonly List<IPassRewardModifier> _rewardModifiers = new List<IPassRewardModifier>();
 
-        public PassModel(PassDatabase database, IPassSaveAdapter passSaveAdapter, PassEventScheduler eventScheduler)
+        private readonly ITimeProvider _timeProvider;
+
+        public PassModel(PassDatabase database, IPassSaveAdapter passSaveAdapter, PassEventScheduler eventScheduler, ITimeProvider timeProvider)
         {
             _database = database;
             _passSaveAdapter = passSaveAdapter;
             _eventScheduler = eventScheduler;
+            _timeProvider = timeProvider; // Gán time provider
             CacheStaticDatabaseData();
             Initialize();
         }
         
         public void Initialize()
         {
-            _eventScheduler.UpdateMonthlySchedule(DateTime.UtcNow);
+            _eventScheduler.UpdateMonthlySchedule(_timeProvider); 
             _saveData = _passSaveAdapter.LoadData() ?? new PassSaveData();
             if (!string.IsNullOrEmpty(_saveData.currentEventId) && _saveData.currentEventId != _eventScheduler.eventId)
             {

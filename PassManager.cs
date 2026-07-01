@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using ChieChie.Constracts;
 using Cysharp.Threading.Tasks;
 
 namespace ChieChie.GamePass
@@ -17,15 +18,19 @@ namespace ChieChie.GamePass
         private CancellationTokenSource _countdownCts;
         public event Action<List<PassRewardData>> OnRewardsClaimed;
 
-        public PassManager(PassDatabase database, IPassSaveAdapter saveAdapter)
+        private readonly ITimeProvider _timeProvider;
+        public DateTime EventEndTime => _passModel != null ? _passModel.EventEndTime : DateTime.MinValue;
+
+        public PassManager(PassDatabase database, IPassSaveAdapter saveAdapter, ITimeProvider timeProvider)
         {
             _passDatabase = database;
             _passSaveAdapter = saveAdapter;
+            _timeProvider = timeProvider;
         }
 
         public async UniTask<bool> InitializeAsync(CancellationToken cancellationToken)
         {
-            _passModel = new PassModel(_passDatabase, _passSaveAdapter, _passSchedule);
+            _passModel = new PassModel(_passDatabase, _passSaveAdapter, _passSchedule, _timeProvider);
             _passModel.OnRewardsClaimed += HandleModelRewardsClaimed;
             _passPresenter = new PassPresenter(_passModel,_passDatabase);
             IsInitialized = true;
@@ -66,6 +71,16 @@ namespace ChieChie.GamePass
         public void AddExp(int amount)
         {
            _passModel.AddExp(amount);
+        }
+
+        public void CheckEventUpdate()
+        {
+            if (!IsInitialized || _passModel == null) 
+            {
+                UnityEngine.Debug.LogWarning("[PassManager] Chưa khởi tạo hệ thống, không thể check event update.");
+                return;
+            }
+            _passModel.Initialize();
         }
     }
 }

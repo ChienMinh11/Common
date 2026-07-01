@@ -15,6 +15,9 @@ namespace ChieChie.GamePass
        void AddExp(int amount);
        void RegisterRewardModifier(IPassRewardModifier modifier);
        void UnregisterRewardModifier(IPassRewardModifier modifier);
-       
+
+       void CheckEventUpdate();
+       DateTime EventEndTime {get; }
+
     }
 }
