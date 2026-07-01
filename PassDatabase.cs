@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace ChieChie.GamePass
 {
-    [CreateAssetMenu(fileName = "PassDatabase", menuName = "CORE/GamePass/Pass Reward Database")]
+    [CreateAssetMenu(fileName = "PassDatabase", menuName = "CORE/GamePass/Pass Database")]
     public class PassDatabase : ScriptableObject
     {
         [SerializeField] private List<PassData> passItems = new List<PassData>();
