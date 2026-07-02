@@ -141,7 +141,10 @@ namespace ChieChie.GamePass
             if (oldData == null) return;
             int tempExp = oldData.currentExp;
             int oldMaxMilestoneIndex = 0;
-            foreach (var item in _database.PassItems)
+            
+            var sortedPassItems = _database.PassItems.OrderBy(i => i.index).ToList();
+            
+            foreach (var item in sortedPassItems)
             {
                 if (tempExp >= item.expRequired)
                 {
@@ -152,7 +155,7 @@ namespace ChieChie.GamePass
             }
 
             // 1. Thu thập Normal Rewards (Free và Premium)
-            foreach (var item in _database.PassItems)
+            foreach (var item in sortedPassItems)
             {
                 if (oldMaxMilestoneIndex >= item.index)
                 {
@@ -241,7 +244,10 @@ namespace ChieChie.GamePass
         {
             int exp = _saveData.currentExp;
             int currentMilestone = 0;
-            foreach (var item in _database.PassItems)
+          
+            var sortedPassItems = _database.PassItems.OrderBy(i => i.index).ToList();
+    
+            foreach (var item in sortedPassItems)
             {
                 if (exp >= item.expRequired)
                 {
