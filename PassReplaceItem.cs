@@ -8,6 +8,7 @@ namespace ChieChie.GamePass
     public class PassReplaceItem : ScriptableObject
     {
         public int replaceIndex;
+        public bool isBonus;
         public List<PassRewardData> replacePassRewards = new List<PassRewardData>();
         public List<IItemReward> ReplacePassRewards => replacePassRewards.ConvertAll(x => (IItemReward)x);
        
