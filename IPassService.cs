@@ -11,6 +11,7 @@ namespace ChieChie.GamePass
     { 
         event Action<List<IItemReward>> OnRewardsClaimed;
         event Action<List<IItemReward>> OnAutoClaimedRewardsProcessed;
+        event Action<IPassNotificationEventData> OnAutoClaimNotificationTriggered;
         List<IItemReward> GetAndClearAutoClaimedRewards();
        void RegisterView(IPassView view);
        void UnregisterView(IPassView view);

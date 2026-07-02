@@ -22,6 +22,7 @@ namespace ChieChie.GamePass
         public string EventId => _saveData.currentEventId; // Lấy theo ID đang chạy trong SaveData thay vì scheduler
         public List<IItemReward> AutoClaimedRewards { get; private set; } = new List<IItemReward>();
         private readonly List<IPassRewardModifier> _rewardModifiers = new List<IPassRewardModifier>();
+        public event Action<IPassNotificationEventData> OnAutoClaimNotificationTriggered;
 
         private readonly ITimeProvider _timeProvider;
 
