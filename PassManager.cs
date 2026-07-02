@@ -16,7 +16,8 @@ namespace ChieChie.GamePass
         public bool IsInitialized { get; set; }
 
         private CancellationTokenSource _countdownCts;
-        public event Action<List<PassRewardData>> OnRewardsClaimed;
+        public event Action<List<IItemReward>> OnRewardsClaimed;
+        public event Action<List<IItemReward>> OnAutoClaimedRewardsProcessed;
 
         private readonly ITimeProvider _timeProvider;
         public DateTime EventEndTime => _passModel != null ? _passModel.EventEndTime : DateTime.MinValue;
@@ -36,7 +37,7 @@ namespace ChieChie.GamePass
             IsInitialized = true;
 
             _countdownCts = new CancellationTokenSource();
-        
+            CheckAndTriggerAutoClaimEvent();
 
             return await UniTask.FromResult(true);
         }
@@ -57,9 +58,18 @@ namespace ChieChie.GamePass
             _passPresenter?.Cleanup();
         }
 
-        public List<PassRewardData> GetAndClearAutoClaimedRewards() => _passModel.AutoClaimedRewards;
+        private void CheckAndTriggerAutoClaimEvent()
+        {
+            var autoRewards = GetAndClearAutoClaimedRewards(); // Hàm này lấy ra danh sách quà hiện tại từ Model
+            if (autoRewards != null && autoRewards.Count > 0)
+            {
+                // Bắn event ra ngoài để hệ thống Resource tự động cập nhật và UI tự động hiển thị
+                OnAutoClaimedRewardsProcessed?.Invoke(autoRewards);
+            }
+        }
+        public List<IItemReward> GetAndClearAutoClaimedRewards() => _passModel.AutoClaimedRewards;
        
-        private void HandleModelRewardsClaimed(List<PassRewardData> rewards)
+        private void HandleModelRewardsClaimed(List<IItemReward> rewards)
         {
             OnRewardsClaimed?.Invoke(rewards);
         }
@@ -81,6 +91,7 @@ namespace ChieChie.GamePass
                 return;
             }
             _passModel.Initialize();
+            CheckAndTriggerAutoClaimEvent();
         }
         
         public void ActiveNewEvent() => _passModel.ActivateNewEventManual();

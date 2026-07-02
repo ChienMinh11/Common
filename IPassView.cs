@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using ChieChie.Constracts;
 
 namespace ChieChie.GamePass
 {
@@ -18,7 +19,7 @@ namespace ChieChie.GamePass
     {
         public int Index;
         public int RequiredExp;
-        public List<PassRewardData> Rewards;
+        public List<IItemReward> Rewards;
         public MilestoneState State;
         public UnityEngine.GameObject BonusIcon;
     }
@@ -27,8 +28,8 @@ namespace ChieChie.GamePass
     {
         public int Index;
         public int RequiredExp;
-        public List<PassRewardData> FreeRewards;
-        public List<PassRewardData> PremiumRewards;
+        public List<IItemReward> FreeRewards;
+        public List<IItemReward> PremiumRewards;
         public MilestoneState FreeState;
         public MilestoneState PremiumState;
         public UnityEngine.GameObject CustomIconFreePass;

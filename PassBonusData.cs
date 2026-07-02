@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using ChieChie.Constracts;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -12,5 +13,6 @@ namespace ChieChie.GamePass
         public GameObject bonusIcon;
         public List<PassRewardData> bonusPassrewards = new List<PassRewardData>();
         public bool UseBonusIcon => bonusIcon != null;
+        public List<IItemReward> BonusPassrewards => bonusPassrewards.ConvertAll(x => (IItemReward)x);
     }
 }

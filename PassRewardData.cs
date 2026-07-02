@@ -63,13 +63,7 @@ namespace ChieChie.GamePass
                 return null;
             }
         }
-
-        public interface IPassIdentitySource
-        {
-            string ResourceId { get; }
-            Sprite Icon { get; }
-            Sprite InfinityIcon { get; }
-        }
+      
     }
 
 

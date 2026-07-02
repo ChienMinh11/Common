@@ -17,6 +17,9 @@ namespace ChieChie.GamePass
         public List<PassRewardData> premiumPassrewards = new List<PassRewardData>();
        public bool UseCustomIconFreePass => customIconFreePass != null;
         public bool UseCustomIconPremiumPass => customIconPremiumPass != null;
+        
+        public List<IItemReward> FreePassrewards => freePassrewards .ConvertAll(x => (IItemReward)x);
+        public List<IItemReward> PremiumPassrewards => premiumPassrewards .ConvertAll(x => (IItemReward)x);
     }
 
 }

@@ -15,12 +15,12 @@ namespace ChieChie.GamePass
         private Dictionary<int, PassBonusData> _bonusItemsCache;
  
         public event Action OnDataChanged;
-        public event Action<List<PassRewardData>> OnRewardsClaimed;
+        public event Action<List<IItemReward>> OnRewardsClaimed;
 
         public int CurrentExp => _saveData.currentExp;
         public bool IsPremiumUnlocked => _saveData.isPremiumUnlocked;
         public string EventId => _saveData.currentEventId; // Lấy theo ID đang chạy trong SaveData thay vì scheduler
-        public List<PassRewardData> AutoClaimedRewards { get; private set; } = new List<PassRewardData>();
+        public List<IItemReward> AutoClaimedRewards { get; private set; } = new List<IItemReward>();
         private readonly List<IPassRewardModifier> _rewardModifiers = new List<IPassRewardModifier>();
 
         private readonly ITimeProvider _timeProvider;
@@ -127,9 +127,9 @@ namespace ChieChie.GamePass
             }
         }
         
-        private List<PassRewardData> ProcessAutoClaimUnclaimedRewards(PassSaveData oldData)
+        private List<IItemReward> ProcessAutoClaimUnclaimedRewards(PassSaveData oldData)
         {
-            var rewards = new List<PassRewardData>();
+            var rewards = new List<IItemReward>();
             if (oldData == null) return rewards;
             int tempExp = oldData.currentExp;
             int oldMaxMilestoneIndex = 0;
@@ -148,11 +148,11 @@ namespace ChieChie.GamePass
                 {
                     if (!oldData.claimedFreeMilestones.Contains(item.index))
                     {
-                        rewards.AddRange(GetFinalRewards(item.index, false, false, item.freePassrewards));
+                        rewards.AddRange(GetFinalRewards(item.index, false, false, item.FreePassrewards));
                     }
                     if (oldData.isPremiumUnlocked && !oldData.claimedPremiumMilestones.Contains(item.index))
                     {
-                        rewards.AddRange(GetFinalRewards(item.index, true, false, item.premiumPassrewards));
+                        rewards.AddRange(GetFinalRewards(item.index, true, false, item.PremiumPassrewards));
                     }
                 }
             }
@@ -169,7 +169,7 @@ namespace ChieChie.GamePass
 
                 if (hasEnoughExp && isPreviousClaimed)
                 {
-                    rewards.AddRange(GetFinalRewards(bonusItem.index, false, true, bonusItem.bonusPassrewards));
+                    rewards.AddRange(GetFinalRewards(bonusItem.index, false, true, bonusItem.BonusPassrewards));
                     oldClaimedBonus.Add(bonusItem.index);
                 }
             }
@@ -177,7 +177,7 @@ namespace ChieChie.GamePass
             return rewards;
         }
 
-        public List<PassRewardData> GetFinalRewards(int index, bool isPremium, bool isBonus, List<PassRewardData> originalRewards)
+        public List<IItemReward> GetFinalRewards(int index, bool isPremium, bool isBonus, List<IItemReward> originalRewards)
         {
             var finalRewards = originalRewards;
             foreach (var modifier in _rewardModifiers)
@@ -258,7 +258,7 @@ namespace ChieChie.GamePass
  
             if (_bonusItemsCache.TryGetValue(index, out var bonusItem))
             {
-                var finalRewards = GetFinalRewards(index, false, true, bonusItem.bonusPassrewards);
+                var finalRewards = GetFinalRewards(index, false, true, bonusItem.BonusPassrewards);
                 OnRewardsClaimed?.Invoke(finalRewards);
             }
 
@@ -287,8 +287,8 @@ namespace ChieChie.GamePass
             if (isPremium) _saveData.claimedPremiumMilestones.Add(index);
             else _saveData.claimedFreeMilestones.Add(index);
             
-            var originalRewards = isPremium ? _database.PassItems.FirstOrDefault(i => i.index == index)?.premiumPassrewards 
-                : _database.PassItems.FirstOrDefault(i => i.index == index)?.freePassrewards;
+            var originalRewards = isPremium ? _database.PassItems.FirstOrDefault(i => i.index == index)?.PremiumPassrewards 
+                : _database.PassItems.FirstOrDefault(i => i.index == index)?.FreePassrewards;
 
             if (originalRewards != null)
             {

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using ChieChie.Constracts;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -8,9 +9,9 @@ namespace ChieChie.GamePass
 {
     public interface IPassService 
     { 
-        event Action<List<PassRewardData>> OnRewardsClaimed;
-        
-        List<PassRewardData> GetAndClearAutoClaimedRewards();
+        event Action<List<IItemReward>> OnRewardsClaimed;
+        event Action<List<IItemReward>> OnAutoClaimedRewardsProcessed;
+        List<IItemReward> GetAndClearAutoClaimedRewards();
        void RegisterView(IPassView view);
        void UnregisterView(IPassView view);
        void AddExp(int amount);
