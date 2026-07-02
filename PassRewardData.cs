@@ -1,11 +1,12 @@
 using System;
+using ChieChie.Constracts;
 using UnityEngine;
 using UnityEngine.Serialization;
 
 namespace ChieChie.GamePass
 {
     [Serializable]
-    public class PassRewardData
+    public class PassRewardData : IItemReward
     {
         [Header("Identity Reference")]
         [Tooltip("Kéo thả ScriptableObject (có implement IPassIdentitySource) vào đây")]

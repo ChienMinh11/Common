@@ -62,17 +62,11 @@ namespace ChieChie.GamePass
         public void ActivateNewEventManual()
         {
             _eventScheduler.UpdateMonthlySchedule(_timeProvider);
-          
             if (_saveData.currentEventId != _eventScheduler.eventId)
             {
-                if (!string.IsNullOrEmpty(_saveData.currentEventId))
-                {
-                    AutoClaimedRewards = ProcessAutoClaimUnclaimedRewards(_saveData);
-                }
                 _saveData = new PassSaveData { currentEventId = _eventScheduler.eventId };
                 _passSaveAdapter.SaveData(_saveData);
             }
-
             OnDataChanged?.Invoke();
         }
     
