@@ -171,24 +171,26 @@ namespace ChieChie.GamePass
                 }
             }
 
-            // 2. Thu thập Bonus Rewards
-            int oldBonusExp = Math.Max(0, oldData.currentExp - _totalRequiredNormalExp);
-            var oldClaimedBonus = new HashSet<int>(oldData.claimedBonusMilestones);
-            var sortedBonusItems = _database.BonusPassItems.OrderBy(b => b.index).ToList();
-
-            foreach (var bonusItem in sortedBonusItems)
+            if (oldData.isPremiumUnlocked) 
             {
-                if (oldClaimedBonus.Contains(bonusItem.index)) continue;
+                int oldBonusExp = Math.Max(0, oldData.currentExp - _totalRequiredNormalExp);
+                var oldClaimedBonus = new HashSet<int>(oldData.claimedBonusMilestones);
+                var sortedBonusItems = _database.BonusPassItems.OrderBy(b => b.index).ToList();
 
-                bool hasEnoughExp = oldBonusExp >= bonusItem.expRequied;
-                bool isPreviousClaimed = bonusItem.index == 0 || oldClaimedBonus.Contains(bonusItem.index - 1);
-
-                if (hasEnoughExp && isPreviousClaimed)
+                foreach (var bonusItem in sortedBonusItems)
                 {
-                    var rewards = GetFinalRewards(bonusItem.index, false, true, bonusItem.BonusPassrewards);
-                    AutoClaimedBonusRewards.AddRange(rewards);
-                    AutoClaimedRewards.AddRange(rewards);
-                    oldClaimedBonus.Add(bonusItem.index);
+                    if (oldClaimedBonus.Contains(bonusItem.index)) continue;
+
+                    bool hasEnoughExp = oldBonusExp >= bonusItem.expRequied;
+                    bool isPreviousClaimed = bonusItem.index == 0 || oldClaimedBonus.Contains(bonusItem.index - 1);
+
+                    if (hasEnoughExp && isPreviousClaimed)
+                    {
+                        var rewards = GetFinalRewards(bonusItem.index, false, true, bonusItem.BonusPassrewards);
+                        AutoClaimedBonusRewards.AddRange(rewards);
+                        AutoClaimedRewards.AddRange(rewards);
+                        oldClaimedBonus.Add(bonusItem.index);
+                    }
                 }
             }
         }
@@ -259,6 +261,9 @@ namespace ChieChie.GamePass
 
         public MilestoneState GetBonusMilestoneState(int index)
         {
+            if (!_saveData.isPremiumUnlocked) 
+                return MilestoneState.Locked;
+            
             if (_saveData.claimedBonusMilestones.Contains(index))
                 return MilestoneState.Claimed;
 
