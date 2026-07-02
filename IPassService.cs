@@ -22,6 +22,7 @@ namespace ChieChie.GamePass
        void CheckEventUpdate();
        DateTime EventEndTime {get; }
        void ActiveNewEvent();
+       void UnlockPremiumPass();
        void RefreshData();
 
     }

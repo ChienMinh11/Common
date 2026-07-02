@@ -103,6 +103,8 @@ namespace ChieChie.GamePass
         }
         
         public void ActiveNewEvent() => _passModel.ActivateNewEventManual();
+        public void UnlockPremiumPass() => _passModel.UnlockPremium();
+
         public void RefreshData()
         {
             _passModel.RefreshData();
