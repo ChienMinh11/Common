@@ -1,14 +1,34 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace ChieChie.Core
 {
     public class RewardDisplayService
     {
-        public IBaseRewardDisplayData CurrentData { get; private set; }
+        private readonly Queue<IBaseRewardDisplayData> _dataQueue = new Queue<IBaseRewardDisplayData>();
+        private IBaseRewardDisplayData _currentData;
+
+        public IBaseRewardDisplayData CurrentData 
+        { 
+            get
+            {
+                if (_currentData == null && _dataQueue.Count > 0)
+                {
+                    _currentData = _dataQueue.Dequeue();
+                }
+                return _currentData;
+            } 
+            private set => _currentData = value; 
+        }
 
         public void SetContextData(IBaseRewardDisplayData data)
         {
-            CurrentData = data;
+            _currentData = data;
+        }
+
+        public void EnqueueContextData(IBaseRewardDisplayData data)
+        {
+            _dataQueue.Enqueue(data);
         }
     }
 }

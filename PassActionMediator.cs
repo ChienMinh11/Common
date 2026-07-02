@@ -1,13 +1,25 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using ChieChie.Constracts;
 using ChieChie.Core;
 using ChieChie.GamePass;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using VContainer.Unity;
 
 namespace Game.GamePlay
 {
+    public class AutoClaimMergedReward : IItemReward
+    {
+        public string ResourceId { get; set; }
+        public long Amount { get; set; }
+        public bool IsInfiniteReward { get; set; }
+        public float InfinityDuration { get; set; }
+        public Sprite IconReward { get; set; }
+        public Sprite InfinityRewardIcon { get; set; }
+    }
+
     public class PassActionMediator : IStartable, IDisposable
     {
         private readonly IPassService _passService;
@@ -51,14 +63,12 @@ namespace Game.GamePlay
 
         private void HandleAutoClaimedRewards(List<IItemReward> rewards)
         {
-            AddRewardsToResourceSystem(rewards, isAutoClaim: true, true);
+            AddRewardsToResourceSystem(rewards, isAutoClaim: true, delayUpdate: true);
         }
 
         private void AddRewardsToResourceSystem(List<IItemReward> rewards, bool isAutoClaim, bool delayUpdate = false)
         {
             if (rewards == null || rewards.Count == 0) return;
-
-            string prefix = isAutoClaim ? "[Auto Claim]" : "[Normal Claim]";
 
             foreach (var reward in rewards)
             {
@@ -83,7 +93,65 @@ namespace Game.GamePlay
         public void HandleAutoClaimNotification(IPassNotificationEventData eventData)
         {
             if (eventData == null || eventData.Rewards == null || eventData.Rewards.Count == 0) return;
-         
+
+            List<IItemReward> targetRewards;
+
+            if (!eventData.IsBonusData)
+            {
+                var mergedDict = new Dictionary<string, AutoClaimMergedReward>();
+                foreach (var r in eventData.Rewards)
+                {
+                    if (string.IsNullOrEmpty(r.ResourceId)) continue;
+
+                    if (mergedDict.TryGetValue(r.ResourceId, out var existing))
+                    {
+                        if (r.IsInfiniteReward)
+                        {
+                            existing.IsInfiniteReward = true;
+                            existing.InfinityDuration += r.InfinityDuration;
+                        }
+                        else
+                        {
+                            existing.Amount += r.Amount;
+                        }
+                    }
+                    else
+                    {
+                        mergedDict[r.ResourceId] = new AutoClaimMergedReward
+                        {
+                            ResourceId = r.ResourceId,
+                            Amount = r.Amount,
+                            IsInfiniteReward = r.IsInfiniteReward,
+                            InfinityDuration = r.InfinityDuration,
+                            IconReward = r.IconReward,
+                            InfinityRewardIcon = r.InfinityRewardIcon
+                        };
+                    }
+                }
+                targetRewards = mergedDict.Values.Cast<IItemReward>().ToList();
+            }
+            else
+            {
+                targetRewards = eventData.Rewards;
+            }
+
+            if (targetRewards.Count == 0) return;
+
+            var displayData = new AutoClaimRewardDisplayData(targetRewards);
+            _rewardDisplayService.EnqueueContextData(displayData);
+            if (_popupService is IPopupQueueService queueService)
+            {
+                queueService.Enqueue(new PopupQueueRequest(
+                    popupNameId: "PopupDisplayReward",
+                    message: "",
+                    priority: 0,
+                    closeAndRestore: false
+                ));
+            }
+            else
+            {
+                _popupService.ShowPopup("PopupDisplayReward").Forget();
+            }
         }
 
         #endregion

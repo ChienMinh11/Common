@@ -18,6 +18,7 @@ namespace ChieChie.GamePass
         private CancellationTokenSource _countdownCts;
         public event Action<List<IItemReward>> OnRewardsClaimed;
         public event Action<List<IItemReward>> OnAutoClaimedRewardsProcessed;
+        public event Action<IPassNotificationEventData> OnAutoClaimNotificationTriggered;
 
         private readonly ITimeProvider _timeProvider;
         public DateTime EventEndTime => _passModel != null ? _passModel.EventEndTime : DateTime.MinValue;
@@ -33,6 +34,7 @@ namespace ChieChie.GamePass
         {
             _passModel = new PassModel(_passDatabase, _passSaveAdapter, _passSchedule, _timeProvider);
             _passModel.OnRewardsClaimed += HandleModelRewardsClaimed;
+            _passModel.OnAutoClaimNotificationTriggered += HandleModelAutoClaimNotification;
             _passPresenter = new PassPresenter(_passModel,_passDatabase);
             IsInitialized = true;
 
@@ -52,6 +54,7 @@ namespace ChieChie.GamePass
             if (_passModel != null)
             {
                 _passModel.OnRewardsClaimed -= HandleModelRewardsClaimed;
+                _passModel.OnAutoClaimNotificationTriggered -= HandleModelAutoClaimNotification;
             }
 
             _passModel?.Cleanup();
@@ -65,7 +68,12 @@ namespace ChieChie.GamePass
             {
                 // Bắn event ra ngoài để hệ thống Resource tự động cập nhật và UI tự động hiển thị
                 OnAutoClaimedRewardsProcessed?.Invoke(autoRewards);
+                _passModel.TriggerAutoClaimNotifications();
             }
+        }
+        private void HandleModelAutoClaimNotification(IPassNotificationEventData eventData)
+        {
+            OnAutoClaimNotificationTriggered?.Invoke(eventData);
         }
         public List<IItemReward> GetAndClearAutoClaimedRewards() => _passModel.AutoClaimedRewards;
        

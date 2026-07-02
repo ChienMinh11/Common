@@ -22,6 +22,9 @@ namespace ChieChie.GamePass
         public string EventId => _saveData.currentEventId; // Lấy theo ID đang chạy trong SaveData thay vì scheduler
         public List<IItemReward> AutoClaimedRewards { get; private set; } = new List<IItemReward>();
         private readonly List<IPassRewardModifier> _rewardModifiers = new List<IPassRewardModifier>();
+        
+        public List<IItemReward> AutoClaimedNormalRewards { get; private set; } = new List<IItemReward>();
+        public List<IItemReward> AutoClaimedBonusRewards { get; private set; } = new List<IItemReward>();
         public event Action<IPassNotificationEventData> OnAutoClaimNotificationTriggered;
 
         private readonly ITimeProvider _timeProvider;
@@ -42,14 +45,15 @@ namespace ChieChie.GamePass
             if (!string.IsNullOrEmpty(_saveData.currentEventId))
             {
                 if (DateTime.TryParseExact(_saveData.currentEventId.Replace("GamePass_", ""), "yyyyMM", 
-                    System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTime eventMonth))
+                        System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTime eventMonth))
                 {
                     var startTemp = new DateTime(eventMonth.Year, eventMonth.Month, 1, 0, 0, 0, DateTimeKind.Utc);
                     var endTemp = startTemp.AddMonths(1).AddSeconds(-1);
                  
                     if (_timeProvider.UtcNow > endTemp)
                     {
-                       AutoClaimedRewards = ProcessAutoClaimUnclaimedRewards(_saveData);
+                        // Tiến hành xử lý gom quà tự động
+                        ProcessAutoClaimUnclaimedRewards(_saveData);
                         _saveData = new PassSaveData { currentEventId = string.Empty };
                         _passSaveAdapter.SaveData(_saveData);
                     }
@@ -128,10 +132,13 @@ namespace ChieChie.GamePass
             }
         }
         
-        private List<IItemReward> ProcessAutoClaimUnclaimedRewards(PassSaveData oldData)
+       private void ProcessAutoClaimUnclaimedRewards(PassSaveData oldData)
         {
-            var rewards = new List<IItemReward>();
-            if (oldData == null) return rewards;
+            AutoClaimedNormalRewards.Clear();
+            AutoClaimedBonusRewards.Clear();
+            AutoClaimedRewards.Clear();
+
+            if (oldData == null) return;
             int tempExp = oldData.currentExp;
             int oldMaxMilestoneIndex = 0;
             foreach (var item in _database.PassItems)
@@ -143,20 +150,28 @@ namespace ChieChie.GamePass
                 }
                 else break;
             }
+
+            // 1. Thu thập Normal Rewards (Free và Premium)
             foreach (var item in _database.PassItems)
             {
                 if (oldMaxMilestoneIndex >= item.index)
                 {
                     if (!oldData.claimedFreeMilestones.Contains(item.index))
                     {
-                        rewards.AddRange(GetFinalRewards(item.index, false, false, item.FreePassrewards));
+                        var rewards = GetFinalRewards(item.index, false, false, item.FreePassrewards);
+                        AutoClaimedNormalRewards.AddRange(rewards);
+                        AutoClaimedRewards.AddRange(rewards);
                     }
                     if (oldData.isPremiumUnlocked && !oldData.claimedPremiumMilestones.Contains(item.index))
                     {
-                        rewards.AddRange(GetFinalRewards(item.index, true, false, item.PremiumPassrewards));
+                        var rewards = GetFinalRewards(item.index, true, false, item.PremiumPassrewards);
+                        AutoClaimedNormalRewards.AddRange(rewards);
+                        AutoClaimedRewards.AddRange(rewards);
                     }
                 }
             }
+
+            // 2. Thu thập Bonus Rewards
             int oldBonusExp = Math.Max(0, oldData.currentExp - _totalRequiredNormalExp);
             var oldClaimedBonus = new HashSet<int>(oldData.claimedBonusMilestones);
             var sortedBonusItems = _database.BonusPassItems.OrderBy(b => b.index).ToList();
@@ -170,12 +185,12 @@ namespace ChieChie.GamePass
 
                 if (hasEnoughExp && isPreviousClaimed)
                 {
-                    rewards.AddRange(GetFinalRewards(bonusItem.index, false, true, bonusItem.BonusPassrewards));
+                    var rewards = GetFinalRewards(bonusItem.index, false, true, bonusItem.BonusPassrewards);
+                    AutoClaimedBonusRewards.AddRange(rewards);
+                    AutoClaimedRewards.AddRange(rewards);
                     oldClaimedBonus.Add(bonusItem.index);
                 }
             }
-
-            return rewards;
         }
 
         public List<IItemReward> GetFinalRewards(int index, bool isPremium, bool isBonus, List<IItemReward> originalRewards)
@@ -189,6 +204,18 @@ namespace ChieChie.GamePass
                 }
             }
             return finalRewards;
+        }
+        
+        public void TriggerAutoClaimNotifications()
+        {
+            if (AutoClaimedBonusRewards.Count > 0)
+            {
+                OnAutoClaimNotificationTriggered?.Invoke(new PassNotificationEventData(AutoClaimedBonusRewards, true));
+            }
+            if (AutoClaimedNormalRewards.Count > 0)
+            {
+                OnAutoClaimNotificationTriggered?.Invoke(new PassNotificationEventData(AutoClaimedNormalRewards, false));
+            }
         }
 
         public void AddExp(int amount)
