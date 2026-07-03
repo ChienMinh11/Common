@@ -34,30 +34,17 @@ namespace Game.GamePlay
             return isBonusState;
         }
 
-        public async UniTask<bool> UpdateProgressDetailedAsync(PassViewData viewData)
+        public async UniTask PlaySliderAnimationAsync(float fromProgress, float toProgress, string expText, CancellationToken ct)
         {
-            if (viewData?.Milestones == null || viewData.Milestones.Count == 0) return false;
-
-            bool isBonusState = GetProgressData(viewData, out string expText, out float targetProgress);
             if (txtCurrentExp != null) txtCurrentExp.text = expText;
 
-            if (gameObject.activeInHierarchy)
-            {
-                StopAnimation();
-                _animationCts = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
-              
-                await UniTask.WhenAll(
-                    sliderExpProgress.LerpValueAsync(targetProgress, animationDuration, _animationCts.Token),
-                    filledImage.LerpFillAmountAsync(targetProgress, animationDuration, _animationCts.Token)
-                );
-            }
-            else
-            {
-                StopAnimation();
-                UpdateVisualProgress(targetProgress);
-            }
+            if (sliderExpProgress != null) sliderExpProgress.value = fromProgress;
+            if (filledImage != null) filledImage.fillAmount = fromProgress;
 
-            return isBonusState;
+            await UniTask.WhenAll(
+                sliderExpProgress.LerpValueAsync(toProgress, animationDuration, ct),
+                filledImage.LerpFillAmountAsync(toProgress, animationDuration, ct)
+            );
         }
 
         private bool GetProgressData(PassViewData viewData, out string expText, out float progressFraction)

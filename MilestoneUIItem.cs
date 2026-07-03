@@ -12,6 +12,7 @@ namespace Game.GamePlay
     {
         [SerializeField] private TMP_Text txtIndex;
         [SerializeField] private GameObject starIndex;
+        [SerializeField] private GamePassExpSlider expSlider;
     
         [Header("Free Pass")]
         [SerializeField] private RewardSlotView freeRewardSlotView;
