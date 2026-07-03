@@ -25,6 +25,7 @@ namespace Game.GamePlay
         [SerializeField] private Button btnBuyPremium;
         [SerializeField] private GameObject objPremiumBadge;
         [SerializeField] private GameObject objBonusPassActiveVisual;
+       
 
         [Header("Milestones List")] [SerializeField]
         private Transform milestoneContainer;
@@ -110,6 +111,8 @@ namespace Game.GamePlay
             if (viewData.Milestones != null)
             {
                 var sortedMilestones = viewData.Milestones.OrderBy(m => m.Index).ToList();
+                
+              
 
                 for (int i = 0; i < sortedMilestones.Count; i++)
                 {
@@ -131,6 +134,8 @@ namespace Game.GamePlay
                     }
 
                     item.Setup(sortedMilestones[i], HandleClaimRewardItem);
+                    var nextMilestoneIndex = GetNextMilestoneIndex(viewData, viewData.CurrentExp);
+                    item.UpdateHighlightState(nextMilestoneIndex);
                 }
 
                 if (endIndex != null && startIndex != null)
@@ -211,6 +216,12 @@ namespace Game.GamePlay
         {
             if (txtCurrentLevel == null) return;
 
+            var nextMilestoneIndex = GetNextMilestoneIndex(viewData, currentExp);
+            txtCurrentLevel.text = $"{nextMilestoneIndex}";
+        }
+
+        private static int GetNextMilestoneIndex(PassViewData viewData, int currentExp)
+        {
             int calculatedMilestoneIndex = 0;
             if (viewData.Milestones != null && viewData.Milestones.Count > 0)
             {
@@ -232,7 +243,7 @@ namespace Game.GamePlay
                 : calculatedMilestoneIndex;
 
             int nextMilestoneIndex = Mathf.Min(calculatedMilestoneIndex + 1, maxMilestoneIndex);
-            txtCurrentLevel.text = $"{nextMilestoneIndex}";
+            return nextMilestoneIndex;
         }
 
         private void UpdateExpProgressUI(PassViewData viewData)

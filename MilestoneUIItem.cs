@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using ChieChie.Core;
 using ChieChie.GamePass;
+using DG.Tweening;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -13,10 +14,14 @@ namespace Game.GamePlay
         [SerializeField] private TMP_Text txtIndex;
         [SerializeField] private GameObject starIndex;
         [SerializeField] private GamePassExpSlider expSlider;
+        
+        [Header("Progress Highlight Connection")]
+        [SerializeField] private MilestoneHighlight milestoneHighlight;
     
         [Header("Free Pass")]
         [SerializeField] private RewardSlotView freeRewardSlotView;
         [SerializeField] private Button btnClaimFree;
+        [SerializeField] private DOTweenAnimation btnClaimFreeScale;
         [SerializeField] private GameObject objFreeLocked;
         [SerializeField] private GameObject objFreeClaimed;
         [SerializeField] private GameObject freeIconContainer; // Chứa freeRewardSlotView hoặc ẩn khi dùng Custom Icon
@@ -25,6 +30,7 @@ namespace Game.GamePlay
         [Header("Premium Pass")]
         [SerializeField] private RewardSlotView premiumRewardSlotView;
         [SerializeField] private Button btnClaimPremium;
+        [SerializeField] private DOTweenAnimation btnClaimPremiumScale;
         [SerializeField] private GameObject objPremiumLocked;
         [SerializeField] private GameObject objPremiumClaimed;
         [SerializeField] private GameObject premiumIconContainer; // Chứa premiumRewardSlotView hoặc ẩn khi dùng Custom Icon
@@ -138,6 +144,21 @@ namespace Game.GamePlay
                 var newInstance = Instantiate(prefab, container);
                 cache[prefab] = newInstance;
                 currentActiveIcon = newInstance;
+            }
+        }
+        
+        public void UpdateHighlightState(int currentLevelIndex)
+        {
+            if (milestoneHighlight == null) return;
+
+            if (_milestoneIndex == currentLevelIndex)
+            {
+                milestoneHighlight.SetImmediate(1f);
+            }
+            else 
+            {
+               
+                milestoneHighlight.SetDefault();
             }
         }
 
