@@ -210,19 +210,20 @@ namespace Game.GamePlay
                     int scrollTargetMilestoneIndex = GetNextMilestoneIndex(toViewData, step.EvaluatedExpForClaimableCheck);
                     MilestoneUIItem completedItem = completedAfter > completedBefore ? GetMilestoneItem(completedAfter) : null;
 
-                    UniTask topSliderTask = expSlider.PlaySliderAnimationAsync(
+                    await expSlider.PlaySliderAnimationAsync(
                         step.FromProgressPercentage, 
                         step.ToProgressPercentage, 
                         step.FromProgressText, 
                         step.ToProgressText, 
                         ct
                     );
+
                     UniTask itemSliderTask = completedItem != null
                         ? completedItem.PlayExpSliderAnimationAsync(0f, 1f, ct)
                         : UniTask.CompletedTask;
                     UniTask scrollTask = ScrollToMilestone(scrollTargetMilestoneIndex, animate: true, ct: ct);
 
-                    await UniTask.WhenAll(topSliderTask, itemSliderTask, scrollTask);
+                    await UniTask.WhenAll(itemSliderTask, scrollTask);
 
                     animatedExp = step.EvaluatedExpForClaimableCheck;
                     SetCompletedMilestoneSlidersByExp(toViewData, animatedExp);
