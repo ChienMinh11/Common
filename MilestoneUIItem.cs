@@ -38,6 +38,9 @@ namespace Game.GamePlay
 
         private int _milestoneIndex;
         private Action<int, bool> _onClaimClicked;
+        private MilestoneState _freeState;
+        private MilestoneState _premiumState;
+        private bool _showClaimButtons = true;
 
         private readonly Dictionary<GameObject, GameObject> _cachedFreeIcons = new Dictionary<GameObject, GameObject>();
 
@@ -48,10 +51,13 @@ namespace Game.GamePlay
         private GameObject _currentActivePremiumIcon;
         public int MilestoneIndex => _milestoneIndex;
 
-        public void Setup(MilestoneUIData data, Action<int, bool> onClaimClicked)
+        public void Setup(MilestoneUIData data, Action<int, bool> onClaimClicked, bool showClaimButtons = true)
         {
             _milestoneIndex = data.Index;
             _onClaimClicked = onClaimClicked;
+            _freeState = data.FreeState;
+            _premiumState = data.PremiumState;
+            _showClaimButtons = showClaimButtons;
 
             bool isZeroIndex = _milestoneIndex == 0;
             if (starIndex != null) starIndex.SetActive(isZeroIndex);
@@ -85,7 +91,7 @@ namespace Game.GamePlay
                 }
             }
 
-            UpdateStateUI(data.FreeState, btnClaimFree, objFreeLocked, objFreeClaimed);
+            UpdateStateUI(_freeState, btnClaimFree, objFreeLocked, objFreeClaimed);
 
             UpdateCustomIcon(data.CustomIconPremiumPass, customPremiumIconContainer, _cachedPremiumIcons,
                 ref _currentActivePremiumIcon);
@@ -113,7 +119,7 @@ namespace Game.GamePlay
                 }
             }
 
-            UpdateStateUI(data.PremiumState, btnClaimPremium, objPremiumLocked, objPremiumClaimed);
+            UpdateStateUI(_premiumState, btnClaimPremium, objPremiumLocked, objPremiumClaimed);
         }
 
         private void UpdateCustomIcon(GameObject prefab, Transform container, Dictionary<GameObject, GameObject> cache,
@@ -163,6 +169,13 @@ namespace Game.GamePlay
             }
         }
 
+        public void SetClaimButtonsVisible(bool visible)
+        {
+            _showClaimButtons = visible;
+            UpdateStateUI(_freeState, btnClaimFree, objFreeLocked, objFreeClaimed);
+            UpdateStateUI(_premiumState, btnClaimPremium, objPremiumLocked, objPremiumClaimed);
+        }
+
         public void SetExpSliderProgress(float progress)
         {
             if (expSlider == null) return;
@@ -195,7 +208,7 @@ namespace Game.GamePlay
 
         private void UpdateStateUI(MilestoneState state, Button btn, GameObject lockObj, GameObject claimedObj)
         {
-            btn.gameObject.SetActive(state == MilestoneState.ReadyToClaim);
+            btn.gameObject.SetActive(_showClaimButtons && state == MilestoneState.ReadyToClaim);
             lockObj.SetActive(state == MilestoneState.Locked);
             claimedObj.SetActive(state == MilestoneState.Claimed);
         }
@@ -207,4 +220,3 @@ namespace Game.GamePlay
         }
     }
 }
- 
