@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using ChieChie.Core;
 using ChieChie.GamePass;
+using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
@@ -160,6 +162,15 @@ namespace Game.GamePlay
                
                 milestoneHighlight.SetDefault();
             }
+        }
+
+        public async UniTask SetHighlightByAnimationAsync(float value, CancellationToken ct)
+        {
+            if (milestoneHighlight == null) return;
+
+            ct.ThrowIfCancellationRequested();
+            await milestoneHighlight.SetByAnimationAsync(value);
+            ct.ThrowIfCancellationRequested();
         }
 
         private void UpdateStateUI(MilestoneState state, Button btn, GameObject lockObj, GameObject claimedObj)
