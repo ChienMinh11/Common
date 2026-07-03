@@ -110,6 +110,7 @@ namespace Game.GamePlay
             {
                 var sortedMilestones = viewData.Milestones.OrderBy(m => m.Index).ToList();
                 int highlightedMilestoneIndex = GetNextMilestoneIndex(viewData, initialViewData.CurrentExp);
+                bool showClaimButtons = !shouldAnimateManualRefresh;
 
                 for (int i = 0; i < sortedMilestones.Count; i++)
                 {
@@ -130,7 +131,7 @@ namespace Game.GamePlay
                         item.transform.SetSiblingIndex(startIndex.GetSiblingIndex() + i + 1);
                     }
 
-                    item.Setup(sortedMilestones[i], HandleClaimRewardItem);
+                    item.Setup(sortedMilestones[i], HandleClaimRewardItem, showClaimButtons);
                     item.UpdateHighlightState(highlightedMilestoneIndex);
                     item.SetExpSliderProgress(GetCompletedMilestoneSliderProgress(initialViewData, initialViewData.CurrentExp, item.MilestoneIndex));
                 }
@@ -200,6 +201,7 @@ namespace Game.GamePlay
 
                 UpdateLevelText(toViewData, fromViewData.CurrentExp);
                 SetCompletedMilestoneSlidersByExp(toViewData, fromViewData.CurrentExp);
+                SetClaimButtonsVisible(false);
 
                 int topSliderAnimatedExp = fromViewData.CurrentExp;
                 foreach (var step in animationSteps)
@@ -228,6 +230,7 @@ namespace Game.GamePlay
                 SetCompletedMilestoneSlidersByExp(toViewData, toViewData.CurrentExp);
                 await AnimateMilestoneHighlightAsync(nextMilestoneIndex, 1f, ct, 0.5f);
                 UpdateMilestoneHighlightState(nextMilestoneIndex);
+                SetClaimButtonsVisible(true);
             }
             catch (OperationCanceledException)
             {
@@ -342,6 +345,15 @@ namespace Game.GamePlay
             {
                 if (item == null || !item.gameObject.activeSelf) continue;
                 item.SetExpSliderProgress(GetCompletedMilestoneSliderProgress(viewData, currentExp, item.MilestoneIndex));
+            }
+        }
+
+        private void SetClaimButtonsVisible(bool visible)
+        {
+            foreach (var item in _milestonePool)
+            {
+                if (item == null || !item.gameObject.activeSelf) continue;
+                item.SetClaimButtonsVisible(visible);
             }
         }
 
