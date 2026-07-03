@@ -88,8 +88,10 @@ namespace Game.GamePlay
             expRequiredForNextLevel = 0;
             isMaxNormalLevel = true;
             int accumulatedExpBefore = 0;
+            
+            var sortedMilestones = viewData.Milestones.OrderBy(m => m.Index).ToList();
 
-            foreach (var milestone in viewData.Milestones)
+            foreach (var milestone in sortedMilestones)
             {
                 if (milestone.Index <= currentLevelIndex)
                 {

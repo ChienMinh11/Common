@@ -14,5 +14,6 @@ namespace ChieChie.GamePass
         public List<PassRewardData> bonusPassrewards = new List<PassRewardData>();
         public bool UseBonusIcon => bonusIcon != null;
         public List<IItemReward> BonusPassrewards => bonusPassrewards.ConvertAll(x => (IItemReward)x);
+     
     }
 }
