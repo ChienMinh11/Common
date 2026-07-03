@@ -26,12 +26,13 @@ namespace Game.GamePlay
 
         [Header("Milestones List")] [SerializeField]
         private Transform milestoneContainer;
+        [SerializeField] private Transform startIndex;
+        [SerializeField] private Transform endIndex;
 
         [SerializeField] private MilestoneUIItem milestonePrefab;
 
-        [Header("Bonus Milestones List")] [SerializeField]
-        private Transform bonusContainer;
-
+        [Header("Bonus Milestones List")] 
+        [SerializeField] private Transform bonusContainer;
         [SerializeField] private BonusMilestoneUIItem bonusPrefab;
 
         private readonly List<MilestoneUIItem> _milestonePool = new List<MilestoneUIItem>();
@@ -44,6 +45,8 @@ namespace Game.GamePlay
         private readonly List<GameObject> _spawnedItems = new List<GameObject>();
 
         private IPassService _passService;
+
+        
 
         public void Initialize(IPassService passService)
         {
@@ -101,8 +104,19 @@ namespace Game.GamePlay
                         item = Instantiate(milestonePrefab, milestoneContainer);
                         _milestonePool.Add(item);
                     }
+        
+                    if (startIndex != null)
+                    {
+                        item.transform.SetSiblingIndex(startIndex.GetSiblingIndex() + i + 1);
+                    }
 
                     item.Setup(sortedMilestones[i], HandleClaimRewardItem);
+                }
+
+                if (endIndex != null && startIndex != null)
+                {
+                    int nextIndexAfterMilestones = startIndex.GetSiblingIndex() + sortedMilestones.Count + 1;
+                    endIndex.SetSiblingIndex(nextIndexAfterMilestones);
                 }
 
                 for (int i = sortedMilestones.Count; i < _milestonePool.Count; i++)
@@ -171,9 +185,11 @@ namespace Game.GamePlay
         {
             foreach (var item in _spawnedItems)
             {
-                if (item != null) Destroy(item);
+                if (item != null && item.transform != startIndex) 
+                {
+                    Destroy(item);
+                }
             }
-
             _spawnedItems.Clear();
         }
     }

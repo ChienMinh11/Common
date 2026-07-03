@@ -11,8 +11,10 @@ namespace Game.GamePlay
     public class MilestoneUIItem : MonoBehaviour
     {
         [SerializeField] private TMP_Text txtIndex;
+        [SerializeField] private GameObject starIndex;
     
         [Header("Free Pass")]
+        [SerializeField] private RewardSlotView freeRewardSlotView;
         [SerializeField] private Image imgFreeIcon;
         [SerializeField] private TMP_Text txtFreeAmount;
         [SerializeField] private Button btnClaimFree;
@@ -22,6 +24,7 @@ namespace Game.GamePlay
         [SerializeField] private Transform customFreeIconContainer;
 
         [Header("Premium Pass")]
+        [SerializeField] private RewardSlotView premiumRewardSlotView;
         [SerializeField] private Image imgPremiumIcon;
         [SerializeField] private TMP_Text txtPremiumAmount;
         [SerializeField] private Button btnClaimPremium;
@@ -44,6 +47,10 @@ namespace Game.GamePlay
         {
             _milestoneIndex = data.Index; 
             _onClaimClicked = onClaimClicked;
+            
+            bool isZeroIndex = _milestoneIndex == 0;
+            if (starIndex != null) starIndex.SetActive(isZeroIndex);
+            if (txtIndex != null) txtIndex.gameObject.SetActive(!isZeroIndex);
             
             txtIndex.text = $"{_milestoneIndex}";
 
