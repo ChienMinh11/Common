@@ -162,7 +162,7 @@ namespace Game.GamePlay
             expSlider.SetProgress(Mathf.Clamp01(progress), string.Empty);
         }
 
-        public async UniTask PlayExpSliderAnimationAsync(float fromProgress, float toProgress, CancellationToken ct)
+        public async UniTask PlayExpSliderAnimationAsync(float fromProgress, float toProgress, CancellationToken ct, float durationOverride = -1f)
         {
             if (expSlider == null) return;
 
@@ -171,7 +171,8 @@ namespace Game.GamePlay
                 Mathf.Clamp01(toProgress),
                 string.Empty,
                 string.Empty,
-                ct
+                ct,
+                durationOverride
             );
         }
 
