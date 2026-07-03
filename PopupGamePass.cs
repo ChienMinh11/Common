@@ -24,7 +24,7 @@ namespace Game.GamePlay
 
         protected override void OnShow()
         {
-            
+            if(gamePassView != null) gamePassView.RefreshUIManual();
         }
 
         protected override void OnHide()

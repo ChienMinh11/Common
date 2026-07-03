@@ -124,10 +124,16 @@ namespace Game.GamePlay
                 {
                     ct.ThrowIfCancellationRequested();
                     expSlider.SetProgress(step.FromProgressPercentage, step.FromProgressText);
-                    await expSlider.PlaySliderAnimationAsync(step.FromProgressPercentage, step.ToProgressPercentage, step.FromProgressText, ct);
+                    await expSlider.PlaySliderAnimationAsync(
+                        step.FromProgressPercentage, 
+                        step.ToProgressPercentage, 
+                        step.FromProgressText, 
+                        step.ToProgressText, 
+                        ct
+                    );
+                    
                     expSlider.SetProgress(step.ToProgressPercentage, step.ToProgressText);
                     UpdateClaimableUI(toViewData, step.EvaluatedExpForClaimableCheck);
-                    
                 }
 
                 UpdateExpProgress(toViewData);

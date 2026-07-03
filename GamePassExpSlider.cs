@@ -1,9 +1,10 @@
 using System;
 using System.Linq;
+using System.Text.RegularExpressions; // Thêm để bóc tách chuỗi số
 using System.Threading;
 using ChieChie.GamePass;
 using Cysharp.Threading.Tasks;
-using Game.Extensions; // Import namespace chứa Extension của bạn
+using Game.Extensions;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -33,23 +34,101 @@ namespace Game.GamePlay
 
             return isBonusState;
         }
+
         public void SetProgress(float progressFraction, string expText)
         {
             if (txtCurrentExp != null) txtCurrentExp.text = expText;
             UpdateVisualProgress(progressFraction);
         }
 
-        public async UniTask PlaySliderAnimationAsync(float fromProgress, float toProgress, string expText, CancellationToken ct)
+        // --- Cập nhật hàm chạy Animation đồng bộ cả Slider và Text ---
+        public async UniTask PlaySliderAnimationAsync(float fromProgress, float toProgress, string fromText, string toText, CancellationToken ct)
         {
-            if (txtCurrentExp != null) txtCurrentExp.text = expText;
-
             if (sliderExpProgress != null) sliderExpProgress.value = fromProgress;
             if (filledImage != null) filledImage.fillAmount = fromProgress;
 
-            await UniTask.WhenAll(
-                sliderExpProgress.LerpValueAsync(toProgress, animationDuration, ct),
-                filledImage.LerpFillAmountAsync(toProgress, animationDuration, ct)
-            );
+            // Phân tích chuỗi text (Ví dụ: "50/100" -> số hiện tại bắt đầu là 50, yêu cầu là 100)
+            bool isFromValid = TryParseExpText(fromText, out int fromValue, out int fromMax);
+            bool isToValid = TryParseExpText(toText, out int toValue, out int toMax);
+
+            float elapsed = 0f;
+
+            // Chạy hiệu ứng Scale nhẹ chữ khi bắt đầu tăng EXP (Punch Animation)
+            PlayTextPunchAnimation(ct).Forget();
+
+            while (elapsed < animationDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / animationDuration;
+                
+                // Ép kiểu Lerp mượt từ progress cũ sang progress mới
+                float currentProgress = Mathf.Lerp(fromProgress, toProgress, t);
+                UpdateVisualProgress(currentProgress);
+
+                // Cập nhật giá trị số hiển thị tăng dần trên text
+                if (txtCurrentExp != null)
+                {
+                    if (isFromValid && isToValid && fromMax == toMax)
+                    {
+                        // Cùng một level, chỉ tăng số EXP hiện tại
+                        int currentExpValue = Mathf.RoundToInt(Mathf.Lerp(fromValue, toValue, t));
+                        txtCurrentExp.text = $"{currentExpValue}/{fromMax}";
+                    }
+                    else
+                    {
+                        // Khác level (đang chạy tràn slider ở level cũ), dùng text gốc ban đầu của bước đó
+                        txtCurrentExp.text = fromText;
+                    }
+                }
+
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+
+            // Đảm bảo kết thúc hành trình đạt giá trị chuẩn xác cuối cùng
+            UpdateVisualProgress(toProgress);
+            if (txtCurrentExp != null) txtCurrentExp.text = toText;
+        }
+
+        // Hàm phân tích chuỗi định dạng "X/Y" thành 2 số nguyên
+        private bool TryParseExpText(string text, out int currentExp, out int maxExp)
+        {
+            currentExp = 0;
+            maxExp = 0;
+            if (string.IsNullOrEmpty(text)) return false;
+
+            var match = Regex.Match(text, @"^(\d+)/(\d+)$");
+            if (match.Success)
+            {
+                currentExp = int.Parse(match.Groups[1].Value);
+                maxExp = int.Parse(match.Groups[2].Value);
+                return true;
+            }
+            return false;
+        }
+
+        // Hiệu ứng giật nhẹ chữ khi slider chạy (Punch Scale)
+        private async UniTaskVoid PlayTextPunchAnimation(CancellationToken ct)
+        {
+            if (txtCurrentExp == null) return;
+
+            Vector3 originalScale = Vector3.one;
+            Vector3 punchScale = originalScale * 1.2f; // Phóng to 20%
+            
+            txtCurrentExp.transform.localScale = punchScale;
+            
+            float duration = 0.15f;
+            float elapsed = 0f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                if (txtCurrentExp == null) return;
+                txtCurrentExp.transform.localScale = Vector3.Lerp(punchScale, originalScale, t);
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+
+            if (txtCurrentExp != null) txtCurrentExp.transform.localScale = originalScale;
         }
 
         private bool GetProgressData(PassViewData viewData, out string expText, out float progressFraction)

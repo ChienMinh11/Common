@@ -39,6 +39,7 @@ namespace Game.GamePlay
         
         private GameObject _currentActiveFreeIcon;
         private GameObject _currentActivePremiumIcon;
+        public int MilestoneIndex => _milestoneIndex;
 
         public void Setup(MilestoneUIData data, Action<int, bool> onClaimClicked)
         {

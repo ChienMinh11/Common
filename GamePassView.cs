@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using ChieChie.Constracts;
 using ChieChie.Core;
+using ChieChie.Core.Utilities;
 using ChieChie.GamePass;
 using Cysharp.Threading.Tasks;
 using Sirenix.OdinInspector;
@@ -16,11 +17,9 @@ namespace Game.GamePlay
 {
     public class GamePassView : MonoBehaviour, IPassView 
     {
-        private const string COMPLETED = "Completed!";
         [SerializeField] private string viewId = nameof(GamePassView);
         [Header("Top Bar")] 
         [SerializeField] private UITimeCountdownWidget timeCountdownWidget;
-        [SerializeField] private TMP_Text txtCurrentExp;
         [SerializeField] private TMP_Text txtCurrentLevel;
         [SerializeField] private GamePassExpSlider expSlider;
         [SerializeField] private Button btnBuyPremium;
@@ -53,8 +52,7 @@ namespace Game.GamePlay
         private PassViewData _lastViewData;
         private bool _playManualRefreshAnimation;
         private CancellationTokenSource _refreshAnimationCts;
-
-        
+        private CancellationTokenSource _scrollCts;
 
         public void Initialize(IPassService passService)
         {
@@ -67,13 +65,9 @@ namespace Game.GamePlay
             btnBuyPremium.onClick.AddListener(() => OnBuyPremiumClicked?.Invoke());
         }
 
-        private void OnDestroy()
-        {
-            _passService.UnregisterView(this);
-        }
+      
 
-        [Button]
-        private void RefreshUIManual()
+        public void RefreshUIManual()
         {
             _playManualRefreshAnimation = true;
             _passService.FlushDelayedUIUpdate(this);
@@ -94,8 +88,6 @@ namespace Game.GamePlay
             {
                 objPremiumBadge.SetActive(viewData.IsPremiumUnlocked);
             }
-            
-            // --- Tái cấu trúc logic cập nhật EXP tiến trình & chạy slider ---
             bool shouldAnimateManualRefresh = _playManualRefreshAnimation &&
                                               _lastViewData != null &&
                                               expSlider != null &&
@@ -180,6 +172,10 @@ namespace Game.GamePlay
                 }
             }
             _lastViewData = viewData;
+            if (!shouldAnimateManualRefresh)
+            {
+                 ScrollToMilestone(viewData.CurrentMilestoneIndex, animate: false).Forget();
+            }
         }
         private async UniTask AnimateManualRefreshAsync(PassViewData fromViewData, PassViewData toViewData, CancellationToken ct)
         {
@@ -192,9 +188,14 @@ namespace Game.GamePlay
                 foreach (var step in animationSteps)
                 {
                     ct.ThrowIfCancellationRequested();
-                    expSlider.SetProgress(step.FromProgressPercentage, step.FromProgressText);
-                    await expSlider.PlaySliderAnimationAsync(step.FromProgressPercentage, step.ToProgressPercentage, step.FromProgressText, ct);
-                    expSlider.SetProgress(step.ToProgressPercentage, step.ToProgressText);
+                    await expSlider.PlaySliderAnimationAsync(
+                        step.FromProgressPercentage, 
+                        step.ToProgressPercentage, 
+                        step.FromProgressText, 
+                        step.ToProgressText, 
+                        ct
+                    );
+                    
                     UpdateLevelText(toViewData, step.EvaluatedExpForClaimableCheck);
                 }
        
@@ -203,7 +204,7 @@ namespace Game.GamePlay
             }
             catch (OperationCanceledException)
             {
-                // Bị hủy khi tắt UI hoặc có đợt refresh mới chồng lên
+              
             }
         }
         private void UpdateLevelText(PassViewData viewData, int currentExp)
@@ -251,12 +252,56 @@ namespace Game.GamePlay
         {
             OnClaimBonusClicked?.Invoke(index);
         }
+        private async UniTask ScrollToMilestone(int milestoneIndex, bool animate = false, float duration = 0.5f)
+        {
+            if (milestoneScrollRect == null) return;
+
+            CancelScrollAnimation();
+
+            var targetItem = _milestonePool.FirstOrDefault(item => item.gameObject.activeSelf && item.MilestoneIndex == milestoneIndex);
+
+            if (targetItem != null)
+            {
+                var rectTransform = targetItem.GetComponent<RectTransform>();
+                if (rectTransform != null)
+                {
+                   
+                    if (!milestoneScrollRect.gameObject.activeInHierarchy || !gameObject.activeInHierarchy)
+                    {
+                        milestoneScrollRect.FocusOnItem(rectTransform, bias: 0.5f);
+                        return;
+                    }
+
+                    _scrollCts = new CancellationTokenSource();
+                    try
+                    {
+                        float finalDuration = animate ? duration : 0f;
+                        await milestoneScrollRect.FocusOnItemAsync(rectTransform, finalDuration, _scrollCts.Token, bias: 0.5f);
+                    }
+                    catch (System.OperationCanceledException)
+                    {
+                       
+                    }
+                }
+            }
+        }
         private void CancelRefreshAnimation()
         {
             if (_refreshAnimationCts == null) return;
             _refreshAnimationCts.Cancel();
             _refreshAnimationCts.Dispose();
             _refreshAnimationCts = null;
+        }
+        
+      
+        private void CancelScrollAnimation()
+        {
+            if (_scrollCts != null)
+            {
+                _scrollCts.Cancel();
+                _scrollCts.Dispose();
+                _scrollCts = null;
+            }
         }
 
         private void ClearOldItems()
@@ -269,6 +314,22 @@ namespace Game.GamePlay
                 }
             }
             _spawnedItems.Clear();
+        }
+
+        private void OnDisable()
+        {
+            CancelRefreshAnimation();
+            CancelScrollAnimation();
+        }
+
+        private void OnDestroy()
+        {
+            if (_passService != null)
+            {
+                _passService.UnregisterView(this);
+            }
+            CancelRefreshAnimation();
+            CancelScrollAnimation();
         }
     }
 }
