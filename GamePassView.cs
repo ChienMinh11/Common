@@ -129,7 +129,7 @@ namespace Game.GamePlay
 
                     item.Setup(sortedMilestones[i], HandleClaimRewardItem);
                     item.UpdateHighlightState(highlightedMilestoneIndex);
-                    item.SetExpSliderProgress(GetMilestoneSliderProgress(initialViewData, initialViewData.CurrentExp, item.MilestoneIndex));
+                    item.SetExpSliderProgress(GetCompletedMilestoneSliderProgress(initialViewData, initialViewData.CurrentExp, item.MilestoneIndex));
                 }
 
                 if (endIndex != null && startIndex != null)
@@ -197,7 +197,7 @@ namespace Game.GamePlay
                 int animatedExp = fromViewData.CurrentExp;
 
                 UpdateLevelText(toViewData, fromViewData.CurrentExp);
-                SetMilestoneSlidersByExp(toViewData, fromViewData.CurrentExp);
+                SetCompletedMilestoneSlidersByExp(toViewData, fromViewData.CurrentExp);
 
                 await AnimateMilestoneHighlightAsync(fromMilestoneIndex, 0f, ct, 0.5f);
 
@@ -205,9 +205,10 @@ namespace Game.GamePlay
                 {
                     ct.ThrowIfCancellationRequested();
 
-                    int animatedMilestoneIndex = GetNextMilestoneIndex(toViewData, animatedExp);
+                    int completedBefore = GetCompletedMilestoneIndex(toViewData, animatedExp);
+                    int completedAfter = GetCompletedMilestoneIndex(toViewData, step.EvaluatedExpForClaimableCheck);
                     int scrollTargetMilestoneIndex = GetNextMilestoneIndex(toViewData, step.EvaluatedExpForClaimableCheck);
-                    MilestoneUIItem animatedItem = GetMilestoneItem(animatedMilestoneIndex);
+                    MilestoneUIItem completedItem = completedAfter > completedBefore ? GetMilestoneItem(completedAfter) : null;
 
                     UniTask topSliderTask = expSlider.PlaySliderAnimationAsync(
                         step.FromProgressPercentage, 
@@ -216,20 +217,20 @@ namespace Game.GamePlay
                         step.ToProgressText, 
                         ct
                     );
-                    UniTask itemSliderTask = animatedItem != null
-                        ? animatedItem.PlayExpSliderAnimationAsync(step.FromProgressPercentage, step.ToProgressPercentage, ct)
+                    UniTask itemSliderTask = completedItem != null
+                        ? completedItem.PlayExpSliderAnimationAsync(0f, 1f, ct)
                         : UniTask.CompletedTask;
                     UniTask scrollTask = ScrollToMilestone(scrollTargetMilestoneIndex, animate: true, ct: ct);
 
                     await UniTask.WhenAll(topSliderTask, itemSliderTask, scrollTask);
 
                     animatedExp = step.EvaluatedExpForClaimableCheck;
-                    SetMilestoneSlidersByExp(toViewData, animatedExp);
+                    SetCompletedMilestoneSlidersByExp(toViewData, animatedExp);
                     UpdateLevelText(toViewData, animatedExp);
                 }
        
                 UpdateExpProgressUI(toViewData);
-                SetMilestoneSlidersByExp(toViewData, toViewData.CurrentExp);
+                SetCompletedMilestoneSlidersByExp(toViewData, toViewData.CurrentExp);
                 UpdateLevelText(toViewData, toViewData.CurrentExp);
                 await AnimateMilestoneHighlightAsync(nextMilestoneIndex, 1f, ct, 0.5f);
                 UpdateMilestoneHighlightState(nextMilestoneIndex);
@@ -250,6 +251,17 @@ namespace Game.GamePlay
 
         private static int GetNextMilestoneIndex(PassViewData viewData, int currentExp)
         {
+            int calculatedMilestoneIndex = GetCompletedMilestoneIndex(viewData, currentExp);
+            int maxMilestoneIndex = viewData.Milestones != null && viewData.Milestones.Count > 0 
+                ? viewData.Milestones.Max(m => m.Index) 
+                : calculatedMilestoneIndex;
+
+            int nextMilestoneIndex = Mathf.Min(calculatedMilestoneIndex + 1, maxMilestoneIndex);
+            return nextMilestoneIndex;
+        }
+
+        private static int GetCompletedMilestoneIndex(PassViewData viewData, int currentExp)
+        {
             int calculatedMilestoneIndex = 0;
             if (viewData.Milestones != null && viewData.Milestones.Count > 0)
             {
@@ -266,53 +278,21 @@ namespace Game.GamePlay
                 }
             }
 
-            int maxMilestoneIndex = viewData.Milestones != null && viewData.Milestones.Count > 0 
-                ? viewData.Milestones.Max(m => m.Index) 
-                : calculatedMilestoneIndex;
-
-            int nextMilestoneIndex = Mathf.Min(calculatedMilestoneIndex + 1, maxMilestoneIndex);
-            return nextMilestoneIndex;
+            return calculatedMilestoneIndex;
         }
 
-        private static float GetMilestoneSliderProgress(PassViewData viewData, int currentExp, int milestoneIndex)
+        private static float GetCompletedMilestoneSliderProgress(PassViewData viewData, int currentExp, int milestoneIndex)
         {
-            if (viewData?.Milestones == null || viewData.Milestones.Count == 0) return 0f;
-
-            var sortedMilestones = viewData.Milestones.OrderBy(m => m.Index).ToList();
-            int tempExp = Mathf.Max(0, currentExp);
-
-            foreach (var milestone in sortedMilestones)
-            {
-                if (milestone.Index == 0)
-                {
-                    if (milestone.Index == milestoneIndex) return 1f;
-                    continue;
-                }
-
-                if (tempExp >= milestone.RequiredExp)
-                {
-                    if (milestone.Index == milestoneIndex) return 1f;
-                    tempExp -= milestone.RequiredExp;
-                    continue;
-                }
-
-                if (milestone.Index == milestoneIndex)
-                {
-                    return milestone.RequiredExp > 0 ? Mathf.Clamp01((float)tempExp / milestone.RequiredExp) : 1f;
-                }
-
-                return 0f;
-            }
-
-            return 0f;
+            int completedMilestoneIndex = GetCompletedMilestoneIndex(viewData, currentExp);
+            return milestoneIndex <= completedMilestoneIndex ? 1f : 0f;
         }
 
-        private void SetMilestoneSlidersByExp(PassViewData viewData, int currentExp)
+        private void SetCompletedMilestoneSlidersByExp(PassViewData viewData, int currentExp)
         {
             foreach (var item in _milestonePool)
             {
                 if (item == null || !item.gameObject.activeSelf) continue;
-                item.SetExpSliderProgress(GetMilestoneSliderProgress(viewData, currentExp, item.MilestoneIndex));
+                item.SetExpSliderProgress(GetCompletedMilestoneSliderProgress(viewData, currentExp, item.MilestoneIndex));
             }
         }
 
