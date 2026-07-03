@@ -88,18 +88,7 @@ namespace Game.GamePlay
             {
                 timeCountdownWidget.Setup(viewData.EventEndTime);
             }
-
-      
-            int maxMilestoneIndex = viewData.Milestones != null && viewData.Milestones.Count > 0 
-                ? viewData.Milestones.Max(m => m.Index) 
-                : viewData.CurrentMilestoneIndex;
-
-            int nextMilestoneIndex = Mathf.Min(viewData.CurrentMilestoneIndex + 1, maxMilestoneIndex);
-
-            txtCurrentLevel.text = $"{nextMilestoneIndex}";
-
             UpdateExpProgressUI(viewData);
-
             btnBuyPremium.gameObject.SetActive(!viewData.IsPremiumUnlocked);
             if (objPremiumBadge != null)
             {
@@ -123,6 +112,7 @@ namespace Game.GamePlay
             else
             {
                 UpdateExpProgressUI(viewData);
+                UpdateLevelText(viewData, viewData.CurrentExp);
             }
 
             if (viewData.Milestones != null)
@@ -195,24 +185,53 @@ namespace Game.GamePlay
         {
             try
             {
-                
                 var animationSteps = EventProgressAnimationCalculator.CalculateAnimationSteps(toViewData, fromViewData.CurrentExp, toViewData.CurrentExp);
+
+                UpdateLevelText(toViewData, fromViewData.CurrentExp);
 
                 foreach (var step in animationSteps)
                 {
                     ct.ThrowIfCancellationRequested();
-
                     expSlider.SetProgress(step.FromProgressPercentage, step.FromProgressText);
                     await expSlider.PlaySliderAnimationAsync(step.FromProgressPercentage, step.ToProgressPercentage, step.FromProgressText, ct);
                     expSlider.SetProgress(step.ToProgressPercentage, step.ToProgressText);
+                    UpdateLevelText(toViewData, step.EvaluatedExpForClaimableCheck);
                 }
-
+       
                 UpdateExpProgressUI(toViewData);
+                UpdateLevelText(toViewData, toViewData.CurrentExp);
             }
             catch (OperationCanceledException)
             {
                 // Bị hủy khi tắt UI hoặc có đợt refresh mới chồng lên
             }
+        }
+        private void UpdateLevelText(PassViewData viewData, int currentExp)
+        {
+            if (txtCurrentLevel == null) return;
+
+            int calculatedMilestoneIndex = 0;
+            if (viewData.Milestones != null && viewData.Milestones.Count > 0)
+            {
+                var sortedMilestones = viewData.Milestones.OrderBy(m => m.Index).ToList();
+                int tempExp = currentExp;
+                foreach (var milestone in sortedMilestones)
+                {
+                    if (tempExp >= milestone.RequiredExp)
+                    {
+                        calculatedMilestoneIndex = milestone.Index;
+                        tempExp -= milestone.RequiredExp;
+                    }
+                    else break;
+                }
+            }
+
+            int maxMilestoneIndex = viewData.Milestones != null && viewData.Milestones.Count > 0 
+                ? viewData.Milestones.Max(m => m.Index) 
+                : calculatedMilestoneIndex;
+
+            int nextMilestoneIndex = Mathf.Min(calculatedMilestoneIndex + 1, maxMilestoneIndex);
+            txtCurrentLevel.text = $"{nextMilestoneIndex}";
         }
 
         private void UpdateExpProgressUI(PassViewData viewData)
