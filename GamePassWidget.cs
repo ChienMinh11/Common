@@ -147,14 +147,14 @@ namespace Game.GamePlay
                 ExpProgressState fromState = GetProgressState(viewData, currentExp);
                 if (fromState.IsCompleted)
                 {
-                    yield return new ExpAnimationStep(
+                    yield return new ExpAnimationStep
                     {
                         FromProgress = fromState.Progress,
                         ToProgress = 1f,
                         FromText = fromState.Text,
                         ToText = fromState.Text,
                         EndExpForClaimable = targetExp
-                    });
+                    };
                     yield break;
                 }
 
@@ -309,11 +309,11 @@ namespace Game.GamePlay
 
         private readonly struct ExpAnimationStep
         {
-            public float FromProgress { get; init; }
-            public float ToProgress { get; init; }
-            public string FromText { get; init; }
-            public string ToText { get; init; }
-            public int EndExpForClaimable { get; init; }
+            public float FromProgress { get; set; }
+            public float ToProgress { get; set; }
+            public string FromText { get; set; }
+            public string ToText { get; set; }
+            public int EndExpForClaimable { get; set; }
         }
 
         private readonly struct ExpProgressState
@@ -327,11 +327,11 @@ namespace Game.GamePlay
                 IsCompleted = true
             };
 
-            public float Progress { get; init; }
-            public string Text { get; init; }
-            public int LevelEndExp { get; init; }
-            public int RequiredExp { get; init; }
-            public bool IsCompleted { get; init; }
+            public float Progress { get; set; }
+            public string Text { get; set; }
+            public int LevelEndExp { get; set; }
+            public int RequiredExp { get; set; }
+            public bool IsCompleted { get; set; }
         }
     }
 }
