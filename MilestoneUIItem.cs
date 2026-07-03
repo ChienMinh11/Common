@@ -164,12 +164,12 @@ namespace Game.GamePlay
             }
         }
 
-        public async UniTask SetHighlightByAnimationAsync(float value, CancellationToken ct)
+        public async UniTask SetHighlightByAnimationAsync(float value, CancellationToken ct, float duration = 0.5f)
         {
             if (milestoneHighlight == null) return;
 
             ct.ThrowIfCancellationRequested();
-            await milestoneHighlight.SetByAnimationAsync(value);
+            await milestoneHighlight.SetByAnimationAsync(value, duration);
             ct.ThrowIfCancellationRequested();
         }
 
