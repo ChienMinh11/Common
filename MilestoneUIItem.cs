@@ -26,7 +26,7 @@ namespace Game.GamePlay
         [SerializeField] private DOTweenAnimation btnClaimFreeScale;
         [SerializeField] private GameObject objFreeLocked;
         [SerializeField] private GameObject objFreeClaimed;
-        [SerializeField] private GameObject freeIconContainer; // Chứa freeRewardSlotView hoặc ẩn khi dùng Custom Icon
+        [SerializeField] private GameObject freeIconContainer;
         [SerializeField] private Transform customFreeIconContainer;
 
         [Header("Premium Pass")]
@@ -35,13 +35,12 @@ namespace Game.GamePlay
         [SerializeField] private DOTweenAnimation btnClaimPremiumScale;
         [SerializeField] private GameObject objPremiumLocked;
         [SerializeField] private GameObject objPremiumClaimed;
-        [SerializeField] private GameObject premiumIconContainer; // Chứa premiumRewardSlotView hoặc ẩn khi dùng Custom Icon
+        [SerializeField] private GameObject premiumIconContainer;
         [SerializeField] private Transform customPremiumIconContainer;
 
         private int _milestoneIndex;
         private Action<int, bool> _onClaimClicked;
 
-        // Cache lưu trữ cho cả Free và Premium Pass
         private readonly Dictionary<GameObject, GameObject> _cachedFreeIcons = new Dictionary<GameObject, GameObject>();
         private readonly Dictionary<GameObject, GameObject> _cachedPremiumIcons = new Dictionary<GameObject, GameObject>();
         
@@ -60,7 +59,6 @@ namespace Game.GamePlay
             
             txtIndex.text = $"{_milestoneIndex}";
 
-            // --- Xử lý Free Pass Icon bằng Cache ---
             UpdateCustomIcon(data.CustomIconFreePass, customFreeIconContainer, _cachedFreeIcons, ref _currentActiveFreeIcon);
             
             if (data.CustomIconFreePass != null)
@@ -74,8 +72,6 @@ namespace Game.GamePlay
                 {
                     var freeReward = data.FreeRewards[0];
                     Sprite rewardSprite = freeReward.IsInfiniteReward ? freeReward.InfinityRewardIcon : freeReward.IconReward;
-                    
-                    // Sử dụng hàm Setup có sẵn của RewardSlotView
                     freeRewardSlotView.Setup(
                         freeReward.IsInfiniteReward, 
                         freeReward.Amount, 
@@ -88,7 +84,6 @@ namespace Game.GamePlay
             
             UpdateStateUI(data.FreeState, btnClaimFree, objFreeLocked, objFreeClaimed);
 
-            // --- Xử lý Premium Pass Icon bằng Cache ---
             UpdateCustomIcon(data.CustomIconPremiumPass, customPremiumIconContainer, _cachedPremiumIcons, ref _currentActivePremiumIcon);
 
             if (data.CustomIconPremiumPass != null)
@@ -102,8 +97,6 @@ namespace Game.GamePlay
                 {
                     var premiumReward = data.PremiumRewards[0];
                     Sprite rewardSprite = premiumReward.IsInfiniteReward ? premiumReward.InfinityRewardIcon : premiumReward.IconReward;
-                    
-                    // Sử dụng hàm Setup có sẵn của RewardSlotView
                     premiumRewardSlotView.Setup(
                         premiumReward.IsInfiniteReward, 
                         premiumReward.Amount, 
@@ -159,9 +152,27 @@ namespace Game.GamePlay
             }
             else 
             {
-               
                 milestoneHighlight.SetDefault();
             }
+        }
+
+        public void SetExpSliderProgress(float progress)
+        {
+            if (expSlider == null) return;
+            expSlider.SetProgress(Mathf.Clamp01(progress), string.Empty);
+        }
+
+        public async UniTask PlayExpSliderAnimationAsync(float fromProgress, float toProgress, CancellationToken ct)
+        {
+            if (expSlider == null) return;
+
+            await expSlider.PlaySliderAnimationAsync(
+                Mathf.Clamp01(fromProgress),
+                Mathf.Clamp01(toProgress),
+                string.Empty,
+                string.Empty,
+                ct
+            );
         }
 
         public async UniTask SetHighlightByAnimationAsync(float value, CancellationToken ct, float duration)
