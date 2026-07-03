@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic; // Thêm thư viện này để dùng Dictionary
+using System.Collections.Generic;
 using ChieChie.Core;
 using ChieChie.GamePass;
 using TMPro;
@@ -15,22 +15,18 @@ namespace Game.GamePlay
     
         [Header("Free Pass")]
         [SerializeField] private RewardSlotView freeRewardSlotView;
-        [SerializeField] private Image imgFreeIcon;
-        [SerializeField] private TMP_Text txtFreeAmount;
         [SerializeField] private Button btnClaimFree;
         [SerializeField] private GameObject objFreeLocked;
         [SerializeField] private GameObject objFreeClaimed;
-        [SerializeField] private GameObject freeIconContainer;
+        [SerializeField] private GameObject freeIconContainer; // Chứa freeRewardSlotView hoặc ẩn khi dùng Custom Icon
         [SerializeField] private Transform customFreeIconContainer;
 
         [Header("Premium Pass")]
         [SerializeField] private RewardSlotView premiumRewardSlotView;
-        [SerializeField] private Image imgPremiumIcon;
-        [SerializeField] private TMP_Text txtPremiumAmount;
         [SerializeField] private Button btnClaimPremium;
         [SerializeField] private GameObject objPremiumLocked;
         [SerializeField] private GameObject objPremiumClaimed;
-        [SerializeField] private GameObject premiumIconContainer;
+        [SerializeField] private GameObject premiumIconContainer; // Chứa premiumRewardSlotView hoặc ẩn khi dùng Custom Icon
         [SerializeField] private Transform customPremiumIconContainer;
 
         private int _milestoneIndex;
@@ -59,23 +55,27 @@ namespace Game.GamePlay
             
             if (data.CustomIconFreePass != null)
             {
-                freeIconContainer.SetActive(false);
+                if (freeIconContainer != null) freeIconContainer.SetActive(false);
             }
             else
             {
-                freeIconContainer.SetActive(true);
-                if (data.FreeRewards != null && data.FreeRewards.Count > 0)
+                if (freeIconContainer != null) freeIconContainer.SetActive(true);
+                if (freeRewardSlotView != null && data.FreeRewards != null && data.FreeRewards.Count > 0)
                 {
                     var freeReward = data.FreeRewards[0];
-                    imgFreeIcon.sprite = freeReward.IsInfiniteReward ? freeReward.InfinityRewardIcon : freeReward.IconReward;
+                    Sprite rewardSprite = freeReward.IsInfiniteReward ? freeReward.InfinityRewardIcon : freeReward.IconReward;
+                    
+                    // Sử dụng hàm Setup có sẵn của RewardSlotView
+                    freeRewardSlotView.Setup(
+                        freeReward.IsInfiniteReward, 
+                        freeReward.Amount, 
+                        freeReward.InfinityDuration, 
+                        rewardSprite, 
+                        showPrefix: true
+                    );
                 }
             }
             
-            if (data.FreeRewards != null && data.FreeRewards.Count > 0)
-            {
-                var freeReward = data.FreeRewards[0];
-                txtFreeAmount.text = freeReward.IsInfiniteReward ? CoreExtensions.FormatTime(freeReward.InfinityDuration) : freeReward.Amount.ToString();
-            }
             UpdateStateUI(data.FreeState, btnClaimFree, objFreeLocked, objFreeClaimed);
 
             // --- Xử lý Premium Pass Icon bằng Cache ---
@@ -83,27 +83,30 @@ namespace Game.GamePlay
 
             if (data.CustomIconPremiumPass != null)
             {
-                premiumIconContainer.SetActive(false);
+                if (premiumIconContainer != null) premiumIconContainer.SetActive(false);
             }
             else
             {
-                premiumIconContainer.SetActive(true); 
-                if (data.PremiumRewards != null && data.PremiumRewards.Count > 0)
+                if (premiumIconContainer != null) premiumIconContainer.SetActive(true); 
+                if (premiumRewardSlotView != null && data.PremiumRewards != null && data.PremiumRewards.Count > 0)
                 {
                     var premiumReward = data.PremiumRewards[0];
-                    imgPremiumIcon.sprite = premiumReward.IsInfiniteReward ? premiumReward.InfinityRewardIcon : premiumReward.IconReward;
+                    Sprite rewardSprite = premiumReward.IsInfiniteReward ? premiumReward.InfinityRewardIcon : premiumReward.IconReward;
+                    
+                    // Sử dụng hàm Setup có sẵn của RewardSlotView
+                    premiumRewardSlotView.Setup(
+                        premiumReward.IsInfiniteReward, 
+                        premiumReward.Amount, 
+                        premiumReward.InfinityDuration, 
+                        rewardSprite, 
+                        showPrefix: true
+                    );
                 }
             }
 
-            if (data.PremiumRewards != null && data.PremiumRewards.Count > 0)
-            {
-                var premiumReward = data.PremiumRewards[0];
-                txtPremiumAmount.text = premiumReward.IsInfiniteReward ? CoreExtensions.FormatTime(premiumReward.InfinityDuration) : premiumReward.Amount.ToString();
-            }
             UpdateStateUI(data.PremiumState, btnClaimPremium, objPremiumLocked, objPremiumClaimed);
         }
 
-        // Hàm dùng chung tối ưu hóa việc quản lý và cập nhật Custom Icon tránh Instantiate liên tục
         private void UpdateCustomIcon(GameObject prefab, Transform container, Dictionary<GameObject, GameObject> cache, ref GameObject currentActiveIcon)
         {
             if (currentActiveIcon != null)

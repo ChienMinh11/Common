@@ -1,5 +1,9 @@
+using System;
 using System.Linq;
+using System.Threading;
 using ChieChie.GamePass;
+using Cysharp.Threading.Tasks;
+using Game.Extensions; // Import namespace chứa Extension của bạn
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -11,35 +15,71 @@ namespace Game.GamePlay
         private const string COMPLETED = "Completed!";
 
         [SerializeField] private Slider sliderExpProgress;
+        [SerializeField] private Image filledImage;
         [SerializeField] private TMP_Text txtCurrentExp;
-
+        [SerializeField] private float animationDuration = 0.5f;
+        
+        private CancellationTokenSource _animationCts;
 
         public bool UpdateProgressDetailed(PassViewData viewData)
         {
-            if (viewData.Milestones == null || viewData.Milestones.Count == 0) return false;
+            if (viewData?.Milestones == null || viewData.Milestones.Count == 0) return false;
 
+            bool isBonusState = GetProgressData(viewData, out string expText, out float progressFraction);
+            if (txtCurrentExp != null) txtCurrentExp.text = expText;
+            
+            StopAnimation();
+            UpdateVisualProgress(progressFraction);
+
+            return isBonusState;
+        }
+
+        public async UniTask<bool> UpdateProgressDetailedAsync(PassViewData viewData)
+        {
+            if (viewData?.Milestones == null || viewData.Milestones.Count == 0) return false;
+
+            bool isBonusState = GetProgressData(viewData, out string expText, out float targetProgress);
+            if (txtCurrentExp != null) txtCurrentExp.text = expText;
+
+            if (gameObject.activeInHierarchy)
+            {
+                StopAnimation();
+                _animationCts = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
+              
+                await UniTask.WhenAll(
+                    sliderExpProgress.LerpValueAsync(targetProgress, animationDuration, _animationCts.Token),
+                    filledImage.LerpFillAmountAsync(targetProgress, animationDuration, _animationCts.Token)
+                );
+            }
+            else
+            {
+                StopAnimation();
+                UpdateVisualProgress(targetProgress);
+            }
+
+            return isBonusState;
+        }
+
+        private bool GetProgressData(PassViewData viewData, out string expText, out float progressFraction)
+        {
             CalculateNormalProgress(viewData, out int expInCurrentLevel, out int expRequiredForNextLevel, out bool isMaxNormalLevel);
 
             if (!isMaxNormalLevel)
             {
-                if (txtCurrentExp != null) txtCurrentExp.text = $"{expInCurrentLevel}/{expRequiredForNextLevel}";
-                if (sliderExpProgress != null && expRequiredForNextLevel > 0)
-                {
-                    sliderExpProgress.value = (float)expInCurrentLevel / expRequiredForNextLevel;
-                }
+                expText = $"{expInCurrentLevel}/{expRequiredForNextLevel}";
+                progressFraction = expRequiredForNextLevel > 0 ? (float)expInCurrentLevel / expRequiredForNextLevel : 0f;
                 return false; 
             }
 
             if (viewData.BonusMilestones == null || viewData.BonusMilestones.Count == 0)
             {
-                if (txtCurrentExp != null) txtCurrentExp.text = COMPLETED;
-                if (sliderExpProgress != null) sliderExpProgress.value = 1f;
+                expText = COMPLETED;
+                progressFraction = 1f;
                 return true;
             }
 
             int bonusExp = viewData.TotalBonusExpEarned;
             var sortedBonus = viewData.BonusMilestones.OrderBy(b => b.Index).ToList();
-
             int currentBonusMilestoneIndex = -1;
             int accumulatedBonusExpBefore = 0;
             int bonusExpRequiredForNext = 0;
@@ -52,7 +92,6 @@ namespace Game.GamePlay
                     currentBonusMilestoneIndex = bonus.Index;
                     accumulatedBonusExpBefore = bonus.RequiredExp;
                 }
-
                 if (bonus.Index > currentBonusMilestoneIndex)
                 {
                     bonusExpRequiredForNext = bonus.RequiredExp - accumulatedBonusExpBefore;
@@ -63,17 +102,14 @@ namespace Game.GamePlay
 
             if (isMaxAllBonus)
             {
-                if (txtCurrentExp != null) txtCurrentExp.text = COMPLETED;
-                if (sliderExpProgress != null) sliderExpProgress.value = 1f;
-                return true;
+                expText = COMPLETED;
+                progressFraction = 1f;
             }
-
-            int expInCurrentBonus = Mathf.Max(0, bonusExp - accumulatedBonusExpBefore);
-
-            if (txtCurrentExp != null) txtCurrentExp.text = $"{expInCurrentBonus}/{bonusExpRequiredForNext}";
-            if (sliderExpProgress != null && bonusExpRequiredForNext > 0)
+            else
             {
-                sliderExpProgress.value = (float)expInCurrentBonus / bonusExpRequiredForNext;
+                int expInCurrentBonus = Mathf.Max(0, bonusExp - accumulatedBonusExpBefore);
+                expText = $"{expInCurrentBonus}/{bonusExpRequiredForNext}";
+                progressFraction = bonusExpRequiredForNext > 0 ? (float)expInCurrentBonus / bonusExpRequiredForNext : 0f;
             }
 
             return true;
@@ -90,22 +126,34 @@ namespace Game.GamePlay
             int accumulatedExpBefore = 0;
             
             var sortedMilestones = viewData.Milestones.OrderBy(m => m.Index).ToList();
-
             foreach (var milestone in sortedMilestones)
             {
-                if (milestone.Index <= currentLevelIndex)
-                {
-                    accumulatedExpBefore += milestone.RequiredExp;
-                }
-
+                if (milestone.Index <= currentLevelIndex) accumulatedExpBefore += milestone.RequiredExp;
                 if (milestone.Index == currentLevelIndex + 1)
                 {
                     expRequiredForNextLevel = milestone.RequiredExp;
                     isMaxNormalLevel = false;
                 }
             }
-
             expInCurrentLevel = Mathf.Max(0, totalExpProgress - accumulatedExpBefore);
         }
+
+        private void UpdateVisualProgress(float value)
+        {
+            if (sliderExpProgress != null) sliderExpProgress.value = value;
+            if (filledImage != null) filledImage.fillAmount = value;
+        }
+
+        private void StopAnimation()
+        {
+            if (_animationCts != null)
+            {
+                _animationCts.Cancel();
+                _animationCts.Dispose();
+                _animationCts = null;
+            }
+        }
+
+        private void OnDisable() => StopAnimation();
     }
 }

@@ -74,10 +74,14 @@ namespace Game.GamePlay
                 timeCountdownWidget.Setup(viewData.EventEndTime);
             }
 
-            if (txtCurrentLevel != null)
-            {
-                txtCurrentLevel.text = $"{viewData.CurrentMilestoneIndex}";
-            }
+      
+            int maxMilestoneIndex = viewData.Milestones != null && viewData.Milestones.Count > 0 
+                ? viewData.Milestones.Max(m => m.Index) 
+                : viewData.CurrentMilestoneIndex;
+
+            int nextMilestoneIndex = Mathf.Min(viewData.CurrentMilestoneIndex + 1, maxMilestoneIndex);
+
+            txtCurrentLevel.text = $"{nextMilestoneIndex}";
 
             UpdateExpProgressUI(viewData);
 
