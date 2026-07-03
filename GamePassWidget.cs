@@ -307,7 +307,7 @@ namespace Game.GamePlay
             _refreshAnimationCts = null;
         }
 
-        private readonly struct ExpAnimationStep
+        private struct ExpAnimationStep
         {
             public float FromProgress { get; set; }
             public float ToProgress { get; set; }
@@ -316,7 +316,7 @@ namespace Game.GamePlay
             public int EndExpForClaimable { get; set; }
         }
 
-        private readonly struct ExpProgressState
+        private struct ExpProgressState
         {
             public static ExpProgressState Completed => new ExpProgressState
             {
