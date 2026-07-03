@@ -32,9 +32,9 @@ namespace Game.GamePlay
         [SerializeField] private Transform startIndex;
         [SerializeField] private Transform endIndex;
         [SerializeField] private ScrollRect milestoneScrollRect;
-        [SerializeField] private float milestoneFlowMinItemDuration = 0.15f;
-        [SerializeField] private float milestoneFlowMaxItemDuration = 0.45f;
-        [SerializeField] private float milestoneFlowMaxTotalDuration = 2.75f;
+        [SerializeField] private float milestoneFlowMinItemDuration = 0.25f;
+        [SerializeField] private float milestoneFlowMaxItemDuration = 0.65f;
+        [SerializeField] private float milestoneFlowMaxTotalDuration = 4.25f;
 
         [SerializeField] private MilestoneUIItem milestonePrefab;
 
