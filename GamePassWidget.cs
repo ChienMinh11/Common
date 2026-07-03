@@ -1,7 +1,7 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using ChieChie.Core;
 using ChieChie.GamePass;
 using Cysharp.Threading.Tasks;
 using Sirenix.OdinInspector;
@@ -116,16 +116,18 @@ namespace Game.GamePlay
             try
             {
                 UpdateClaimableUI(toViewData, fromViewData.CurrentExp);
+                var animationSteps = EventProgressAnimationCalculator.CalculateAnimationSteps(toViewData,
+                    fromViewData.CurrentExp,
+                    toViewData.CurrentExp);
 
-                foreach (var step in BuildExpAnimationSteps(toViewData, fromViewData.CurrentExp, toViewData.CurrentExp))
+                foreach (var step in animationSteps)
                 {
                     ct.ThrowIfCancellationRequested();
-
-                    expSlider.SetProgress(step.FromProgress, step.FromText);
-                    await expSlider.PlaySliderAnimationAsync(step.FromProgress, step.ToProgress, step.FromText, ct);
-                    expSlider.SetProgress(step.ToProgress, step.ToText);
-
-                    UpdateClaimableUI(toViewData, step.EndExpForClaimable);
+                    expSlider.SetProgress(step.FromProgressPercentage, step.FromProgressText);
+                    await expSlider.PlaySliderAnimationAsync(step.FromProgressPercentage, step.ToProgressPercentage, step.FromProgressText, ct);
+                    expSlider.SetProgress(step.ToProgressPercentage, step.ToProgressText);
+                    UpdateClaimableUI(toViewData, step.EvaluatedExpForClaimableCheck);
+                    
                 }
 
                 UpdateExpProgress(toViewData);
@@ -133,120 +135,13 @@ namespace Game.GamePlay
             }
             catch (OperationCanceledException)
             {
-                // Ignore cancellation when another refresh starts or this widget is disabled/destroyed.
+                // Ignore cancellation
             }
         }
 
-        private IEnumerable<ExpAnimationStep> BuildExpAnimationSteps(PassViewData viewData, int fromExp, int toExp)
-        {
-            int currentExp = Mathf.Max(0, fromExp);
-            int targetExp = Mathf.Max(currentExp, toExp);
+       
 
-            while (currentExp < targetExp)
-            {
-                ExpProgressState fromState = GetProgressState(viewData, currentExp);
-                if (fromState.IsCompleted)
-                {
-                    yield return new ExpAnimationStep
-                    {
-                        FromProgress = fromState.Progress,
-                        ToProgress = 1f,
-                        FromText = fromState.Text,
-                        ToText = fromState.Text,
-                        EndExpForClaimable = targetExp
-                    };
-                    yield break;
-                }
-
-                int endExp = Mathf.Min(targetExp, fromState.LevelEndExp);
-                bool reachedLevelEnd = endExp >= fromState.LevelEndExp;
-
-                if (reachedLevelEnd)
-                {
-                    yield return new ExpAnimationStep
-                    {
-                        FromProgress = fromState.Progress,
-                        ToProgress = 1f,
-                        FromText = fromState.Text,
-                        ToText = $"{fromState.RequiredExp}/{fromState.RequiredExp}",
-                        EndExpForClaimable = endExp
-                    };
-                }
-                else
-                {
-                    ExpProgressState toState = GetProgressState(viewData, endExp);
-                    yield return new ExpAnimationStep
-                    {
-                        FromProgress = fromState.Progress,
-                        ToProgress = toState.Progress,
-                        FromText = fromState.Text,
-                        ToText = toState.Text,
-                        EndExpForClaimable = endExp
-                    };
-                }
-
-                if (endExp <= currentExp) yield break;
-                currentExp = endExp;
-            }
-        }
-
-        private ExpProgressState GetProgressState(PassViewData viewData, int totalExp)
-        {
-            int accumulatedNormalExp = 0;
-            var sortedMilestones = viewData.Milestones?.OrderBy(m => m.Index).ToList();
-
-            if (sortedMilestones != null)
-            {
-                foreach (var milestone in sortedMilestones)
-                {
-                    int levelStartExp = accumulatedNormalExp;
-                    int levelEndExp = accumulatedNormalExp + milestone.RequiredExp;
-                    if (totalExp < levelEndExp)
-                    {
-                        int expInLevel = Mathf.Max(0, totalExp - levelStartExp);
-                        float progress = milestone.RequiredExp > 0 ? (float)expInLevel / milestone.RequiredExp : 0f;
-                        return new ExpProgressState
-                        {
-                            Progress = progress,
-                            Text = $"{expInLevel}/{milestone.RequiredExp}",
-                            LevelEndExp = levelEndExp,
-                            RequiredExp = milestone.RequiredExp
-                        };
-                    }
-
-                    accumulatedNormalExp = levelEndExp;
-                }
-            }
-
-            var sortedBonus = viewData.BonusMilestones?.OrderBy(b => b.Index).ToList();
-            if (sortedBonus == null || sortedBonus.Count == 0)
-            {
-                return ExpProgressState.Completed;
-            }
-
-            int bonusExp = Mathf.Max(0, totalExp - accumulatedNormalExp);
-            int accumulatedBonusExpBefore = 0;
-            foreach (var bonus in sortedBonus)
-            {
-                if (bonusExp < bonus.RequiredExp)
-                {
-                    int requiredExp = bonus.RequiredExp - accumulatedBonusExpBefore;
-                    int expInBonus = Mathf.Max(0, bonusExp - accumulatedBonusExpBefore);
-                    float progress = requiredExp > 0 ? (float)expInBonus / requiredExp : 0f;
-                    return new ExpProgressState
-                    {
-                        Progress = progress,
-                        Text = $"{expInBonus}/{requiredExp}",
-                        LevelEndExp = accumulatedNormalExp + bonus.RequiredExp,
-                        RequiredExp = requiredExp
-                    };
-                }
-
-                accumulatedBonusExpBefore = bonus.RequiredExp;
-            }
-
-            return ExpProgressState.Completed;
-        }
+       
 
         private void UpdateClaimableUI(PassViewData viewData)
         {
@@ -305,33 +200,6 @@ namespace Game.GamePlay
             _refreshAnimationCts.Cancel();
             _refreshAnimationCts.Dispose();
             _refreshAnimationCts = null;
-        }
-
-        private struct ExpAnimationStep
-        {
-            public float FromProgress { get; set; }
-            public float ToProgress { get; set; }
-            public string FromText { get; set; }
-            public string ToText { get; set; }
-            public int EndExpForClaimable { get; set; }
-        }
-
-        private struct ExpProgressState
-        {
-            public static ExpProgressState Completed => new ExpProgressState
-            {
-                Progress = 1f,
-                Text = "Completed!",
-                LevelEndExp = int.MaxValue,
-                RequiredExp = 0,
-                IsCompleted = true
-            };
-
-            public float Progress { get; set; }
-            public string Text { get; set; }
-            public int LevelEndExp { get; set; }
-            public int RequiredExp { get; set; }
-            public bool IsCompleted { get; set; }
         }
     }
 }

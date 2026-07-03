@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using ChieChie.Constracts;
+using ChieChie.Core;
 using ChieChie.GamePass;
 using Cysharp.Threading.Tasks;
 using Sirenix.OdinInspector;
@@ -30,6 +31,7 @@ namespace Game.GamePlay
         private Transform milestoneContainer;
         [SerializeField] private Transform startIndex;
         [SerializeField] private Transform endIndex;
+        [SerializeField] private ScrollRect milestoneScrollRect;
 
         [SerializeField] private MilestoneUIItem milestonePrefab;
 
@@ -48,6 +50,9 @@ namespace Game.GamePlay
 
         private IPassService _passService;
         public string ViewId => string.IsNullOrEmpty(viewId) ? nameof(GamePassView) : viewId;
+        private PassViewData _lastViewData;
+        private bool _playManualRefreshAnimation;
+        private CancellationTokenSource _refreshAnimationCts;
 
         
 
@@ -70,6 +75,7 @@ namespace Game.GamePlay
         [Button]
         private void RefreshUIManual()
         {
+            _playManualRefreshAnimation = true;
             _passService.FlushDelayedUIUpdate(this);
         }
 
@@ -98,6 +104,25 @@ namespace Game.GamePlay
             if (objPremiumBadge != null)
             {
                 objPremiumBadge.SetActive(viewData.IsPremiumUnlocked);
+            }
+            
+            // --- Tái cấu trúc logic cập nhật EXP tiến trình & chạy slider ---
+            bool shouldAnimateManualRefresh = _playManualRefreshAnimation &&
+                                              _lastViewData != null &&
+                                              expSlider != null &&
+                                              viewData.CurrentExp > _lastViewData.CurrentExp;
+            _playManualRefreshAnimation = false;
+
+            CancelRefreshAnimation();
+
+            if (shouldAnimateManualRefresh)
+            {
+                _refreshAnimationCts = new CancellationTokenSource();
+                AnimateManualRefreshAsync(_lastViewData, viewData, _refreshAnimationCts.Token).Forget();
+            }
+            else
+            {
+                UpdateExpProgressUI(viewData);
             }
 
             if (viewData.Milestones != null)
@@ -164,23 +189,38 @@ namespace Game.GamePlay
                     _bonusPool[i].gameObject.SetActive(false);
                 }
             }
+            _lastViewData = viewData;
+        }
+        private async UniTask AnimateManualRefreshAsync(PassViewData fromViewData, PassViewData toViewData, CancellationToken ct)
+        {
+            try
+            {
+                
+                var animationSteps = EventProgressAnimationCalculator.CalculateAnimationSteps(toViewData, fromViewData.CurrentExp, toViewData.CurrentExp);
+
+                foreach (var step in animationSteps)
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    expSlider.SetProgress(step.FromProgressPercentage, step.FromProgressText);
+                    await expSlider.PlaySliderAnimationAsync(step.FromProgressPercentage, step.ToProgressPercentage, step.FromProgressText, ct);
+                    expSlider.SetProgress(step.ToProgressPercentage, step.ToProgressText);
+                }
+
+                UpdateExpProgressUI(toViewData);
+            }
+            catch (OperationCanceledException)
+            {
+                // Bị hủy khi tắt UI hoặc có đợt refresh mới chồng lên
+            }
         }
 
         private void UpdateExpProgressUI(PassViewData viewData)
         {
             if (expSlider == null) return;
-        
             bool isBonusActive = expSlider.UpdateProgressDetailed(viewData);
-
-            if (txtCurrentLevel != null) 
-            {
-                txtCurrentLevel.gameObject.SetActive(!isBonusActive);
-            }
-    
-            if (objBonusPassActiveVisual != null) 
-            {
-                objBonusPassActiveVisual.SetActive(isBonusActive);
-            }
+            if (txtCurrentLevel != null) txtCurrentLevel.gameObject.SetActive(!isBonusActive);
+            if (objBonusPassActiveVisual != null) objBonusPassActiveVisual.SetActive(isBonusActive);
         }
 
         private void HandleClaimRewardItem(int index, bool isPremium)
@@ -192,7 +232,13 @@ namespace Game.GamePlay
         {
             OnClaimBonusClicked?.Invoke(index);
         }
-
+        private void CancelRefreshAnimation()
+        {
+            if (_refreshAnimationCts == null) return;
+            _refreshAnimationCts.Cancel();
+            _refreshAnimationCts.Dispose();
+            _refreshAnimationCts = null;
+        }
 
         private void ClearOldItems()
         {
