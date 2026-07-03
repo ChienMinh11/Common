@@ -32,6 +32,9 @@ namespace Game.GamePlay
         [SerializeField] private Transform startIndex;
         [SerializeField] private Transform endIndex;
         [SerializeField] private ScrollRect milestoneScrollRect;
+        [SerializeField] private float milestoneFlowMinItemDuration = 0.15f;
+        [SerializeField] private float milestoneFlowMaxItemDuration = 0.45f;
+        [SerializeField] private float milestoneFlowMaxTotalDuration = 2.75f;
 
         [SerializeField] private MilestoneUIItem milestonePrefab;
 
@@ -220,29 +223,9 @@ namespace Game.GamePlay
 
                 await AnimateMilestoneHighlightAsync(fromMilestoneIndex, 0f, ct, 0.5f);
 
-                int milestoneFlowExp = fromViewData.CurrentExp;
-                foreach (var step in animationSteps)
-                {
-                    ct.ThrowIfCancellationRequested();
-
-                    int completedBefore = GetCompletedMilestoneIndex(toViewData, milestoneFlowExp);
-                    int completedAfter = GetCompletedMilestoneIndex(toViewData, step.EvaluatedExpForClaimableCheck);
-                    int scrollTargetMilestoneIndex = GetNextMilestoneIndex(toViewData, step.EvaluatedExpForClaimableCheck);
-                    MilestoneUIItem completedItem = completedAfter > completedBefore ? GetMilestoneItem(completedAfter) : null;
-
-                    if (completedItem != null)
-                    {
-                        UniTask itemSliderTask = completedItem.PlayExpSliderAnimationAsync(0f, 1f, ct);
-                        UniTask scrollTask = ScrollToMilestone(scrollTargetMilestoneIndex, animate: true, ct: ct);
-                        await UniTask.WhenAll(itemSliderTask, scrollTask);
-                    }
-
-                    milestoneFlowExp = step.EvaluatedExpForClaimableCheck;
-                    SetCompletedMilestoneSlidersByExp(toViewData, milestoneFlowExp);
-                }
+                await PlayContinuousMilestoneFlowAsync(fromViewData, toViewData, nextMilestoneIndex, ct);
 
                 SetCompletedMilestoneSlidersByExp(toViewData, toViewData.CurrentExp);
-                await ScrollToMilestone(nextMilestoneIndex, animate: true, ct: ct);
                 await AnimateMilestoneHighlightAsync(nextMilestoneIndex, 1f, ct, 0.5f);
                 UpdateMilestoneHighlightState(nextMilestoneIndex);
             }
@@ -250,6 +233,61 @@ namespace Game.GamePlay
             {
               
             }
+        }
+
+        private async UniTask PlayContinuousMilestoneFlowAsync(PassViewData fromViewData, PassViewData toViewData, int nextMilestoneIndex, CancellationToken ct)
+        {
+            var completedMilestoneIndices = GetCompletedMilestoneIndicesBetween(fromViewData.CurrentExp, toViewData.CurrentExp, toViewData);
+
+            if (completedMilestoneIndices.Count == 0)
+            {
+                await ScrollToMilestone(nextMilestoneIndex, animate: true, ct: ct);
+                return;
+            }
+
+            float itemDuration = GetMilestoneFlowItemDuration(completedMilestoneIndices.Count);
+            float totalDuration = itemDuration * completedMilestoneIndices.Count;
+
+            UniTask scrollTask = ScrollToMilestone(nextMilestoneIndex, animate: true, duration: totalDuration, ct: ct);
+            UniTask sliderTask = PlayCompletedMilestoneSlidersAsync(completedMilestoneIndices, itemDuration, ct);
+
+            await UniTask.WhenAll(scrollTask, sliderTask);
+        }
+
+        private async UniTask PlayCompletedMilestoneSlidersAsync(List<int> completedMilestoneIndices, float itemDuration, CancellationToken ct)
+        {
+            foreach (int milestoneIndex in completedMilestoneIndices)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var item = GetMilestoneItem(milestoneIndex);
+                if (item == null) continue;
+
+                await item.PlayExpSliderAnimationAsync(0f, 1f, ct, itemDuration);
+                item.SetExpSliderProgress(1f);
+            }
+        }
+
+        private float GetMilestoneFlowItemDuration(int completedCount)
+        {
+            if (completedCount <= 0) return milestoneFlowMaxItemDuration;
+
+            float durationByMaxTotal = milestoneFlowMaxTotalDuration / completedCount;
+            return Mathf.Clamp(durationByMaxTotal, milestoneFlowMinItemDuration, milestoneFlowMaxItemDuration);
+        }
+
+        private List<int> GetCompletedMilestoneIndicesBetween(int fromExp, int toExp, PassViewData viewData)
+        {
+            int completedBefore = GetCompletedMilestoneIndex(viewData, fromExp);
+            int completedAfter = GetCompletedMilestoneIndex(viewData, toExp);
+
+            if (completedAfter <= completedBefore) return new List<int>();
+
+            return viewData.Milestones
+                .OrderBy(m => m.Index)
+                .Where(m => m.Index > completedBefore && m.Index <= completedAfter)
+                .Select(m => m.Index)
+                .ToList();
         }
 
         private void UpdateLevelText(PassViewData viewData, int currentExp)
