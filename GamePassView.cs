@@ -194,45 +194,55 @@ namespace Game.GamePlay
 
                 int fromMilestoneIndex = GetNextMilestoneIndex(toViewData, fromViewData.CurrentExp);
                 int nextMilestoneIndex = GetNextMilestoneIndex(toViewData, toViewData.CurrentExp);
-                int animatedExp = fromViewData.CurrentExp;
 
                 UpdateLevelText(toViewData, fromViewData.CurrentExp);
                 SetCompletedMilestoneSlidersByExp(toViewData, fromViewData.CurrentExp);
 
-                await AnimateMilestoneHighlightAsync(fromMilestoneIndex, 0f, ct, 0.5f);
-
+                int topSliderAnimatedExp = fromViewData.CurrentExp;
                 foreach (var step in animationSteps)
                 {
                     ct.ThrowIfCancellationRequested();
 
-                    int completedBefore = GetCompletedMilestoneIndex(toViewData, animatedExp);
+                    await expSlider.PlaySliderAnimationAsync(
+                        step.FromProgressPercentage,
+                        step.ToProgressPercentage,
+                        step.FromProgressText,
+                        step.ToProgressText,
+                        ct
+                    );
+
+                    topSliderAnimatedExp = step.EvaluatedExpForClaimableCheck;
+                    UpdateLevelText(toViewData, topSliderAnimatedExp);
+                }
+
+                UpdateExpProgressUI(toViewData);
+                UpdateLevelText(toViewData, toViewData.CurrentExp);
+
+                await AnimateMilestoneHighlightAsync(fromMilestoneIndex, 0f, ct, 0.5f);
+
+                int milestoneFlowExp = fromViewData.CurrentExp;
+                foreach (var step in animationSteps)
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    int completedBefore = GetCompletedMilestoneIndex(toViewData, milestoneFlowExp);
                     int completedAfter = GetCompletedMilestoneIndex(toViewData, step.EvaluatedExpForClaimableCheck);
                     int scrollTargetMilestoneIndex = GetNextMilestoneIndex(toViewData, step.EvaluatedExpForClaimableCheck);
                     MilestoneUIItem completedItem = completedAfter > completedBefore ? GetMilestoneItem(completedAfter) : null;
 
-                    await expSlider.PlaySliderAnimationAsync(
-                        step.FromProgressPercentage, 
-                        step.ToProgressPercentage, 
-                        step.FromProgressText, 
-                        step.ToProgressText, 
-                        ct
-                    );
+                    if (completedItem != null)
+                    {
+                        UniTask itemSliderTask = completedItem.PlayExpSliderAnimationAsync(0f, 1f, ct);
+                        UniTask scrollTask = ScrollToMilestone(scrollTargetMilestoneIndex, animate: true, ct: ct);
+                        await UniTask.WhenAll(itemSliderTask, scrollTask);
+                    }
 
-                    UniTask itemSliderTask = completedItem != null
-                        ? completedItem.PlayExpSliderAnimationAsync(0f, 1f, ct)
-                        : UniTask.CompletedTask;
-                    UniTask scrollTask = ScrollToMilestone(scrollTargetMilestoneIndex, animate: true, ct: ct);
-
-                    await UniTask.WhenAll(itemSliderTask, scrollTask);
-
-                    animatedExp = step.EvaluatedExpForClaimableCheck;
-                    SetCompletedMilestoneSlidersByExp(toViewData, animatedExp);
-                    UpdateLevelText(toViewData, animatedExp);
+                    milestoneFlowExp = step.EvaluatedExpForClaimableCheck;
+                    SetCompletedMilestoneSlidersByExp(toViewData, milestoneFlowExp);
                 }
-       
-                UpdateExpProgressUI(toViewData);
+
                 SetCompletedMilestoneSlidersByExp(toViewData, toViewData.CurrentExp);
-                UpdateLevelText(toViewData, toViewData.CurrentExp);
+                await ScrollToMilestone(nextMilestoneIndex, animate: true, ct: ct);
                 await AnimateMilestoneHighlightAsync(nextMilestoneIndex, 1f, ct, 0.5f);
                 UpdateMilestoneHighlightState(nextMilestoneIndex);
             }
