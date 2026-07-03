@@ -5,6 +5,7 @@ using System.Threading;
 using ChieChie.Constracts;
 using ChieChie.GamePass;
 using Cysharp.Threading.Tasks;
+using Sirenix.OdinInspector;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -15,6 +16,7 @@ namespace Game.GamePlay
     public class GamePassView : MonoBehaviour, IPassView 
     {
         private const string COMPLETED = "Completed!";
+        [SerializeField] private string viewId = nameof(GamePassView);
         [Header("Top Bar")] 
         [SerializeField] private UITimeCountdownWidget timeCountdownWidget;
         [SerializeField] private TMP_Text txtCurrentExp;
@@ -45,6 +47,7 @@ namespace Game.GamePlay
         private readonly List<GameObject> _spawnedItems = new List<GameObject>();
 
         private IPassService _passService;
+        public string ViewId => string.IsNullOrEmpty(viewId) ? nameof(GamePassView) : viewId;
 
         
 
@@ -62,6 +65,12 @@ namespace Game.GamePlay
         private void OnDestroy()
         {
             _passService.UnregisterView(this);
+        }
+
+        [Button]
+        private void RefreshUIManual()
+        {
+            _passService.FlushDelayedUIUpdate(this);
         }
 
 

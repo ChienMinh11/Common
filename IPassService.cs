@@ -13,17 +13,20 @@ namespace ChieChie.GamePass
         event Action<List<IItemReward>> OnAutoClaimedRewardsProcessed;
         event Action<IPassNotificationEventData> OnAutoClaimNotificationTriggered;
         List<IItemReward> GetAndClearAutoClaimedRewards();
-       void RegisterView(IPassView view);
-       void UnregisterView(IPassView view);
-       void AddExp(int amount);
-       void RegisterRewardModifier(IPassRewardModifier modifier);
-       void UnregisterRewardModifier(IPassRewardModifier modifier);
+        void RegisterView(IPassView view);
+        void UnregisterView(IPassView view);
+        void AddExp(int amount);
+        void AddExp(int amount, bool delayUpdateUI);
+        void FlushDelayedUIUpdate();
+        void FlushDelayedUIUpdate(IPassView view);
+        void RegisterRewardModifier(IPassRewardModifier modifier);
+        void UnregisterRewardModifier(IPassRewardModifier modifier);
 
-       void CheckEventUpdate();
-       DateTime EventEndTime {get; }
-       void ActiveNewEvent();
-       void UnlockPremiumPass();
-       void RefreshData();
+        void CheckEventUpdate();
+        DateTime EventEndTime {get; }
+        void ActiveNewEvent();
+        void UnlockPremiumPass();
+        void RefreshData();
 
     }
 }

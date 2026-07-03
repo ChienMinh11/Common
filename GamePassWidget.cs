@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using ChieChie.GamePass;
+using Sirenix.OdinInspector;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -10,6 +11,8 @@ namespace Game.GamePlay
 {
     public class GamePassWidget : MonoBehaviour, IPassView
     {
+        [SerializeField] private string viewId = nameof(GamePassWidget);
+
         [Header("UI Components")]
         [SerializeField] private GamePassExpSlider expSlider;
         [SerializeField] private UITimeCountdownWidget timeCountdownWidget;
@@ -21,6 +24,7 @@ namespace Game.GamePlay
         public event Action<int, bool> OnClaimRewardClicked;
         public event Action<int> OnClaimBonusClicked;
         public event Action OnBuyPremiumClicked;
+        public string ViewId => string.IsNullOrEmpty(viewId) ? nameof(GamePassWidget) : viewId;
 
         [Inject]
         public void Constructor(IPassService passService)
@@ -37,6 +41,11 @@ namespace Game.GamePlay
             }
         }
 
+        [Button]
+        private void RefreshUIManual()
+        {
+            _passService.FlushDelayedUIUpdate(this);
+        }
         public void RefreshUI(PassViewData viewData)
         {
             if (viewData == null) return;

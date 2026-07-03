@@ -38,6 +38,7 @@ namespace ChieChie.GamePass
 
     public interface IPassView 
     {
+        string ViewId { get; }
         event Action<int, bool> OnClaimRewardClicked;
         event Action<int> OnClaimBonusClicked; 
         event Action OnBuyPremiumClicked;

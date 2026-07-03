@@ -18,6 +18,7 @@ namespace ChieChie.GamePass
         public event Action<List<IItemReward>> OnRewardsClaimed;
 
         public int CurrentExp => _saveData.currentExp;
+        public bool HasDelayedUIUpdate => _saveData != null && _saveData.hasDelayedUIUpdate;
         public bool IsPremiumUnlocked => _saveData.isPremiumUnlocked;
         public string EventId => _saveData.currentEventId; // Lấy theo ID đang chạy trong SaveData thay vì scheduler
         public List<IItemReward> AutoClaimedRewards { get; private set; } = new List<IItemReward>();
@@ -42,6 +43,7 @@ namespace ChieChie.GamePass
         public void Initialize()
         {
             _saveData = _passSaveAdapter.LoadData() ?? new PassSaveData();
+            EnsureSaveDataDefaults();
             if (!string.IsNullOrEmpty(_saveData.currentEventId))
             {
                 if (DateTime.TryParseExact(_saveData.currentEventId.Replace("GamePass_", ""), "yyyyMM", 
@@ -61,7 +63,34 @@ namespace ChieChie.GamePass
             }
           
             SyncSchedulerWithSaveData();
-            OnDataChanged?.Invoke();
+            NotifyDataChanged();
+        }
+
+        private void EnsureSaveDataDefaults()
+        {
+            if (_saveData.viewDisplayStates == null)
+            {
+                _saveData.viewDisplayStates = new List<PassViewDisplayState>();
+            }
+            else
+            {
+                _saveData.viewDisplayStates.RemoveAll(state => state == null);
+            }
+
+            if (_saveData.claimedFreeMilestones == null)
+            {
+                _saveData.claimedFreeMilestones = new List<int>();
+            }
+
+            if (_saveData.claimedPremiumMilestones == null)
+            {
+                _saveData.claimedPremiumMilestones = new List<int>();
+            }
+
+            if (_saveData.claimedBonusMilestones == null)
+            {
+                _saveData.claimedBonusMilestones = new List<int>();
+            }
         }
       
         public void ActivateNewEventManual()
@@ -72,7 +101,7 @@ namespace ChieChie.GamePass
                 _saveData = new PassSaveData { currentEventId = _eventScheduler.eventId };
                 _passSaveAdapter.SaveData(_saveData);
             }
-            OnDataChanged?.Invoke();
+            NotifyDataChanged();
         }
     
         private void SyncSchedulerWithSaveData()
@@ -120,7 +149,7 @@ namespace ChieChie.GamePass
             if (!_rewardModifiers.Contains(modifier))
             {
                 _rewardModifiers.Add(modifier);
-                OnDataChanged?.Invoke(); 
+                NotifyDataChanged();
             }
         }
 
@@ -128,7 +157,7 @@ namespace ChieChie.GamePass
         {
             if (_rewardModifiers.Remove(modifier))
             {
-                OnDataChanged?.Invoke();
+                NotifyDataChanged();
             }
         }
         
@@ -223,13 +252,94 @@ namespace ChieChie.GamePass
             }
         }
 
-        public void AddExp(int amount)
+        public bool AddExp(int amount)
         {
-            if (!_eventScheduler.isActive) return;
+            return AddExp(amount, false);
+        }
+
+        public bool AddExp(int amount, bool delayUpdateUI)
+        {
+            if (!_eventScheduler.isActive) return false;
+
+            if (delayUpdateUI)
+            {
+                BeginDelayedUIUpdate();
+            }
+            else
+            {
+                ClearDelayedUIUpdate();
+            }
 
             _saveData.currentExp += amount;
             _passSaveAdapter.SaveData(_saveData);
-            OnDataChanged?.Invoke();
+            if (delayUpdateUI)
+            {
+                return true;
+            }
+
+            NotifyDataChanged();
+            return true;
+        }
+
+        public int GetDisplayedExp(string viewId)
+        {
+            if (!_saveData.hasDelayedUIUpdate)
+            {
+                return _saveData.currentExp;
+            }
+
+            var viewDisplayState = GetViewDisplayState(viewId);
+            return viewDisplayState != null ? viewDisplayState.displayedExp : _saveData.delayedDisplayExp;
+        }
+
+        public void FlushDelayedUIUpdate(string viewId)
+        {
+            if (!_saveData.hasDelayedUIUpdate || string.IsNullOrEmpty(viewId)) return;
+
+            SetViewDisplayedExp(viewId, _saveData.currentExp);
+            _passSaveAdapter.SaveData(_saveData);
+        }
+
+        public void FlushDelayedUIUpdate()
+        {
+            if (!_saveData.hasDelayedUIUpdate) return;
+
+            ClearDelayedUIUpdate();
+            _passSaveAdapter.SaveData(_saveData);
+        }
+
+        private void BeginDelayedUIUpdate()
+        {
+            if (_saveData.hasDelayedUIUpdate) return;
+
+            _saveData.hasDelayedUIUpdate = true;
+            _saveData.delayedDisplayExp = _saveData.currentExp;
+            _saveData.viewDisplayStates.Clear();
+        }
+
+        private void ClearDelayedUIUpdate()
+        {
+            _saveData.hasDelayedUIUpdate = false;
+            _saveData.delayedDisplayExp = _saveData.currentExp;
+            _saveData.viewDisplayStates.Clear();
+        }
+
+        private PassViewDisplayState GetViewDisplayState(string viewId)
+        {
+            if (string.IsNullOrEmpty(viewId)) return null;
+            return _saveData.viewDisplayStates.FirstOrDefault(state => state != null && state.viewId == viewId);
+        }
+
+        private void SetViewDisplayedExp(string viewId, int displayedExp)
+        {
+            var viewDisplayState = GetViewDisplayState(viewId);
+            if (viewDisplayState == null)
+            {
+                viewDisplayState = new PassViewDisplayState { viewId = viewId };
+                _saveData.viewDisplayStates.Add(viewDisplayState);
+            }
+
+            viewDisplayState.displayedExp = displayedExp;
         }
 
         public void UnlockPremium()
@@ -237,12 +347,16 @@ namespace ChieChie.GamePass
             if (_saveData.isPremiumUnlocked) return;
             _saveData.isPremiumUnlocked = true;
             _passSaveAdapter.SaveData(_saveData);
-            OnDataChanged?.Invoke();
+            NotifyDataChanged();
         }
 
         public int GetCurrentMilestoneIndex()
         {
-            int exp = _saveData.currentExp;
+            return GetCurrentMilestoneIndex(_saveData.currentExp);
+        }
+
+        public int GetCurrentMilestoneIndex(int exp)
+        {
             int currentMilestone = 0;
           
             var sortedPassItems = _database.PassItems.OrderBy(i => i.index).ToList();
@@ -261,11 +375,21 @@ namespace ChieChie.GamePass
 
         public int GetBonusExp()
         {
-            int bonusExp = _saveData.currentExp - _totalRequiredNormalExp;
+            return GetBonusExp(_saveData.currentExp);
+        }
+
+        public int GetBonusExp(int exp)
+        {
+            int bonusExp = exp - _totalRequiredNormalExp;
             return Math.Max(0, bonusExp);
         }
 
         public MilestoneState GetBonusMilestoneState(int index)
+        {
+            return GetBonusMilestoneState(index, _saveData.currentExp);
+        }
+
+        public MilestoneState GetBonusMilestoneState(int index, int exp)
         {
             if (!_saveData.isPremiumUnlocked) 
                 return MilestoneState.Locked;
@@ -276,7 +400,7 @@ namespace ChieChie.GamePass
             if (!_bonusItemsCache.TryGetValue(index, out var bonusItem)) 
                 return MilestoneState.Locked;
 
-            int bonusExp = GetBonusExp();
+            int bonusExp = GetBonusExp(exp);
             bool hasEnoughExp = bonusExp >= bonusItem.expRequied;
             bool isPreviousClaimed = index == 0 || _saveData.claimedBonusMilestones.Contains(index - 1);
 
@@ -303,13 +427,18 @@ namespace ChieChie.GamePass
 
             _passSaveAdapter.SaveData(_passSaveAdapter.LoadData() ?? _saveData);
             _passSaveAdapter.SaveData(_saveData);
-            OnDataChanged?.Invoke();
+            NotifyDataChanged();
             return true;
         }
         
         public MilestoneState GetMilestoneState(int index, bool isPremium)
         {
-            int currentMilestone = GetCurrentMilestoneIndex();
+            return GetMilestoneState(index, isPremium, _saveData.currentExp);
+        }
+
+        public MilestoneState GetMilestoneState(int index, bool isPremium, int exp)
+        {
+            int currentMilestone = GetCurrentMilestoneIndex(exp);
             if (isPremium && !_saveData.isPremiumUnlocked) return MilestoneState.Locked;
 
             var claimedList = isPremium ? _saveData.claimedPremiumMilestones : _saveData.claimedFreeMilestones;
@@ -336,12 +465,17 @@ namespace ChieChie.GamePass
             }
           
             _passSaveAdapter.SaveData(_saveData);
-            OnDataChanged?.Invoke();
+            NotifyDataChanged();
             return true;
         }
         public DateTime EventEndTime => _eventScheduler.endTime;
 
         public void RefreshData()
+        {
+            NotifyDataChanged();
+        }
+
+        private void NotifyDataChanged()
         {
             OnDataChanged?.Invoke();
         }

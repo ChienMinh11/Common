@@ -88,7 +88,24 @@ namespace ChieChie.GamePass
         public void UnregisterRewardModifier(IPassRewardModifier modifier) => _passModel?.UnregisterModifier(modifier);
         public void AddExp(int amount)
         {
-           _passModel.AddExp(amount);
+            AddExp(amount, false);
+        }
+
+        public void AddExp(int amount, bool delayUpdateUI)
+        {
+            if (_passModel == null) return;
+
+            _passModel.AddExp(amount, delayUpdateUI);
+        }
+
+        public void FlushDelayedUIUpdate()
+        {
+            _passPresenter?.FlushDelayedUIUpdate();
+        }
+
+        public void FlushDelayedUIUpdate(IPassView view)
+        {
+            _passPresenter?.FlushDelayedUIUpdate(view);
         }
 
         public void CheckEventUpdate()

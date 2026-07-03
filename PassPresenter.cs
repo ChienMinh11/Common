@@ -25,6 +25,8 @@ namespace ChieChie.GamePass
 
         public void RegisterView(IPassView view)
         {
+            if (view == null) return;
+
             CleanUpDestroyedViews();
             if (!_activeViews.Contains(view))
             {
@@ -33,7 +35,7 @@ namespace ChieChie.GamePass
                 view.OnClaimBonusClicked += HandleClaimBonus;
                 view.OnBuyPremiumClicked += HandleBuyPremium;
 
-                view.RefreshUI(UpdateViewData());
+                RefreshView(view, UpdateViewDataForView(view));
             }
         }
 
@@ -50,24 +52,65 @@ namespace ChieChie.GamePass
 
         private void HandleModelDataChanged()
         {
-            var freshData = UpdateViewData();
+            CleanUpDestroyedViews();
+            if (_model.HasDelayedUIUpdate)
+            {
+                foreach (var view in _activeViews)
+                {
+                    RefreshView(view, UpdateViewDataForView(view));
+                }
+
+                return;
+            }
+
+            var freshData = UpdateViewData(_model.CurrentExp);
+
             foreach (var view in _activeViews)
             {
-                view.RefreshUI(freshData);
+                RefreshView(view, freshData);
             }
         }
 
-        private PassViewData UpdateViewData()
+        public void FlushDelayedUIUpdate()
+        {
+            CleanUpDestroyedViews();
+            _model.FlushDelayedUIUpdate();
+
+            var freshData = UpdateViewData(_model.CurrentExp);
+
+            foreach (var view in _activeViews)
+            {
+                RefreshView(view, freshData);
+            }
+        }
+
+        public void FlushDelayedUIUpdate(IPassView view)
+        {
+            if (view == null) return;
+
+            CleanUpDestroyedViews();
+            if (!_activeViews.Contains(view)) return;
+
+            _model.FlushDelayedUIUpdate(view.ViewId);
+            RefreshView(view, UpdateViewDataForView(view));
+        }
+
+        private PassViewData UpdateViewDataForView(IPassView view)
+        {
+            return UpdateViewData(_model.GetDisplayedExp(view.ViewId));
+        }
+
+        private PassViewData UpdateViewData(int displayedExp)
         {
             var viewData = new PassViewData
             {
-                CurrentExp = _model.CurrentExp,
+                CurrentExp = displayedExp,
                 IsPremiumUnlocked = _model.IsPremiumUnlocked,
-                CurrentMilestoneIndex = _model.GetCurrentMilestoneIndex(),
+                CurrentMilestoneIndex = _model.GetCurrentMilestoneIndex(displayedExp),
                 EventEndTime = _model.EventEndTime,
                 Milestones = new List<MilestoneUIData>(),
                 BonusMilestones = new List<BonusMilestoneUIData>(),
-                TotalBonusExpEarned = _model.GetBonusExp()
+                TotalBonusExpEarned = _model.GetBonusExp(displayedExp)
             };
 
             foreach (var item in _database.PassItems)
@@ -78,8 +121,8 @@ namespace ChieChie.GamePass
                     RequiredExp = item.expRequired,
                     FreeRewards = _model.GetFinalRewards(item.index, false, false, item.FreePassrewards), 
                     PremiumRewards = _model.GetFinalRewards(item.index, true, false, item.PremiumPassrewards),
-                    FreeState = _model.GetMilestoneState(item.index, false),
-                    PremiumState = _model.GetMilestoneState(item.index, true),
+                    FreeState = _model.GetMilestoneState(item.index, false, displayedExp),
+                    PremiumState = _model.GetMilestoneState(item.index, true, displayedExp),
                     CustomIconFreePass = item.customIconFreePass,
                     CustomIconPremiumPass = item.customIconPremiumPass
                 });
@@ -92,12 +135,19 @@ namespace ChieChie.GamePass
                     Index = bonusItem.index,
                     RequiredExp = bonusItem.expRequied,
                     Rewards = _model.GetFinalRewards(bonusItem.index, false, true, bonusItem.BonusPassrewards), 
-                    State = _model.GetBonusMilestoneState(bonusItem.index),
+                    State = _model.GetBonusMilestoneState(bonusItem.index, displayedExp),
                     BonusIcon = bonusItem.bonusIcon
                 });
             }
 
             return viewData;
+        }
+
+        private void RefreshView(IPassView view, PassViewData viewData)
+        {
+            if (view == null || viewData == null) return;
+
+            view.RefreshUI(viewData);
         }
 
         private void HandleClaimReward(int index, bool isPremium)
@@ -117,7 +167,14 @@ namespace ChieChie.GamePass
 
         private void CleanUpDestroyedViews()
         {
-            _activeViews.RemoveAll(view => view == null || (view is UnityEngine.MonoBehaviour mb && mb == null));
+            for (int i = _activeViews.Count - 1; i >= 0; i--)
+            {
+                var view = _activeViews[i];
+                if (view == null || (view is UnityEngine.MonoBehaviour mb && mb == null))
+                {
+                    _activeViews.RemoveAt(i);
+                }
+            }
         }
 
         public void Cleanup()
