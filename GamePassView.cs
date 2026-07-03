@@ -83,34 +83,33 @@ namespace Game.GamePlay
             {
                 timeCountdownWidget.Setup(viewData.EventEndTime);
             }
-            UpdateExpProgressUI(viewData);
+
+            bool shouldAnimateManualRefresh = _playManualRefreshAnimation &&
+                                              _lastViewData != null &&
+                                              expSlider != null &&
+                                              viewData.CurrentExp > _lastViewData.CurrentExp;
+            PassViewData initialViewData = shouldAnimateManualRefresh ? _lastViewData : viewData;
+
+            UpdateExpProgressUI(initialViewData);
             btnBuyPremium.gameObject.SetActive(!viewData.IsPremiumUnlocked);
             if (objPremiumBadge != null)
             {
                 objPremiumBadge.SetActive(viewData.IsPremiumUnlocked);
             }
-            bool shouldAnimateManualRefresh = _playManualRefreshAnimation &&
-                                              _lastViewData != null &&
-                                              expSlider != null &&
-                                              viewData.CurrentExp > _lastViewData.CurrentExp;
+
             _playManualRefreshAnimation = false;
 
             CancelRefreshAnimation();
 
-            if (shouldAnimateManualRefresh)
+            if (!shouldAnimateManualRefresh)
             {
-                _refreshAnimationCts = new CancellationTokenSource();
-                AnimateManualRefreshAsync(_lastViewData, viewData, _refreshAnimationCts.Token).Forget();
-            }
-            else
-            {
-                UpdateExpProgressUI(viewData);
                 UpdateLevelText(viewData, viewData.CurrentExp);
             }
 
             if (viewData.Milestones != null)
             {
                 var sortedMilestones = viewData.Milestones.OrderBy(m => m.Index).ToList();
+                int highlightedMilestoneIndex = GetNextMilestoneIndex(viewData, initialViewData.CurrentExp);
                 
               
 
@@ -134,8 +133,7 @@ namespace Game.GamePlay
                     }
 
                     item.Setup(sortedMilestones[i], HandleClaimRewardItem);
-                    var nextMilestoneIndex = GetNextMilestoneIndex(viewData, viewData.CurrentExp);
-                    item.UpdateHighlightState(nextMilestoneIndex);
+                    item.UpdateHighlightState(highlightedMilestoneIndex);
                 }
 
                 if (endIndex != null && startIndex != null)
@@ -176,36 +174,56 @@ namespace Game.GamePlay
                     _bonusPool[i].gameObject.SetActive(false);
                 }
             }
-            _lastViewData = viewData;
-            if (!shouldAnimateManualRefresh)
+
+            if (shouldAnimateManualRefresh)
             {
-                 ScrollToMilestone(viewData.CurrentMilestoneIndex, animate: false).Forget();
+                _refreshAnimationCts = new CancellationTokenSource();
+                AnimateManualRefreshAsync(_lastViewData, viewData, _refreshAnimationCts.Token).Forget();
             }
+            else
+            {
+                ScrollToMilestone(viewData.CurrentMilestoneIndex, animate: false).Forget();
+            }
+
+            _lastViewData = viewData;
         }
         private async UniTask AnimateManualRefreshAsync(PassViewData fromViewData, PassViewData toViewData, CancellationToken ct)
         {
             try
             {
-                var animationSteps = EventProgressAnimationCalculator.CalculateAnimationSteps(toViewData, fromViewData.CurrentExp, toViewData.CurrentExp);
+                var animationSteps = EventProgressAnimationCalculator
+                    .CalculateAnimationSteps(toViewData, fromViewData.CurrentExp, toViewData.CurrentExp)
+                    .ToList();
+
+                int fromMilestoneIndex = GetNextMilestoneIndex(toViewData, fromViewData.CurrentExp);
+                int nextMilestoneIndex = GetNextMilestoneIndex(toViewData, toViewData.CurrentExp);
 
                 UpdateLevelText(toViewData, fromViewData.CurrentExp);
+
+                await AnimateMilestoneHighlightAsync(fromMilestoneIndex, 0f, ct);
 
                 foreach (var step in animationSteps)
                 {
                     ct.ThrowIfCancellationRequested();
-                    await expSlider.PlaySliderAnimationAsync(
+
+                    int scrollTargetMilestoneIndex = GetNextMilestoneIndex(toViewData, step.EvaluatedExpForClaimableCheck);
+                    UniTask sliderTask = expSlider.PlaySliderAnimationAsync(
                         step.FromProgressPercentage, 
                         step.ToProgressPercentage, 
                         step.FromProgressText, 
                         step.ToProgressText, 
                         ct
                     );
-                    
+                    UniTask scrollTask = ScrollToMilestone(scrollTargetMilestoneIndex, animate: true, ct: ct);
+
+                    await UniTask.WhenAll(sliderTask, scrollTask);
                     UpdateLevelText(toViewData, step.EvaluatedExpForClaimableCheck);
                 }
        
                 UpdateExpProgressUI(toViewData);
                 UpdateLevelText(toViewData, toViewData.CurrentExp);
+                await AnimateMilestoneHighlightAsync(nextMilestoneIndex, 1f, ct);
+                UpdateMilestoneHighlightState(nextMilestoneIndex);
             }
             catch (OperationCanceledException)
             {
@@ -254,6 +272,28 @@ namespace Game.GamePlay
             if (objBonusPassActiveVisual != null) objBonusPassActiveVisual.SetActive(isBonusActive);
         }
 
+        private void UpdateMilestoneHighlightState(int milestoneIndex)
+        {
+            foreach (var item in _milestonePool)
+            {
+                if (item == null || !item.gameObject.activeSelf) continue;
+                item.UpdateHighlightState(milestoneIndex);
+            }
+        }
+
+        private MilestoneUIItem GetMilestoneItem(int milestoneIndex)
+        {
+            return _milestonePool.FirstOrDefault(item => item != null && item.gameObject.activeSelf && item.MilestoneIndex == milestoneIndex);
+        }
+
+        private async UniTask AnimateMilestoneHighlightAsync(int milestoneIndex, float value, CancellationToken ct)
+        {
+            var targetItem = GetMilestoneItem(milestoneIndex);
+            if (targetItem == null) return;
+
+            await targetItem.SetHighlightByAnimationAsync(value, ct);
+        }
+
         private void HandleClaimRewardItem(int index, bool isPremium)
         {
             OnClaimRewardClicked?.Invoke(index, isPremium);
@@ -263,13 +303,13 @@ namespace Game.GamePlay
         {
             OnClaimBonusClicked?.Invoke(index);
         }
-        private async UniTask ScrollToMilestone(int milestoneIndex, bool animate = false, float duration = 0.5f)
+        private async UniTask ScrollToMilestone(int milestoneIndex, bool animate = false, float duration = 0.5f, CancellationToken ct = default(CancellationToken))
         {
             if (milestoneScrollRect == null) return;
 
             CancelScrollAnimation();
 
-            var targetItem = _milestonePool.FirstOrDefault(item => item.gameObject.activeSelf && item.MilestoneIndex == milestoneIndex);
+            var targetItem = GetMilestoneItem(milestoneIndex);
 
             if (targetItem != null)
             {
@@ -283,7 +323,7 @@ namespace Game.GamePlay
                         return;
                     }
 
-                    _scrollCts = new CancellationTokenSource();
+                    _scrollCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                     try
                     {
                         float finalDuration = animate ? duration : 0f;
