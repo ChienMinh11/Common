@@ -16,23 +16,21 @@ namespace Game.GamePlay
         [SerializeField] private TMP_Text txtIndex;
         [SerializeField] private GameObject starIndex;
         [SerializeField] private GamePassExpSlider expSlider;
-        
-        [Header("Progress Highlight Connection")]
-        [SerializeField] private MilestoneHighlight milestoneHighlight;
-    
-        [Header("Free Pass")]
-        [SerializeField] private RewardSlotView freeRewardSlotView;
+
+        [Header("Progress Highlight Connection")] [SerializeField]
+        private MilestoneHighlight milestoneHighlight;
+
+        [Header("Free Pass")] [SerializeField] private RewardSlotView freeRewardSlotView;
         [SerializeField] private Button btnClaimFree;
-        [SerializeField] private DOTweenAnimation btnClaimFreeScale;
         [SerializeField] private GameObject objFreeLocked;
         [SerializeField] private GameObject objFreeClaimed;
         [SerializeField] private GameObject freeIconContainer;
         [SerializeField] private Transform customFreeIconContainer;
 
-        [Header("Premium Pass")]
-        [SerializeField] private RewardSlotView premiumRewardSlotView;
+        [Header("Premium Pass")] [SerializeField]
+        private RewardSlotView premiumRewardSlotView;
+
         [SerializeField] private Button btnClaimPremium;
-        [SerializeField] private DOTweenAnimation btnClaimPremiumScale;
         [SerializeField] private GameObject objPremiumLocked;
         [SerializeField] private GameObject objPremiumClaimed;
         [SerializeField] private GameObject premiumIconContainer;
@@ -42,25 +40,28 @@ namespace Game.GamePlay
         private Action<int, bool> _onClaimClicked;
 
         private readonly Dictionary<GameObject, GameObject> _cachedFreeIcons = new Dictionary<GameObject, GameObject>();
-        private readonly Dictionary<GameObject, GameObject> _cachedPremiumIcons = new Dictionary<GameObject, GameObject>();
-        
+
+        private readonly Dictionary<GameObject, GameObject> _cachedPremiumIcons =
+            new Dictionary<GameObject, GameObject>();
+
         private GameObject _currentActiveFreeIcon;
         private GameObject _currentActivePremiumIcon;
         public int MilestoneIndex => _milestoneIndex;
 
         public void Setup(MilestoneUIData data, Action<int, bool> onClaimClicked)
         {
-            _milestoneIndex = data.Index; 
+            _milestoneIndex = data.Index;
             _onClaimClicked = onClaimClicked;
-            
+
             bool isZeroIndex = _milestoneIndex == 0;
             if (starIndex != null) starIndex.SetActive(isZeroIndex);
             if (txtIndex != null) txtIndex.gameObject.SetActive(!isZeroIndex);
-            
+
             txtIndex.text = $"{_milestoneIndex}";
 
-            UpdateCustomIcon(data.CustomIconFreePass, customFreeIconContainer, _cachedFreeIcons, ref _currentActiveFreeIcon);
-            
+            UpdateCustomIcon(data.CustomIconFreePass, customFreeIconContainer, _cachedFreeIcons,
+                ref _currentActiveFreeIcon);
+
             if (data.CustomIconFreePass != null)
             {
                 if (freeIconContainer != null) freeIconContainer.SetActive(false);
@@ -71,20 +72,23 @@ namespace Game.GamePlay
                 if (freeRewardSlotView != null && data.FreeRewards != null && data.FreeRewards.Count > 0)
                 {
                     var freeReward = data.FreeRewards[0];
-                    Sprite rewardSprite = freeReward.IsInfiniteReward ? freeReward.InfinityRewardIcon : freeReward.IconReward;
+                    Sprite rewardSprite = freeReward.IsInfiniteReward
+                        ? freeReward.InfinityRewardIcon
+                        : freeReward.IconReward;
                     freeRewardSlotView.Setup(
-                        freeReward.IsInfiniteReward, 
-                        freeReward.Amount, 
-                        freeReward.InfinityDuration, 
-                        rewardSprite, 
+                        freeReward.IsInfiniteReward,
+                        freeReward.Amount,
+                        freeReward.InfinityDuration,
+                        rewardSprite,
                         showPrefix: true
                     );
                 }
             }
-            
+
             UpdateStateUI(data.FreeState, btnClaimFree, objFreeLocked, objFreeClaimed);
 
-            UpdateCustomIcon(data.CustomIconPremiumPass, customPremiumIconContainer, _cachedPremiumIcons, ref _currentActivePremiumIcon);
+            UpdateCustomIcon(data.CustomIconPremiumPass, customPremiumIconContainer, _cachedPremiumIcons,
+                ref _currentActivePremiumIcon);
 
             if (data.CustomIconPremiumPass != null)
             {
@@ -92,16 +96,18 @@ namespace Game.GamePlay
             }
             else
             {
-                if (premiumIconContainer != null) premiumIconContainer.SetActive(true); 
+                if (premiumIconContainer != null) premiumIconContainer.SetActive(true);
                 if (premiumRewardSlotView != null && data.PremiumRewards != null && data.PremiumRewards.Count > 0)
                 {
                     var premiumReward = data.PremiumRewards[0];
-                    Sprite rewardSprite = premiumReward.IsInfiniteReward ? premiumReward.InfinityRewardIcon : premiumReward.IconReward;
+                    Sprite rewardSprite = premiumReward.IsInfiniteReward
+                        ? premiumReward.InfinityRewardIcon
+                        : premiumReward.IconReward;
                     premiumRewardSlotView.Setup(
-                        premiumReward.IsInfiniteReward, 
-                        premiumReward.Amount, 
-                        premiumReward.InfinityDuration, 
-                        rewardSprite, 
+                        premiumReward.IsInfiniteReward,
+                        premiumReward.Amount,
+                        premiumReward.InfinityDuration,
+                        rewardSprite,
                         showPrefix: true
                     );
                 }
@@ -110,7 +116,8 @@ namespace Game.GamePlay
             UpdateStateUI(data.PremiumState, btnClaimPremium, objPremiumLocked, objPremiumClaimed);
         }
 
-        private void UpdateCustomIcon(GameObject prefab, Transform container, Dictionary<GameObject, GameObject> cache, ref GameObject currentActiveIcon)
+        private void UpdateCustomIcon(GameObject prefab, Transform container, Dictionary<GameObject, GameObject> cache,
+            ref GameObject currentActiveIcon)
         {
             if (currentActiveIcon != null)
             {
@@ -141,7 +148,7 @@ namespace Game.GamePlay
                 currentActiveIcon = newInstance;
             }
         }
-        
+
         public void UpdateHighlightState(int currentLevelIndex)
         {
             if (milestoneHighlight == null) return;
@@ -150,7 +157,7 @@ namespace Game.GamePlay
             {
                 milestoneHighlight.SetImmediate(1f);
             }
-            else 
+            else
             {
                 milestoneHighlight.SetDefault();
             }
@@ -162,7 +169,8 @@ namespace Game.GamePlay
             expSlider.SetProgress(Mathf.Clamp01(progress), string.Empty);
         }
 
-        public async UniTask PlayExpSliderAnimationAsync(float fromProgress, float toProgress, CancellationToken ct, float durationOverride = -1f)
+        public async UniTask PlayExpSliderAnimationAsync(float fromProgress, float toProgress, CancellationToken ct,
+            float durationOverride = -1f)
         {
             if (expSlider == null) return;
 
@@ -188,8 +196,8 @@ namespace Game.GamePlay
         private void UpdateStateUI(MilestoneState state, Button btn, GameObject lockObj, GameObject claimedObj)
         {
             btn.gameObject.SetActive(state == MilestoneState.ReadyToClaim);
-            lockObj.SetActive(state == MilestoneState.Locked); 
-            claimedObj.SetActive(state == MilestoneState.Claimed); 
+            lockObj.SetActive(state == MilestoneState.Locked);
+            claimedObj.SetActive(state == MilestoneState.Claimed);
         }
 
         private void Awake()
@@ -199,3 +207,4 @@ namespace Game.GamePlay
         }
     }
 }
+ 
