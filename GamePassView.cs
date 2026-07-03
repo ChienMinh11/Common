@@ -200,7 +200,7 @@ namespace Game.GamePlay
 
                 UpdateLevelText(toViewData, fromViewData.CurrentExp);
 
-                await AnimateMilestoneHighlightAsync(fromMilestoneIndex, 0f, ct);
+                await AnimateMilestoneHighlightAsync(fromMilestoneIndex, 0f, ct, 0.5f);
 
                 foreach (var step in animationSteps)
                 {
@@ -222,7 +222,7 @@ namespace Game.GamePlay
        
                 UpdateExpProgressUI(toViewData);
                 UpdateLevelText(toViewData, toViewData.CurrentExp);
-                await AnimateMilestoneHighlightAsync(nextMilestoneIndex, 1f, ct);
+                await AnimateMilestoneHighlightAsync(nextMilestoneIndex, 1f, ct,0.5f);
                 UpdateMilestoneHighlightState(nextMilestoneIndex);
             }
             catch (OperationCanceledException)
@@ -286,12 +286,12 @@ namespace Game.GamePlay
             return _milestonePool.FirstOrDefault(item => item != null && item.gameObject.activeSelf && item.MilestoneIndex == milestoneIndex);
         }
 
-        private async UniTask AnimateMilestoneHighlightAsync(int milestoneIndex, float value, CancellationToken ct)
+        private async UniTask AnimateMilestoneHighlightAsync(int milestoneIndex, float value,CancellationToken ct,float duration)
         {
             var targetItem = GetMilestoneItem(milestoneIndex);
             if (targetItem == null) return;
 
-            await targetItem.SetHighlightByAnimationAsync(value, ct);
+            await targetItem.SetHighlightByAnimationAsync(value, ct,duration);
         }
 
         private void HandleClaimRewardItem(int index, bool isPremium)

@@ -164,7 +164,7 @@ namespace Game.GamePlay
             }
         }
 
-        public async UniTask SetHighlightByAnimationAsync(float value, CancellationToken ct, float duration = 0.5f)
+        public async UniTask SetHighlightByAnimationAsync(float value, CancellationToken ct, float duration)
         {
             if (milestoneHighlight == null) return;
 
