@@ -26,12 +26,16 @@ namespace Game.GamePlay
             if (viewData?.Milestones == null || viewData.Milestones.Count == 0) return false;
 
             bool isBonusState = GetProgressData(viewData, out string expText, out float progressFraction);
-            if (txtCurrentExp != null) txtCurrentExp.text = expText;
-            
+            SetProgress(progressFraction, expText);
             StopAnimation();
-            UpdateVisualProgress(progressFraction);
 
             return isBonusState;
+        }
+
+        public void SetProgress(float progressFraction, string expText)
+        {
+            if (txtCurrentExp != null) txtCurrentExp.text = expText;
+            UpdateVisualProgress(progressFraction);
         }
 
         public async UniTask PlaySliderAnimationAsync(float fromProgress, float toProgress, string expText, CancellationToken ct)
@@ -47,15 +51,20 @@ namespace Game.GamePlay
             );
         }
 
-        private bool GetProgressData(PassViewData viewData, out string expText, out float progressFraction)
+        public bool TryGetProgressDataForExp(PassViewData viewData, int totalExp, out string expText, out float progressFraction)
         {
-            CalculateNormalProgress(viewData, out int expInCurrentLevel, out int expRequiredForNextLevel, out bool isMaxNormalLevel);
+            expText = string.Empty;
+            progressFraction = 0f;
+
+            if (viewData?.Milestones == null || viewData.Milestones.Count == 0) return false;
+
+            CalculateNormalProgress(viewData, totalExp, out int expInCurrentLevel, out int expRequiredForNextLevel, out bool isMaxNormalLevel);
 
             if (!isMaxNormalLevel)
             {
                 expText = $"{expInCurrentLevel}/{expRequiredForNextLevel}";
                 progressFraction = expRequiredForNextLevel > 0 ? (float)expInCurrentLevel / expRequiredForNextLevel : 0f;
-                return false; 
+                return false;
             }
 
             if (viewData.BonusMilestones == null || viewData.BonusMilestones.Count == 0)
@@ -65,48 +74,37 @@ namespace Game.GamePlay
                 return true;
             }
 
-            int bonusExp = viewData.TotalBonusExpEarned;
+            int totalNormalRequiredExp = viewData.Milestones.Sum(m => m.RequiredExp);
+            int bonusExp = Mathf.Max(0, totalExp - totalNormalRequiredExp);
             var sortedBonus = viewData.BonusMilestones.OrderBy(b => b.Index).ToList();
-            int currentBonusMilestoneIndex = -1;
             int accumulatedBonusExpBefore = 0;
-            int bonusExpRequiredForNext = 0;
-            bool isMaxAllBonus = true;
 
             foreach (var bonus in sortedBonus)
             {
-                if (bonusExp >= bonus.RequiredExp)
+                if (bonusExp < bonus.RequiredExp)
                 {
-                    currentBonusMilestoneIndex = bonus.Index;
-                    accumulatedBonusExpBefore = bonus.RequiredExp;
+                    int bonusExpRequiredForNext = bonus.RequiredExp - accumulatedBonusExpBefore;
+                    int expInCurrentBonus = Mathf.Max(0, bonusExp - accumulatedBonusExpBefore);
+                    expText = $"{expInCurrentBonus}/{bonusExpRequiredForNext}";
+                    progressFraction = bonusExpRequiredForNext > 0 ? (float)expInCurrentBonus / bonusExpRequiredForNext : 0f;
+                    return true;
                 }
-                if (bonus.Index > currentBonusMilestoneIndex)
-                {
-                    bonusExpRequiredForNext = bonus.RequiredExp - accumulatedBonusExpBefore;
-                    isMaxAllBonus = false;
-                    break;
-                }
+
+                accumulatedBonusExpBefore = bonus.RequiredExp;
             }
 
-            if (isMaxAllBonus)
-            {
-                expText = COMPLETED;
-                progressFraction = 1f;
-            }
-            else
-            {
-                int expInCurrentBonus = Mathf.Max(0, bonusExp - accumulatedBonusExpBefore);
-                expText = $"{expInCurrentBonus}/{bonusExpRequiredForNext}";
-                progressFraction = bonusExpRequiredForNext > 0 ? (float)expInCurrentBonus / bonusExpRequiredForNext : 0f;
-            }
-
+            expText = COMPLETED;
+            progressFraction = 1f;
             return true;
         }
 
-        private void CalculateNormalProgress(PassViewData viewData, out int expInCurrentLevel, out int expRequiredForNextLevel, out bool isMaxNormalLevel)
+        private bool GetProgressData(PassViewData viewData, out string expText, out float progressFraction)
         {
-            int totalExpProgress = viewData.CurrentExp;
-            int currentLevelIndex = viewData.CurrentMilestoneIndex;
+            return TryGetProgressDataForExp(viewData, viewData.CurrentExp, out expText, out progressFraction);
+        }
 
+        private void CalculateNormalProgress(PassViewData viewData, int totalExpProgress, out int expInCurrentLevel, out int expRequiredForNextLevel, out bool isMaxNormalLevel)
+        {
             expInCurrentLevel = 0;
             expRequiredForNextLevel = 0;
             isMaxNormalLevel = true;
@@ -115,14 +113,17 @@ namespace Game.GamePlay
             var sortedMilestones = viewData.Milestones.OrderBy(m => m.Index).ToList();
             foreach (var milestone in sortedMilestones)
             {
-                if (milestone.Index <= currentLevelIndex) accumulatedExpBefore += milestone.RequiredExp;
-                if (milestone.Index == currentLevelIndex + 1)
+                int accumulatedExpAfter = accumulatedExpBefore + milestone.RequiredExp;
+                if (totalExpProgress < accumulatedExpAfter)
                 {
+                    expInCurrentLevel = Mathf.Max(0, totalExpProgress - accumulatedExpBefore);
                     expRequiredForNextLevel = milestone.RequiredExp;
                     isMaxNormalLevel = false;
+                    return;
                 }
+
+                accumulatedExpBefore = accumulatedExpAfter;
             }
-            expInCurrentLevel = Mathf.Max(0, totalExpProgress - accumulatedExpBefore);
         }
 
         private void UpdateVisualProgress(float value)
