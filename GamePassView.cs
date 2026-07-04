@@ -249,24 +249,32 @@ namespace Game.GamePlay
             }
 
             float itemDuration = GetMilestoneFlowItemDuration(completedMilestoneIndices.Count);
-            float totalDuration = itemDuration * completedMilestoneIndices.Count;
 
-            UniTask scrollTask = ScrollToMilestone(nextMilestoneIndex, animate: true, duration: totalDuration, ct: ct);
-            UniTask sliderTask = PlayCompletedMilestoneSlidersAsync(completedMilestoneIndices, itemDuration, ct);
+            await PlayCompletedMilestoneFlowItemsAsync(completedMilestoneIndices, itemDuration, ct);
 
-            await UniTask.WhenAll(scrollTask, sliderTask);
+            int lastCompletedMilestoneIndex = completedMilestoneIndices[completedMilestoneIndices.Count - 1];
+            if (nextMilestoneIndex != lastCompletedMilestoneIndex)
+            {
+                await ScrollToMilestone(nextMilestoneIndex, animate: true, duration: itemDuration, ct: ct);
+            }
         }
 
-        private async UniTask PlayCompletedMilestoneSlidersAsync(List<int> completedMilestoneIndices, float itemDuration, CancellationToken ct)
+        private async UniTask PlayCompletedMilestoneFlowItemsAsync(List<int> completedMilestoneIndices, float itemDuration, CancellationToken ct)
         {
             foreach (int milestoneIndex in completedMilestoneIndices)
             {
                 ct.ThrowIfCancellationRequested();
 
                 var item = GetMilestoneItem(milestoneIndex);
-                if (item == null) continue;
+                UniTask scrollTask = ScrollToMilestone(milestoneIndex, animate: true, duration: itemDuration, ct: ct);
+                if (item == null)
+                {
+                    await scrollTask;
+                    continue;
+                }
 
-                await item.PlayExpSliderAnimationAsync(0f, 1f, ct, itemDuration);
+                UniTask sliderTask = item.PlayExpSliderAnimationAsync(0f, 1f, ct, itemDuration);
+                await UniTask.WhenAll(scrollTask, sliderTask);
                 item.SetExpSliderProgress(1f);
             }
         }
