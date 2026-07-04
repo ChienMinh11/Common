@@ -69,6 +69,11 @@ namespace Game.GamePlay
             btnBuyPremium.onClick.AddListener(() => OnBuyPremiumClicked?.Invoke());
         }
 
+        private void OnEnable()
+        {
+           
+        }
+
         public void RefreshUIManual()
         {
             _playManualRefreshAnimation = true;
@@ -470,6 +475,7 @@ namespace Game.GamePlay
 
         private void OnDisable()
         {
+            ScrollToMilestone(_lastViewData.CurrentMilestoneIndex, animate: false).Forget();
             CancelRefreshAnimation();
             CancelScrollAnimation();
         }

@@ -15,7 +15,7 @@ namespace Game.GamePlay
 
         public void OnShowPopup()
         {
-            _popupService.ShowPopup("PopupGamePass");
+            _popupService.ShowPopup("PopupGamePass","",false,true);
         }
     }
 }

@@ -29,7 +29,7 @@ namespace Game.GamePlay
 
         protected override void OnHide()
         {
-           
+          
         }
 
         protected override bool CheckAutoShow()
