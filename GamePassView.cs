@@ -10,6 +10,7 @@ using Cysharp.Threading.Tasks;
 using Sirenix.OdinInspector;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.UI;
 using VContainer;
 
@@ -41,6 +42,14 @@ namespace Game.GamePlay
         [Header("Bonus Milestones List")] 
         [SerializeField] private Transform bonusContainer;
         [SerializeField] private BonusMilestoneUIItem bonusPrefab;
+        
+        [Header("Flow Events")]
+
+        public UnityEvent OnFlowStarted;
+        public UnityEvent OnFlowEnded;
+        
+        [Tooltip("Kích hoạt hiệu ứng (Juice) mỗi khi chạy xong animation tăng cấp")]
+        public UnityEvent JuiceEffect; 
 
         private readonly List<MilestoneUIItem> _milestonePool = new List<MilestoneUIItem>();
         private readonly List<BonusMilestoneUIItem> _bonusPool = new List<BonusMilestoneUIItem>();
@@ -57,6 +66,7 @@ namespace Game.GamePlay
         private bool _playManualRefreshAnimation;
         private CancellationTokenSource _refreshAnimationCts;
         private CancellationTokenSource _scrollCts;
+        private bool _isClaimingReward;
 
         public void Initialize(IPassService passService)
         {
@@ -69,10 +79,6 @@ namespace Game.GamePlay
             btnBuyPremium.onClick.AddListener(() => OnBuyPremiumClicked?.Invoke());
         }
 
-        private void OnEnable()
-        {
-           
-        }
 
         public void RefreshUIManual()
         {
@@ -187,9 +193,9 @@ namespace Game.GamePlay
             }
             else
             {
-                ScrollToMilestone(viewData.CurrentMilestoneIndex, animate: false).Forget();
+                if (!_isClaimingReward) ScrollToMilestone(viewData.CurrentMilestoneIndex, animate: false).Forget();
             }
-
+            _isClaimingReward = false;
             _lastViewData = viewData;
         }
 
@@ -203,10 +209,11 @@ namespace Game.GamePlay
 
                 int fromMilestoneIndex = GetNextMilestoneIndex(toViewData, fromViewData.CurrentExp);
                 int nextMilestoneIndex = GetNextMilestoneIndex(toViewData, toViewData.CurrentExp);
-
+                
                 UpdateLevelText(toViewData, fromViewData.CurrentExp);
                 SetCompletedMilestoneSlidersByExp(toViewData, fromViewData.CurrentExp);
                 SetClaimButtonsVisible(false);
+                OnStartFlow();
 
                 int topSliderAnimatedExp = fromViewData.CurrentExp;
                 foreach (var step in animationSteps)
@@ -223,6 +230,10 @@ namespace Game.GamePlay
 
                     topSliderAnimatedExp = step.EvaluatedExpForClaimableCheck;
                     UpdateLevelText(toViewData, topSliderAnimatedExp);
+                    if (step.ToProgressPercentage >= 1f)
+                    {
+                        JuiceEffect?.Invoke();
+                    }
                 }
 
                 UpdateExpProgressUI(toViewData);
@@ -236,6 +247,7 @@ namespace Game.GamePlay
                 await AnimateMilestoneHighlightAsync(nextMilestoneIndex, 1f, ct, 0.5f);
                 UpdateMilestoneHighlightState(nextMilestoneIndex);
                 SetClaimButtonsVisible(true);
+                OnEndFlow();
             }
             catch (OperationCanceledException)
             {
@@ -402,11 +414,13 @@ namespace Game.GamePlay
 
         private void HandleClaimRewardItem(int index, bool isPremium)
         {
+            _isClaimingReward = true;
             OnClaimRewardClicked?.Invoke(index, isPremium);
         }
 
         private void HandleClaimBonusItem(int index)
         {
+            _isClaimingReward = true;
             OnClaimBonusClicked?.Invoke(index);
         }
 
@@ -423,6 +437,13 @@ namespace Game.GamePlay
                 var rectTransform = targetItem.GetComponent<RectTransform>();
                 if (rectTransform != null)
                 {
+                    if (!animate)
+                    {
+                        ForceRebuildMilestoneScrollLayout();
+                        milestoneScrollRect.FocusOnItem(rectTransform, bias: 0.5f);
+                        return;
+                    }
+
                     if (!milestoneScrollRect.gameObject.activeInHierarchy || !gameObject.activeInHierarchy)
                     {
                         milestoneScrollRect.FocusOnItem(rectTransform, bias: 0.5f);
@@ -443,6 +464,23 @@ namespace Game.GamePlay
             }
         }
 
+        private void ForceRebuildMilestoneScrollLayout()
+        {
+            Canvas.ForceUpdateCanvases();
+
+            if (milestoneContainer is RectTransform milestoneContainerRect)
+            {
+                LayoutRebuilder.ForceRebuildLayoutImmediate(milestoneContainerRect);
+            }
+
+            if (milestoneScrollRect != null && milestoneScrollRect.content != null)
+            {
+                LayoutRebuilder.ForceRebuildLayoutImmediate(milestoneScrollRect.content);
+            }
+
+            Canvas.ForceUpdateCanvases();
+        }
+
         private void CancelRefreshAnimation()
         {
             if (_refreshAnimationCts == null) return;
@@ -461,6 +499,16 @@ namespace Game.GamePlay
             }
         }
 
+        public void OnStartFlow()
+        {
+            OnFlowStarted?.Invoke();
+        }
+
+        public void OnEndFlow()
+        {
+            OnFlowEnded?.Invoke();
+        }
+
         private void ClearOldItems()
         {
             foreach (var item in _spawnedItems)
@@ -475,7 +523,11 @@ namespace Game.GamePlay
 
         private void OnDisable()
         {
-            ScrollToMilestone(_lastViewData.CurrentMilestoneIndex, animate: false).Forget();
+            if (_lastViewData != null)
+            {
+                ScrollToMilestone(_lastViewData.CurrentMilestoneIndex, animate: false).Forget();
+            }
+
             CancelRefreshAnimation();
             CancelScrollAnimation();
         }

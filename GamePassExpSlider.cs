@@ -7,6 +7,8 @@ using Cysharp.Threading.Tasks;
 using Game.Extensions;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Events;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 namespace Game.GamePlay
@@ -19,8 +21,11 @@ namespace Game.GamePlay
         [SerializeField] private Image filledImage;
         [SerializeField] private TMP_Text txtCurrentExp;
         [SerializeField] private float animationDuration = 0.5f;
-        
+
         private CancellationTokenSource _animationCts;
+ 
+        [Tooltip("Kích hoạt khi thanh slider chạy đầy 100% (Lên cấp)")]
+        public UnityEvent JuiceEffect; 
 
         public bool UpdateProgressDetailed(PassViewData viewData)
         {
@@ -54,12 +59,21 @@ namespace Game.GamePlay
 
             PlayTextPunchAnimation(ct).Forget();
 
+            bool hasTriggeredJuice = false;
+
             while (elapsed < finalDuration)
             {
                 elapsed += Time.deltaTime;
                 float t = finalDuration > 0f ? elapsed / finalDuration : 1f;
                 float currentProgress = Mathf.Lerp(fromProgress, toProgress, t);
                 UpdateVisualProgress(currentProgress);
+
+                if (currentProgress >= 1f && !hasTriggeredJuice)
+                {
+                    hasTriggeredJuice = true;
+                    JuiceEffect?.Invoke();  
+                     
+                }
 
                 if (txtCurrentExp != null)
                 {
@@ -79,6 +93,11 @@ namespace Game.GamePlay
 
             UpdateVisualProgress(toProgress);
             if (txtCurrentExp != null) txtCurrentExp.text = toText;
+        
+            if (toProgress >= 1f && !hasTriggeredJuice)
+            {
+                JuiceEffect?.Invoke();
+            }
         }
 
         private bool TryParseExpText(string text, out int currentExp, out int maxExp)

@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using ChieChie.Constracts;
 
 namespace ChieChie.GamePass
 {
-    public class PassViewData
+    public class PassViewData:IEventProgressData
     {
         public DateTime EventEndTime;
         public int CurrentExp;
@@ -13,6 +14,9 @@ namespace ChieChie.GamePass
         public List<MilestoneUIData> Milestones;
         public List<BonusMilestoneUIData> BonusMilestones; 
         public int TotalBonusExpEarned; 
+        public IReadOnlyList<int> GetNormalMilestoneRequiredPoints() => Milestones?.Select(m => m.RequiredExp).ToList();
+        public IReadOnlyList<int> GetBonusMilestoneRequiredPoints() => BonusMilestones?.Select(b => b.RequiredExp).ToList();
+        public int TotalBonusPointsEarned => TotalBonusExpEarned;
         
     }
     public class BonusMilestoneUIData

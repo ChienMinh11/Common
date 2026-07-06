@@ -3,12 +3,14 @@ using System.Collections.Generic;
 
 namespace ChieChie.GamePass
 {
+    [System.Serializable]
     public class PassViewDisplayState
     {
         public string viewId;
         public int displayedExp;
     }
 
+    [System.Serializable]
     public class PassSaveData
     {
         public string currentEventId;
