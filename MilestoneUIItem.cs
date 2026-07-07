@@ -205,6 +205,21 @@ namespace Game.GamePlay
             await milestoneHighlight.SetByAnimationAsync(value, duration);
             ct.ThrowIfCancellationRequested();
         }
+        public Transform GetRewardIconTransform(bool isPremium)
+        {
+            if (isPremium)
+            {
+                return (_currentActivePremiumIcon != null && _currentActivePremiumIcon.activeSelf) 
+                    ? customPremiumIconContainer 
+                    : premiumRewardSlotView.transform;
+            }
+            else
+            {
+                return (_currentActiveFreeIcon != null && _currentActiveFreeIcon.activeSelf) 
+                    ? customFreeIconContainer 
+                    : freeRewardSlotView.transform;
+            }
+        }
 
         private void UpdateStateUI(MilestoneState state, Button btn, GameObject lockObj, GameObject claimedObj)
         {

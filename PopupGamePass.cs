@@ -27,7 +27,11 @@ namespace Game.GamePlay
 
         protected override void OnShow()
         {
-            if(gamePassView != null) gamePassView.RefreshUIManual();
+            if (gamePassView != null)
+            {
+                gamePassView.RunScrollFirstTime();
+                gamePassView.RefreshUIManual();
+            }
         }
 
         protected override void OnHide()

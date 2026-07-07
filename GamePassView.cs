@@ -64,6 +64,7 @@ namespace Game.GamePlay
         private bool _playManualRefreshAnimation;
         private CancellationTokenSource _refreshAnimationCts;
         private CancellationTokenSource _scrollCts;
+        private bool _isScrollFirstTime = false;
 
         public void Initialize(IPassService passService,IEventService eventService)
         {
@@ -193,12 +194,17 @@ namespace Game.GamePlay
                 _refreshAnimationCts = new CancellationTokenSource();
                 AnimateManualRefreshAsync(_lastViewData, viewData, _refreshAnimationCts.Token).Forget();
             }
-            else
-            {
-                ScrollToMilestone(viewData.CurrentMilestoneIndex, animate: false).Forget();
-            }
-
             _lastViewData = viewData;
+        }
+
+        public void RunScrollFirstTime()
+        {
+            if(!_isScrollFirstTime)
+            {
+                _isScrollFirstTime = true;
+                ScrollToMilestone(_lastViewData.CurrentMilestoneIndex, animate: false).Forget();
+                
+            }
         }
 
         private async UniTask AnimateManualRefreshAsync(PassViewData fromViewData, PassViewData toViewData, CancellationToken ct)
@@ -412,13 +418,19 @@ namespace Game.GamePlay
 
         private void HandleClaimRewardItem(int index, bool isPremium)
         {
-            PublishClaimedRewards(GetClaimableMilestoneRewards(index, isPremium));
+            var item = GetMilestoneItem(index);
+            Transform spawnTransform = item != null ? item.GetRewardIconTransform(isPremium) : this.transform;
+
+            PublishClaimedRewards(GetClaimableMilestoneRewards(index, isPremium), spawnTransform);
             OnClaimRewardClicked?.Invoke(index, isPremium);
         }
 
         private void HandleClaimBonusItem(int index)
         {
-            PublishClaimedRewards(GetClaimableBonusRewards(index));
+            // var item = GetMilestoneItem(index);
+            // Transform spawnTransform = item != null ? item.GetRewardIconTransform(isPremium) : this.transform;
+            //
+            // PublishClaimedRewards(GetClaimableMilestoneRewards(index, isPremium), spawnTransform);
             OnClaimBonusClicked?.Invoke(index);
         }
 
@@ -441,15 +453,20 @@ namespace Game.GamePlay
             return bonusMilestone.Rewards;
         }
 
-        private void PublishClaimedRewards(IEnumerable<IItemReward> rewards)
+        private void PublishClaimedRewards(IEnumerable<IItemReward> rewards, Transform spawnTransform)
         {
             if (_eventService == null || rewards == null) return;
 
-            var rewardEventData = RewardClaimedEventDataHelper.FromItemRewards(rewards);
-
+            var rewardEventData = RewardClaimedEventDataHelper.FromItemRewards(rewards,true,true);
             if (rewardEventData.Count == 0) return;
 
-            _eventService.Publish(GameEvent.OnRewardClaimByGamePass, rewardEventData);
+            var args = new RewardClaimedArgs
+            {
+                Rewards = rewardEventData,
+                SpawnTransform = spawnTransform
+            };
+
+            _eventService.Publish(GameEvent.OnRewardClaimByGamePass, args);
         }
 
         private async UniTask ScrollToMilestone(int milestoneIndex, bool animate = false, float duration = 0.5f, CancellationToken ct = default(CancellationToken))
@@ -536,7 +553,7 @@ namespace Game.GamePlay
         {
             OnFlowEnded?.Invoke();
         }
-
+       
         private void OnDisable()
         {
             if (_lastViewData != null)
