@@ -47,9 +47,6 @@ namespace Game.GamePlay
 
         public UnityEvent OnFlowStarted;
         public UnityEvent OnFlowEnded;
-        
-        [Tooltip("Kích hoạt hiệu ứng (Juice) mỗi khi chạy xong animation tăng cấp")]
-        public UnityEvent JuiceEffect; 
 
         private readonly List<MilestoneUIItem> _milestonePool = new List<MilestoneUIItem>();
         private readonly List<BonusMilestoneUIItem> _bonusPool = new List<BonusMilestoneUIItem>();
@@ -61,16 +58,17 @@ namespace Game.GamePlay
         private readonly List<GameObject> _spawnedItems = new List<GameObject>();
 
         private IPassService _passService;
+        private IEventService _eventService;
         public string ViewId => string.IsNullOrEmpty(viewId) ? nameof(GamePassView) : viewId;
         private PassViewData _lastViewData;
         private bool _playManualRefreshAnimation;
         private CancellationTokenSource _refreshAnimationCts;
         private CancellationTokenSource _scrollCts;
-        private bool _isClaimingReward;
 
-        public void Initialize(IPassService passService)
+        public void Initialize(IPassService passService,IEventService eventService)
         {
             _passService = passService;
+            _eventService = eventService;
             _passService.RegisterView(this);
         }
 
@@ -79,6 +77,10 @@ namespace Game.GamePlay
             btnBuyPremium.onClick.AddListener(() => OnBuyPremiumClicked?.Invoke());
         }
 
+        private void OnEnable()
+        {
+           
+        }
 
         public void RefreshUIManual()
         {
@@ -193,9 +195,9 @@ namespace Game.GamePlay
             }
             else
             {
-                if (!_isClaimingReward) ScrollToMilestone(viewData.CurrentMilestoneIndex, animate: false).Forget();
+                ScrollToMilestone(viewData.CurrentMilestoneIndex, animate: false).Forget();
             }
-            _isClaimingReward = false;
+
             _lastViewData = viewData;
         }
 
@@ -230,10 +232,6 @@ namespace Game.GamePlay
 
                     topSliderAnimatedExp = step.EvaluatedExpForClaimableCheck;
                     UpdateLevelText(toViewData, topSliderAnimatedExp);
-                    if (step.ToProgressPercentage >= 1f)
-                    {
-                        JuiceEffect?.Invoke();
-                    }
                 }
 
                 UpdateExpProgressUI(toViewData);
@@ -414,13 +412,11 @@ namespace Game.GamePlay
 
         private void HandleClaimRewardItem(int index, bool isPremium)
         {
-            _isClaimingReward = true;
             OnClaimRewardClicked?.Invoke(index, isPremium);
         }
 
         private void HandleClaimBonusItem(int index)
         {
-            _isClaimingReward = true;
             OnClaimBonusClicked?.Invoke(index);
         }
 
@@ -507,18 +503,6 @@ namespace Game.GamePlay
         public void OnEndFlow()
         {
             OnFlowEnded?.Invoke();
-        }
-
-        private void ClearOldItems()
-        {
-            foreach (var item in _spawnedItems)
-            {
-                if (item != null && item.transform != startIndex) 
-                {
-                    Destroy(item);
-                }
-            }
-            _spawnedItems.Clear();
         }
 
         private void OnDisable()

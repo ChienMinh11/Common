@@ -1,3 +1,4 @@
+using ChieChie.Core;
 using ChieChie.GamePass;
 using UnityEngine;
 using VContainer;
@@ -9,13 +10,15 @@ namespace Game.GamePlay
         [SerializeField] private GamePassView gamePassView;
 
         private IPassService _passService;
+        private IEventService _eventService;
 
         [Inject]
-        private void Construct(IPassService passService)
+        private void Construct(IPassService passService, IEventService eventService)
         {
             _passService = passService;
+            _eventService = eventService;
             if (gamePassView == null) gamePassView = GetComponent<GamePassView>();
-            gamePassView?.Initialize(_passService);
+            gamePassView?.Initialize(_passService,_eventService);
         }
         protected override void SetPopupName() => PopupName = "PopupGamePass";
       

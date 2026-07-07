@@ -21,7 +21,8 @@ namespace ChieChie.GamePass
         public event Action<IPassNotificationEventData> OnAutoClaimNotificationTriggered;
 
         private readonly ITimeProvider _timeProvider;
-        public DateTime EventEndTime => _passModel != null ? _passModel.EventEndTime : DateTime.MinValue;
+        public DateTime EventEndTime => _passModel?.EventEndTime ?? DateTime.MinValue;
+        public bool IsEventActive => _passModel?.IsEventActive ?? false;
 
         public PassManager(PassDatabase database, IPassSaveAdapter saveAdapter, ITimeProvider timeProvider)
         {

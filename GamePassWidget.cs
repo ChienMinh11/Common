@@ -9,11 +9,13 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using VContainer;
+using VContainer.Unity;
 
 namespace Game.GamePlay
 {
-    public class GamePassWidget : MonoBehaviour, IPassView
+    public class GamePassWidget : MonoBehaviour, IPassView,IWidgetIdentity
     {
+        [SerializeField] private SideWidgetStructConfig config;
         [SerializeField] private string viewId = nameof(GamePassWidget);
 
         [Header("UI Components")]
@@ -24,6 +26,7 @@ namespace Game.GamePlay
         [SerializeField] private GameObject objNotificationBadge; 
         [SerializeField] private TMP_Text txtClaimableCount;
         private IPassService _passService;
+        private IEventService _eventService;
         private PassViewData _lastViewData;
         private bool _playManualRefreshAnimation;
         private CancellationTokenSource _refreshAnimationCts;
@@ -32,12 +35,21 @@ namespace Game.GamePlay
         public event Action<int> OnClaimBonusClicked;
         public event Action OnBuyPremiumClicked;
         public string ViewId => string.IsNullOrEmpty(viewId) ? nameof(GamePassWidget) : viewId;
+        public SideWidgetStructConfig Config => config;
+      
 
         [Inject]
-        public void Constructor(IPassService passService)
+        public void Constructor(IPassService passService,IEventService eventService)
         {
             _passService = passService;
-            _passService.RegisterView(this); 
+            _eventService = eventService;
+           
+        }
+        
+        public void Initialize()
+        {
+            gameObject.SetActive(true);
+            _passService.RegisterView(this);
         }
 
         private void OnDestroy()
@@ -68,12 +80,14 @@ namespace Game.GamePlay
             if (viewData.EventEndTime == DateTime.MinValue || DateTime.UtcNow >= viewData.EventEndTime)
             {
                 if (gameObject.activeSelf) gameObject.SetActive(false);
+                _eventService.PublishEvent(WidgetEventType.OnWidgetStateChanged);
                 _lastViewData = viewData;
                 return;
             }
             else
             {
                 if (!gameObject.activeSelf) gameObject.SetActive(true);
+                _eventService.PublishEvent(WidgetEventType.OnWidgetStateChanged);
             }
             if (timeCountdownWidget != null)
             {
@@ -207,5 +221,8 @@ namespace Game.GamePlay
             _refreshAnimationCts.Dispose();
             _refreshAnimationCts = null;
         }
+
+
+       
     }
 }

@@ -29,6 +29,7 @@ namespace ChieChie.GamePass
         public event Action<IPassNotificationEventData> OnAutoClaimNotificationTriggered;
 
         private readonly ITimeProvider _timeProvider;
+        public bool IsEventActive => _eventScheduler != null && _eventScheduler.isActive;
 
         public PassModel(PassDatabase database, IPassSaveAdapter passSaveAdapter, PassEventScheduler eventScheduler, ITimeProvider timeProvider)
         {
