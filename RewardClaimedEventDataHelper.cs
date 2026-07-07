@@ -6,14 +6,20 @@ namespace ChieChie.Core
 {
     public static class RewardClaimedEventDataHelper
     {
-        public static List<RewardClaimedEventData> FromRewardDisplayData(IBaseRewardDisplayData data)
+        public static List<RewardClaimedEventData> FromRewardDisplayData(
+            IBaseRewardDisplayData data, 
+            bool forceShowGoldPrefix = false, 
+            bool forceShowGoldAmountText = false)
         {
             return data == null
                 ? new List<RewardClaimedEventData>()
-                : FromBaseRewards(data.GetRewards());
+                : FromBaseRewards(data.GetRewards(), forceShowGoldPrefix, forceShowGoldAmountText);
         }
 
-        public static List<RewardClaimedEventData> FromItemRewards(IEnumerable<IItemReward> rewards)
+        public static List<RewardClaimedEventData> FromItemRewards(
+            IEnumerable<IItemReward> rewards, 
+            bool forceShowGoldPrefix = false, 
+            bool forceShowGoldAmountText = false)
         {
             var rewardDataList = new List<RewardClaimedEventData>();
             if (rewards == null) return rewardDataList;
@@ -21,13 +27,16 @@ namespace ChieChie.Core
             foreach (var reward in rewards)
             {
                 if (reward == null) continue;
-                rewardDataList.Add(FromItemReward(reward));
+                rewardDataList.Add(FromItemReward(reward, forceShowGoldPrefix, forceShowGoldAmountText));
             }
 
             return rewardDataList;
         }
 
-        public static RewardClaimedEventData FromItemReward(IItemReward reward)
+        public static RewardClaimedEventData FromItemReward(
+            IItemReward reward, 
+            bool forceShowGoldPrefix = false, 
+            bool forceShowGoldAmountText = false)
         {
             string typeKey = NormalizeResourceType(reward.ResourceId);
             Sprite rewardSprite = reward.IsInfiniteReward && reward.InfinityRewardIcon != null
@@ -39,11 +48,16 @@ namespace ChieChie.Core
                 reward.Amount,
                 rewardSprite,
                 reward.IsInfiniteReward,
-                reward.InfinityDuration
+                reward.InfinityDuration,
+                forceShowGoldPrefix,
+                forceShowGoldAmountText
             );
         }
 
-        public static List<RewardClaimedEventData> FromBaseRewards(IEnumerable<IItemReward> rewards)
+        public static List<RewardClaimedEventData> FromBaseRewards(
+            IEnumerable<IItemReward> rewards, 
+            bool forceShowGoldPrefix = false, 
+            bool forceShowGoldAmountText = false)
         {
             var rewardDataList = new List<RewardClaimedEventData>();
             if (rewards == null) return rewardDataList;
@@ -51,13 +65,16 @@ namespace ChieChie.Core
             foreach (var reward in rewards)
             {
                 if (reward == null) continue;
-                rewardDataList.Add(FromBaseReward(reward));
+                rewardDataList.Add(FromBaseReward(reward, forceShowGoldPrefix, forceShowGoldAmountText));
             }
 
             return rewardDataList;
         }
 
-        public static RewardClaimedEventData FromBaseReward(IItemReward reward)
+        public static RewardClaimedEventData FromBaseReward(
+            IItemReward reward, 
+            bool forceShowGoldPrefix = false, 
+            bool forceShowGoldAmountText = false)
         {
             string typeKey = NormalizeResourceType(reward.ResourceId);
             Sprite rewardSprite = reward.IsInfiniteReward && reward.IsInfiniteReward != null
@@ -69,7 +86,9 @@ namespace ChieChie.Core
                 reward.Amount,
                 rewardSprite,
                 reward.IsInfiniteReward,
-                reward.InfinityDuration
+                reward.InfinityDuration,
+                forceShowGoldPrefix,
+                forceShowGoldAmountText
             );
         }
 
@@ -78,7 +97,10 @@ namespace ChieChie.Core
             long amount,
             Sprite rewardSprite,
             bool isInfiniteReward,
-            float infinityDuration)
+            float infinityDuration,
+            bool forceShowPrefix,
+            bool forceShowAmountText
+            )
         {
             return new RewardClaimedEventData
             {
@@ -87,8 +109,8 @@ namespace ChieChie.Core
                 RewardSprite = rewardSprite,
                 AmountDisplayText = isInfiniteReward
                     ? CoreExtensions.FormatTime(infinityDuration)
-                    : FormatAmount(typeKey, amount),
-                ShowAmountText = ShouldShowAmountText(typeKey)
+                    : FormatAmount(typeKey, amount, forceShowPrefix),
+                ShowAmountText = ShouldShowAmountText(typeKey, forceShowAmountText)
             };
         }
 
@@ -97,18 +119,23 @@ namespace ChieChie.Core
             return string.IsNullOrEmpty(resourceType) ? string.Empty : resourceType.Trim();
         }
 
-        private static string FormatAmount(string typeKey, long amount)
+        private static string FormatAmount(string typeKey, long amount, bool forceShowGoldPrefix)
         {
-            return ShouldShowPrefix(typeKey) ? $"x{amount}" : $"{amount}";
+            return ShouldShowPrefix(typeKey, forceShowGoldPrefix) ? $"x{amount}" : $"{amount}";
         }
 
-        private static bool ShouldShowPrefix(string typeKey)
+        private static bool ShouldShowPrefix(string typeKey, bool forceShowPrefix)
         {
+   
+            if (typeKey == "Gold" && forceShowPrefix) return true;
+            
             return typeKey != "Gold";
         }
 
-        private static bool ShouldShowAmountText(string typeKey)
+        private static bool ShouldShowAmountText(string typeKey, bool forceShowAmountText)
         {
+            if (typeKey == "Gold" && forceShowAmountText) return true;
+
             return typeKey != "Gold" && typeKey != "Lives";
         }
 
