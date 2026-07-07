@@ -42,6 +42,10 @@ namespace Game.GamePlay
         [Header("Bonus Milestones List")] 
         [SerializeField] private Transform bonusContainer;
         [SerializeField] private BonusMilestoneUIItem bonusPrefab;
+
+        [Header("Reward Info")]
+        [SerializeField] private ItemRewardInfoPanel rewardInfoPanel;
+        [SerializeField] private string rewardInfoTitle = "Rewards";
         
         [Header("Flow Events")]
 
@@ -145,7 +149,7 @@ namespace Game.GamePlay
                         item.transform.SetSiblingIndex(startIndex.GetSiblingIndex() + i + 1);
                     }
 
-                    item.Setup(sortedMilestones[i], HandleClaimRewardItem, showClaimButtons);
+                    item.Setup(sortedMilestones[i], HandleClaimRewardItem, showClaimButtons, HandleRewardInfoRequest);
                     item.UpdateHighlightState(highlightedMilestoneIndex);
                     item.SetExpSliderProgress(GetCompletedMilestoneSliderProgress(initialViewData, initialViewData.CurrentExp, item.MilestoneIndex));
                 }
@@ -180,7 +184,7 @@ namespace Game.GamePlay
                         _bonusPool.Add(item);
                     }
 
-                    item.Setup(sortedBonus[i], HandleClaimBonusItem);
+                    item.Setup(sortedBonus[i], HandleClaimBonusItem, HandleRewardInfoRequest);
                 }
 
                 for (int i = sortedBonus.Count; i < _bonusPool.Count; i++)
@@ -434,6 +438,12 @@ namespace Game.GamePlay
             OnClaimBonusClicked?.Invoke(index);
         }
 
+        private void HandleRewardInfoRequest(IReadOnlyList<IItemReward> rewards, Transform anchor)
+        {
+            if (rewardInfoPanel == null) return;
+            rewardInfoPanel.ShowRewards(rewards, anchor, rewardInfoTitle);
+        }
+
         private List<IItemReward> GetClaimableMilestoneRewards(int index, bool isPremium)
         {
             var milestone = _lastViewData?.Milestones?.FirstOrDefault(m => m.Index == index);
@@ -556,6 +566,11 @@ namespace Game.GamePlay
        
         private void OnDisable()
         {
+            if (rewardInfoPanel != null)
+            {
+                rewardInfoPanel.Hide();
+            }
+
             if (_lastViewData != null)
             {
                 ScrollToMilestone(_lastViewData.CurrentMilestoneIndex, animate: false).Forget();

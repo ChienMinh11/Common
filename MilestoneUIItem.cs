@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using ChieChie.Constracts;
 using ChieChie.Core;
 using ChieChie.GamePass;
 using Cysharp.Threading.Tasks;
@@ -22,6 +23,7 @@ namespace Game.GamePlay
 
         [Header("Free Pass")] [SerializeField] private RewardSlotView freeRewardSlotView;
         [SerializeField] private Button btnClaimFree;
+        [SerializeField] private Button btnShowFreeRewardInfo;
         [SerializeField] private GameObject objFreeLocked;
         [SerializeField] private GameObject objFreeClaimed;
         [SerializeField] private GameObject freeIconContainer;
@@ -31,6 +33,7 @@ namespace Game.GamePlay
         private RewardSlotView premiumRewardSlotView;
 
         [SerializeField] private Button btnClaimPremium;
+        [SerializeField] private Button btnShowPremiumRewardInfo;
         [SerializeField] private GameObject objPremiumLocked;
         [SerializeField] private GameObject objPremiumClaimed;
         [SerializeField] private GameObject premiumIconContainer;
@@ -38,6 +41,9 @@ namespace Game.GamePlay
 
         private int _milestoneIndex;
         private Action<int, bool> _onClaimClicked;
+        private Action<IReadOnlyList<IItemReward>, Transform> _onRewardInfoClicked;
+        private IReadOnlyList<IItemReward> _freeRewards;
+        private IReadOnlyList<IItemReward> _premiumRewards;
         private MilestoneState _freeState;
         private MilestoneState _premiumState;
         private bool _showClaimButtons = true;
@@ -51,10 +57,17 @@ namespace Game.GamePlay
         private GameObject _currentActivePremiumIcon;
         public int MilestoneIndex => _milestoneIndex;
 
-        public void Setup(MilestoneUIData data, Action<int, bool> onClaimClicked, bool showClaimButtons = true)
+        public void Setup(
+            MilestoneUIData data,
+            Action<int, bool> onClaimClicked,
+            bool showClaimButtons = true,
+            Action<IReadOnlyList<IItemReward>, Transform> onRewardInfoClicked = null)
         {
             _milestoneIndex = data.Index;
             _onClaimClicked = onClaimClicked;
+            _onRewardInfoClicked = onRewardInfoClicked;
+            _freeRewards = data.FreeRewards;
+            _premiumRewards = data.PremiumRewards;
             _freeState = data.FreeState;
             _premiumState = data.PremiumState;
             _showClaimButtons = showClaimButtons;
@@ -92,6 +105,7 @@ namespace Game.GamePlay
             }
 
             UpdateStateUI(_freeState, btnClaimFree, objFreeLocked, objFreeClaimed);
+            UpdateRewardInfoButton(btnShowFreeRewardInfo, _freeRewards);
 
             UpdateCustomIcon(data.CustomIconPremiumPass, customPremiumIconContainer, _cachedPremiumIcons,
                 ref _currentActivePremiumIcon);
@@ -120,6 +134,7 @@ namespace Game.GamePlay
             }
 
             UpdateStateUI(_premiumState, btnClaimPremium, objPremiumLocked, objPremiumClaimed);
+            UpdateRewardInfoButton(btnShowPremiumRewardInfo, _premiumRewards);
         }
 
         private void UpdateCustomIcon(GameObject prefab, Transform container, Dictionary<GameObject, GameObject> cache,
@@ -209,29 +224,47 @@ namespace Game.GamePlay
         {
             if (isPremium)
             {
-                return (_currentActivePremiumIcon != null && _currentActivePremiumIcon.activeSelf) 
-                    ? customPremiumIconContainer 
-                    : premiumRewardSlotView.transform;
+                Transform fallback = premiumRewardSlotView != null ? premiumRewardSlotView.transform : transform;
+                return _currentActivePremiumIcon != null && _currentActivePremiumIcon.activeSelf && customPremiumIconContainer != null
+                    ? customPremiumIconContainer
+                    : fallback;
             }
             else
             {
-                return (_currentActiveFreeIcon != null && _currentActiveFreeIcon.activeSelf) 
-                    ? customFreeIconContainer 
-                    : freeRewardSlotView.transform;
+                Transform fallback = freeRewardSlotView != null ? freeRewardSlotView.transform : transform;
+                return _currentActiveFreeIcon != null && _currentActiveFreeIcon.activeSelf && customFreeIconContainer != null
+                    ? customFreeIconContainer
+                    : fallback;
             }
         }
 
         private void UpdateStateUI(MilestoneState state, Button btn, GameObject lockObj, GameObject claimedObj)
         {
-            btn.gameObject.SetActive(_showClaimButtons && state == MilestoneState.ReadyToClaim);
-            lockObj.SetActive(state == MilestoneState.Locked);
-            claimedObj.SetActive(state == MilestoneState.Claimed);
+            if (btn != null) btn.gameObject.SetActive(_showClaimButtons && state == MilestoneState.ReadyToClaim);
+            if (lockObj != null) lockObj.SetActive(state == MilestoneState.Locked);
+            if (claimedObj != null) claimedObj.SetActive(state == MilestoneState.Claimed);
+        }
+
+        private void UpdateRewardInfoButton(Button button, IReadOnlyList<IItemReward> rewards)
+        {
+            if (button == null) return;
+            button.gameObject.SetActive(rewards != null && rewards.Count > 0);
+        }
+
+        private void HandleRewardInfoClicked(bool isPremium)
+        {
+            IReadOnlyList<IItemReward> rewards = isPremium ? _premiumRewards : _freeRewards;
+            if (rewards == null || rewards.Count == 0) return;
+
+            _onRewardInfoClicked?.Invoke(rewards, GetRewardIconTransform(isPremium));
         }
 
         private void Awake()
         {
-            btnClaimFree.onClick.AddListener(() => _onClaimClicked?.Invoke(_milestoneIndex, false));
-            btnClaimPremium.onClick.AddListener(() => _onClaimClicked?.Invoke(_milestoneIndex, true));
+            if (btnClaimFree != null) btnClaimFree.onClick.AddListener(() => _onClaimClicked?.Invoke(_milestoneIndex, false));
+            if (btnClaimPremium != null) btnClaimPremium.onClick.AddListener(() => _onClaimClicked?.Invoke(_milestoneIndex, true));
+            if (btnShowFreeRewardInfo != null) btnShowFreeRewardInfo.onClick.AddListener(() => HandleRewardInfoClicked(false));
+            if (btnShowPremiumRewardInfo != null) btnShowPremiumRewardInfo.onClick.AddListener(() => HandleRewardInfoClicked(true));
         }
     }
 }

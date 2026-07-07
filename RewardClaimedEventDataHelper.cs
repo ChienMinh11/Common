@@ -77,7 +77,7 @@ namespace ChieChie.Core
             bool forceShowGoldAmountText = false)
         {
             string typeKey = NormalizeResourceType(reward.ResourceId);
-            Sprite rewardSprite = reward.IsInfiniteReward && reward.IsInfiniteReward != null
+            Sprite rewardSprite = reward.IsInfiniteReward && reward.InfinityRewardIcon != null
                 ? reward.InfinityRewardIcon
                 : reward.IconReward;
 
