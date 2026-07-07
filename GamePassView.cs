@@ -412,12 +412,44 @@ namespace Game.GamePlay
 
         private void HandleClaimRewardItem(int index, bool isPremium)
         {
+            PublishClaimedRewards(GetClaimableMilestoneRewards(index, isPremium));
             OnClaimRewardClicked?.Invoke(index, isPremium);
         }
 
         private void HandleClaimBonusItem(int index)
         {
+            PublishClaimedRewards(GetClaimableBonusRewards(index));
             OnClaimBonusClicked?.Invoke(index);
+        }
+
+        private List<IItemReward> GetClaimableMilestoneRewards(int index, bool isPremium)
+        {
+            var milestone = _lastViewData?.Milestones?.FirstOrDefault(m => m.Index == index);
+            if (milestone == null) return null;
+
+            MilestoneState state = isPremium ? milestone.PremiumState : milestone.FreeState;
+            if (state != MilestoneState.ReadyToClaim) return null;
+
+            return isPremium ? milestone.PremiumRewards : milestone.FreeRewards;
+        }
+
+        private List<IItemReward> GetClaimableBonusRewards(int index)
+        {
+            var bonusMilestone = _lastViewData?.BonusMilestones?.FirstOrDefault(b => b.Index == index);
+            if (bonusMilestone == null || bonusMilestone.State != MilestoneState.ReadyToClaim) return null;
+
+            return bonusMilestone.Rewards;
+        }
+
+        private void PublishClaimedRewards(IEnumerable<IItemReward> rewards)
+        {
+            if (_eventService == null || rewards == null) return;
+
+            var rewardEventData = RewardClaimedEventDataHelper.FromItemRewards(rewards);
+
+            if (rewardEventData.Count == 0) return;
+
+            _eventService.Publish(GameEvent.OnRewardClaimByGamePass, rewardEventData);
         }
 
         private async UniTask ScrollToMilestone(int milestoneIndex, bool animate = false, float duration = 0.5f, CancellationToken ct = default(CancellationToken))

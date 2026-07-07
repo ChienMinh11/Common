@@ -38,6 +38,7 @@ namespace Game.GamePlay
         private Transform _buttonPlay;
         
         private IDisposable _rewardSubscription;
+        private IDisposable _gamePassRewardSubscription;
 
 
         [Inject]
@@ -87,10 +88,44 @@ namespace Game.GamePlay
         private void RegEvent()
         {
             _rewardSubscription?.Dispose();
+            _gamePassRewardSubscription?.Dispose();
 
             _rewardSubscription = _eventService.Observe<List<RewardClaimedEventData>, GameEvent>(GameEvent.OnRewardClaimByPopupDisplayReward)
                 .Subscribe(rewards => OnRewardClaimedAsync(rewards).Forget());
+
+            _gamePassRewardSubscription = _eventService.Observe<List<RewardClaimedEventData>, GameEvent>(GameEvent.OnRewardClaimByGamePass)
+                .Subscribe(LogGamePassRewardClaimed);
         }
+
+        private void LogGamePassRewardClaimed(List<RewardClaimedEventData> rewards)
+        {
+            if (rewards == null)
+            {
+                Debug.Log("[GamePass] Published rewards: null");
+                return;
+            }
+
+            if (rewards.Count == 0)
+            {
+                Debug.Log("[GamePass] Published rewards: empty");
+                return;
+            }
+
+            string rewardLog = string.Join(", ", rewards.Select(reward =>
+            {
+                string resourceType = string.IsNullOrEmpty(reward.ResourceType) ? "Unknown" : reward.ResourceType;
+                string amountText = string.IsNullOrEmpty(reward.AmountDisplayText)
+                    ? reward.Amount.ToString()
+                    : reward.AmountDisplayText;
+
+                return string.IsNullOrEmpty(reward.AmountDisplayText)
+                    ? $"{resourceType} x{amountText}"
+                    : $"{resourceType} {amountText}";
+            }));
+
+            Debug.Log($"[GamePass] Published rewards: {rewardLog}");
+        }
+
         private async UniTaskVoid OnRewardClaimedAsync(List<RewardClaimedEventData> rewards)
         {
             Debug.Log("OnRewardClaimedAsync called");
@@ -207,6 +242,7 @@ namespace Game.GamePlay
         private void OnDestroy()
         {
             _rewardSubscription?.Dispose();
+            _gamePassRewardSubscription?.Dispose();
         }
     }
 }
