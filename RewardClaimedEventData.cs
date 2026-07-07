@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Game.GamePlay
+namespace ChieChie.Constracts
 {
     public struct RewardClaimedEventData
     {

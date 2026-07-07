@@ -1,9 +1,8 @@
 using System.Collections.Generic;
 using ChieChie.Constracts;
-using ChieChie.Core;
 using UnityEngine;
 
-namespace Game.GamePlay
+namespace ChieChie.Core
 {
     public static class RewardClaimedEventDataHelper
     {
@@ -44,7 +43,7 @@ namespace Game.GamePlay
             );
         }
 
-        public static List<RewardClaimedEventData> FromBaseRewards(IEnumerable<BaseRewardData> rewards)
+        public static List<RewardClaimedEventData> FromBaseRewards(IEnumerable<IItemReward> rewards)
         {
             var rewardDataList = new List<RewardClaimedEventData>();
             if (rewards == null) return rewardDataList;
@@ -58,19 +57,19 @@ namespace Game.GamePlay
             return rewardDataList;
         }
 
-        public static RewardClaimedEventData FromBaseReward(BaseRewardData reward)
+        public static RewardClaimedEventData FromBaseReward(IItemReward reward)
         {
-            string typeKey = NormalizeResourceType(reward.resourceType);
-            Sprite rewardSprite = reward.isInfiniteReward && reward.iconInfiniteReward != null
-                ? reward.iconInfiniteReward
-                : reward.iconRewward;
+            string typeKey = NormalizeResourceType(reward.ResourceId);
+            Sprite rewardSprite = reward.IsInfiniteReward && reward.IsInfiniteReward != null
+                ? reward.InfinityRewardIcon
+                : reward.IconReward;
 
             return Create(
                 typeKey,
-                reward.amount,
+                reward.Amount,
                 rewardSprite,
-                reward.isInfiniteReward,
-                reward.infinityDuration
+                reward.IsInfiniteReward,
+                reward.InfinityDuration
             );
         }
 
