@@ -40,6 +40,14 @@ namespace ChieChie.GamePass
         public MilestoneState State;
         public UnityEngine.GameObject BonusBankIcon;
         public bool IsAvailable => MaxAmount > 0 && ExpConvertToAmount > 0;
+
+        public int ConvertBonusExpToAmount(int bonusExp)
+        {
+            if (!IsAvailable || bonusExp <= 0) return 0;
+
+            long amount = (long)bonusExp * ExpConvertToAmount;
+            return amount >= MaxAmount ? MaxAmount : (int)amount;
+        }
     }
 
     public class BonusMilestoneUIData

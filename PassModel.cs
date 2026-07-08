@@ -411,15 +411,18 @@ namespace ChieChie.GamePass
             if (!IsBonusBankConfigured()) return 0;
 
             int bonusExp = GetBonusExp(exp);
-            int amount = bonusExp / _database.BonusBankData.expConvertToAmount;
-            return Math.Min(amount, _database.BonusBankData.maxRewardAmount);
+            long amount = (long)bonusExp * _database.BonusBankData.expConvertToAmount;
+            return amount >= _database.BonusBankData.maxRewardAmount
+                ? _database.BonusBankData.maxRewardAmount
+                : (int)amount;
         }
 
         public int GetBonusBankRequiredExpToMax()
         {
             if (!IsBonusBankConfigured()) return 0;
 
-            long requiredExp = (long)_database.BonusBankData.maxRewardAmount * _database.BonusBankData.expConvertToAmount;
+            long requiredExp = (_database.BonusBankData.maxRewardAmount + (long)_database.BonusBankData.expConvertToAmount - 1) /
+                               _database.BonusBankData.expConvertToAmount;
             return requiredExp > int.MaxValue ? int.MaxValue : (int)requiredExp;
         }
 

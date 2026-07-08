@@ -217,6 +217,35 @@ namespace Game.GamePlay
             return true;
         }
 
+        public static bool TryGetBonusBankProgressTextAtExp(PassViewData viewData, int totalExp, out string progressText)
+        {
+            progressText = string.Empty;
+
+            var bonusBank = viewData?.BonusBank;
+            if (bonusBank == null || !bonusBank.IsAvailable) return false;
+
+            int totalNormalRequiredExp = GetTotalNormalRequiredExp(viewData);
+            if (totalExp < totalNormalRequiredExp) return false;
+
+            int bonusExp = Mathf.Max(0, totalExp - totalNormalRequiredExp);
+            int currentAmount = bonusBank.ConvertBonusExpToAmount(bonusExp);
+            progressText = $"{currentAmount}/{bonusBank.MaxAmount}";
+            return true;
+        }
+
+        private static int GetTotalNormalRequiredExp(PassViewData viewData)
+        {
+            if (viewData?.Milestones == null) return 0;
+
+            int totalRequiredExp = 0;
+            foreach (var milestone in viewData.Milestones)
+            {
+                totalRequiredExp += milestone.RequiredExp;
+            }
+
+            return totalRequiredExp;
+        }
+
         private void CalculateNormalProgress(PassViewData viewData, out int expInCurrentLevel, out int expRequiredForNextLevel, out bool isMaxNormalLevel)
         {
             int totalExpProgress = viewData.CurrentExp;

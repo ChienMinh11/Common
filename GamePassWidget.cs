@@ -135,20 +135,26 @@ namespace Game.GamePlay
                     fromViewData.CurrentExp,
                     toViewData.CurrentExp);
 
+                int stepStartExp = fromViewData.CurrentExp;
                 foreach (var step in animationSteps)
                 {
                     ct.ThrowIfCancellationRequested();
-                    expSlider.SetProgress(step.FromProgressPercentage, step.FromProgressText);
+
+                    string fromProgressText = GetAnimationProgressText(toViewData, stepStartExp, stepStartExp, step.FromProgressText);
+                    string toProgressText = GetAnimationProgressText(toViewData, stepStartExp, step.EvaluatedExpForClaimableCheck, step.ToProgressText);
+
+                    expSlider.SetProgress(step.FromProgressPercentage, fromProgressText);
                     await expSlider.PlaySliderAnimationAsync(
                         step.FromProgressPercentage, 
                         step.ToProgressPercentage, 
-                        step.FromProgressText, 
-                        step.ToProgressText, 
+                        fromProgressText,
+                        toProgressText,
                         ct
                     );
                     
-                    expSlider.SetProgress(step.ToProgressPercentage, step.ToProgressText);
+                    expSlider.SetProgress(step.ToProgressPercentage, toProgressText);
                     UpdateClaimableUI(toViewData, step.EvaluatedExpForClaimableCheck);
+                    stepStartExp = step.EvaluatedExpForClaimableCheck;
                 }
 
                 UpdateExpProgress(toViewData);
@@ -214,9 +220,7 @@ namespace Game.GamePlay
             if (viewData.BonusBank != null && viewData.BonusBank.State == MilestoneState.ReadyToClaim)
             {
                 int bonusExp = Mathf.Max(0, displayedExp - accumulatedNormalExp);
-                int displayedAmount = viewData.BonusBank.ExpConvertToAmount > 0
-                    ? bonusExp / viewData.BonusBank.ExpConvertToAmount
-                    : 0;
+                int displayedAmount = viewData.BonusBank.ConvertBonusExpToAmount(bonusExp);
 
                 if (displayedAmount >= viewData.BonusBank.MaxAmount)
                 {
@@ -225,6 +229,18 @@ namespace Game.GamePlay
             }
 
             return claimableCount;
+        }
+
+        private static string GetAnimationProgressText(PassViewData viewData, int stepStartExp, int totalExp, string fallbackText)
+        {
+            if (!GamePassExpSlider.TryGetBonusBankProgressTextAtExp(viewData, stepStartExp, out _))
+            {
+                return fallbackText;
+            }
+
+            return GamePassExpSlider.TryGetBonusBankProgressTextAtExp(viewData, totalExp, out string bonusBankText)
+                ? bonusBankText
+                : fallbackText;
         }
 
         private void CancelRefreshAnimation()

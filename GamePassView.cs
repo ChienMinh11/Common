@@ -243,19 +243,24 @@ namespace Game.GamePlay
                 OnStartFlow();
 
                 int topSliderAnimatedExp = fromViewData.CurrentExp;
+                int stepStartExp = fromViewData.CurrentExp;
                 foreach (var step in animationSteps)
                 {
                     ct.ThrowIfCancellationRequested();
 
+                    string fromProgressText = GetAnimationProgressText(toViewData, stepStartExp, stepStartExp, step.FromProgressText);
+                    string toProgressText = GetAnimationProgressText(toViewData, stepStartExp, step.EvaluatedExpForClaimableCheck, step.ToProgressText);
+
                     await expSlider.PlaySliderAnimationAsync(
                         step.FromProgressPercentage,
                         step.ToProgressPercentage,
-                        step.FromProgressText,
-                        step.ToProgressText,
+                        fromProgressText,
+                        toProgressText,
                         ct
                     );
 
                     topSliderAnimatedExp = step.EvaluatedExpForClaimableCheck;
+                    stepStartExp = topSliderAnimatedExp;
                     UpdateLevelText(toViewData, topSliderAnimatedExp);
                 }
 
@@ -379,6 +384,18 @@ namespace Game.GamePlay
             }
 
             return calculatedMilestoneIndex;
+        }
+
+        private static string GetAnimationProgressText(PassViewData viewData, int stepStartExp, int totalExp, string fallbackText)
+        {
+            if (!GamePassExpSlider.TryGetBonusBankProgressTextAtExp(viewData, stepStartExp, out _))
+            {
+                return fallbackText;
+            }
+
+            return GamePassExpSlider.TryGetBonusBankProgressTextAtExp(viewData, totalExp, out string bonusBankText)
+                ? bonusBankText
+                : fallbackText;
         }
 
         private static float GetCompletedMilestoneSliderProgress(PassViewData viewData, int currentExp, int milestoneIndex)
