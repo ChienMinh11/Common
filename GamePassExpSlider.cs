@@ -151,6 +151,11 @@ namespace Game.GamePlay
                 return false; 
             }
 
+            if (TryGetBonusBankProgress(viewData, out expText, out progressFraction))
+            {
+                return true;
+            }
+
             if (viewData.BonusMilestones == null || viewData.BonusMilestones.Count == 0)
             {
                 expText = COMPLETED;
@@ -192,6 +197,23 @@ namespace Game.GamePlay
                 progressFraction = bonusExpRequiredForNext > 0 ? (float)expInCurrentBonus / bonusExpRequiredForNext : 0f;
             }
 
+            return true;
+        }
+
+        private bool TryGetBonusBankProgress(PassViewData viewData, out string expText, out float progressFraction)
+        {
+            expText = string.Empty;
+            progressFraction = 0f;
+
+            var bonusBank = viewData.BonusBank;
+            if (bonusBank == null || !bonusBank.IsAvailable)
+            {
+                return false;
+            }
+
+            int currentAmount = Mathf.Clamp(bonusBank.CurrentAmount, 0, bonusBank.MaxAmount);
+            expText = $"{currentAmount}/{bonusBank.MaxAmount}";
+            progressFraction = bonusBank.MaxAmount > 0 ? (float)currentAmount / bonusBank.MaxAmount : 0f;
             return true;
         }
 

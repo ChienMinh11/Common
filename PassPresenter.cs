@@ -33,6 +33,7 @@ namespace ChieChie.GamePass
                 _activeViews.Add(view);
                 view.OnClaimRewardClicked += HandleClaimReward;
                 view.OnClaimBonusClicked += HandleClaimBonus;
+                view.OnClaimBonusBankClicked += HandleClaimBonusBank;
                 view.OnBuyPremiumClicked += HandleBuyPremium;
 
                 RefreshView(view, UpdateViewDataForView(view));
@@ -45,6 +46,7 @@ namespace ChieChie.GamePass
             {
                 view.OnClaimRewardClicked -= HandleClaimReward;
                 view.OnClaimBonusClicked -= HandleClaimBonus;
+                view.OnClaimBonusBankClicked -= HandleClaimBonusBank;
                 view.OnBuyPremiumClicked -= HandleBuyPremium;
                 _activeViews.Remove(view);
             }
@@ -140,6 +142,22 @@ namespace ChieChie.GamePass
                 });
             }
 
+            if (_model.HasBonusBank)
+            {
+                var bonusBankData = _database.BonusBankData;
+                viewData.BonusBank = new BonusBankUIData
+                {
+                    CurrentAmount = _model.GetBonusBankAmount(displayedExp),
+                    MaxAmount = bonusBankData.maxRewardAmount,
+                    ExpConvertToAmount = bonusBankData.expConvertToAmount,
+                    RequiredExpToMax = _model.GetBonusBankRequiredExpToMax(),
+                    IsUnlocked = _model.IsNormalPassCompleted(displayedExp),
+                    Rewards = _model.GetBonusBankRewards(displayedExp),
+                    State = _model.GetBonusBankState(displayedExp),
+                    BonusBankIcon = bonusBankData.bonusBankIcon
+                };
+            }
+
             return viewData;
         }
 
@@ -158,6 +176,11 @@ namespace ChieChie.GamePass
         private void HandleClaimBonus(int index)
         {
             _model.ClaimBonusReward(index);
+        }
+
+        private void HandleClaimBonusBank()
+        {
+            _model.ClaimBonusBankReward();
         }
 
         private void HandleBuyPremium()

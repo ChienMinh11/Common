@@ -22,6 +22,7 @@ namespace ChieChie.GamePass
         public List<int> claimedFreeMilestones = new List<int>();
         public List<int> claimedPremiumMilestones = new List<int>();
         public List<int> claimedBonusMilestones = new List<int>();
+        public bool isBonusBankClaimed;
     }
 
     public interface IPassSaveAdapter

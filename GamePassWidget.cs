@@ -33,6 +33,7 @@ namespace Game.GamePlay
 
         public event Action<int, bool> OnClaimRewardClicked;
         public event Action<int> OnClaimBonusClicked;
+        public event Action OnClaimBonusBankClicked;
         public event Action OnBuyPremiumClicked;
         public string ViewId => string.IsNullOrEmpty(viewId) ? nameof(GamePassWidget) : viewId;
         public SideWidgetStructConfig Config => config;
@@ -207,6 +208,19 @@ namespace Game.GamePlay
                 {
                     if (bonusExp < bonus.RequiredExp) continue;
                     if (bonus.State == MilestoneState.ReadyToClaim) claimableCount++;
+                }
+            }
+
+            if (viewData.BonusBank != null && viewData.BonusBank.State == MilestoneState.ReadyToClaim)
+            {
+                int bonusExp = Mathf.Max(0, displayedExp - accumulatedNormalExp);
+                int displayedAmount = viewData.BonusBank.ExpConvertToAmount > 0
+                    ? bonusExp / viewData.BonusBank.ExpConvertToAmount
+                    : 0;
+
+                if (displayedAmount >= viewData.BonusBank.MaxAmount)
+                {
+                    claimableCount++;
                 }
             }
 

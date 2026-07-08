@@ -59,6 +59,7 @@ namespace Game.GamePlay
 
         public event Action<int, bool> OnClaimRewardClicked;
         public event Action<int> OnClaimBonusClicked;
+        public event Action OnClaimBonusBankClicked;
         public event Action OnBuyPremiumClicked;
 
         private readonly List<GameObject> _spawnedItems = new List<GameObject>();
@@ -192,6 +193,18 @@ namespace Game.GamePlay
                 for (int i = sortedBonus.Count; i < _bonusPool.Count; i++)
                 {
                     _bonusPool[i].gameObject.SetActive(false);
+                }
+            }
+
+            if (_bonusBankMilestoneUiItem != null)
+            {
+                if (viewData.BonusBank != null && viewData.BonusBank.IsAvailable)
+                {
+                    _bonusBankMilestoneUiItem.Setup(viewData.BonusBank, HandleClaimBonusBankItem, HandleRewardInfoRequest);
+                }
+                else
+                {
+                    _bonusBankMilestoneUiItem.gameObject.SetActive(false);
                 }
             }
 
@@ -440,6 +453,16 @@ namespace Game.GamePlay
             OnClaimBonusClicked?.Invoke(index);
         }
 
+        private void HandleClaimBonusBankItem()
+        {
+            Transform spawnTransform = _bonusBankMilestoneUiItem != null
+                ? _bonusBankMilestoneUiItem.GetRewardIconTransform()
+                : transform;
+
+            PublishClaimedRewards(GetClaimableBonusBankRewards(), spawnTransform);
+            OnClaimBonusBankClicked?.Invoke();
+        }
+
         private void HandleRewardInfoRequest(IReadOnlyList<IItemReward> rewards, Transform anchor)
         {
             if (rewardInfoPanel == null) return;
@@ -484,6 +507,14 @@ namespace Game.GamePlay
             if (bonusMilestone == null || bonusMilestone.State != MilestoneState.ReadyToClaim) return null;
 
             return bonusMilestone.Rewards;
+        }
+
+        private List<IItemReward> GetClaimableBonusBankRewards()
+        {
+            var bonusBank = _lastViewData?.BonusBank;
+            if (bonusBank == null || bonusBank.State != MilestoneState.ReadyToClaim) return null;
+
+            return bonusBank.Rewards;
         }
 
         private void PublishClaimedRewards(IEnumerable<IItemReward> rewards, Transform spawnTransform)

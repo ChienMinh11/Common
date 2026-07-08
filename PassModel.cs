@@ -20,6 +20,7 @@ namespace ChieChie.GamePass
         public int CurrentExp => _saveData.currentExp;
         public bool HasDelayedUIUpdate => _saveData != null && _saveData.hasDelayedUIUpdate;
         public bool IsPremiumUnlocked => _saveData.isPremiumUnlocked;
+        public bool HasBonusBank => IsBonusBankConfigured();
         public string EventId => _saveData.currentEventId; // Lấy theo ID đang chạy trong SaveData thay vì scheduler
         public List<IItemReward> AutoClaimedRewards { get; private set; } = new List<IItemReward>();
         private readonly List<IPassRewardModifier> _rewardModifiers = new List<IPassRewardModifier>();
@@ -226,6 +227,16 @@ namespace ChieChie.GamePass
                     }
                 }
             }
+
+            if (!oldData.isBonusBankClaimed && GetBonusBankAmount(oldData.currentExp) >= GetBonusBankMaxAmount())
+            {
+                var bonusBankReward = CreateBonusBankReward(GetBonusBankMaxAmount());
+                if (bonusBankReward != null)
+                {
+                    AutoClaimedBonusRewards.Add(bonusBankReward);
+                    AutoClaimedRewards.Add(bonusBankReward);
+                }
+            }
         }
 
         public List<IItemReward> GetFinalRewards(int index, bool isPremium, bool isBonus, List<IItemReward> originalRewards)
@@ -385,6 +396,96 @@ namespace ChieChie.GamePass
             return Math.Max(0, bonusExp);
         }
 
+        public bool IsNormalPassCompleted(int exp)
+        {
+            return exp >= _totalRequiredNormalExp;
+        }
+
+        public int GetBonusBankAmount()
+        {
+            return GetBonusBankAmount(_saveData.currentExp);
+        }
+
+        public int GetBonusBankAmount(int exp)
+        {
+            if (!IsBonusBankConfigured()) return 0;
+
+            int bonusExp = GetBonusExp(exp);
+            int amount = bonusExp / _database.BonusBankData.expConvertToAmount;
+            return Math.Min(amount, _database.BonusBankData.maxRewardAmount);
+        }
+
+        public int GetBonusBankRequiredExpToMax()
+        {
+            if (!IsBonusBankConfigured()) return 0;
+
+            long requiredExp = (long)_database.BonusBankData.maxRewardAmount * _database.BonusBankData.expConvertToAmount;
+            return requiredExp > int.MaxValue ? int.MaxValue : (int)requiredExp;
+        }
+
+        public int GetBonusBankMaxAmount()
+        {
+            return IsBonusBankConfigured() ? _database.BonusBankData.maxRewardAmount : 0;
+        }
+
+        public MilestoneState GetBonusBankState()
+        {
+            return GetBonusBankState(_saveData.currentExp);
+        }
+
+        public MilestoneState GetBonusBankState(int exp)
+        {
+            if (!IsBonusBankConfigured()) return MilestoneState.Locked;
+            if (_saveData.isBonusBankClaimed) return MilestoneState.Claimed;
+
+            return GetBonusBankAmount(exp) >= _database.BonusBankData.maxRewardAmount
+                ? MilestoneState.ReadyToClaim
+                : MilestoneState.Locked;
+        }
+
+        public List<IItemReward> GetBonusBankRewards()
+        {
+            return GetBonusBankRewards(_saveData.currentExp);
+        }
+
+        public List<IItemReward> GetBonusBankRewards(int exp)
+        {
+            var reward = CreateBonusBankReward(GetBonusBankAmount(exp));
+            return reward == null ? new List<IItemReward>() : new List<IItemReward> { reward };
+        }
+
+        public bool ClaimBonusBankReward()
+        {
+            if (GetBonusBankState() != MilestoneState.ReadyToClaim)
+                return false;
+
+            int claimAmount = GetBonusBankMaxAmount();
+            var reward = CreateBonusBankReward(claimAmount);
+            if (reward == null) return false;
+
+            _saveData.isBonusBankClaimed = true;
+            OnRewardsClaimed?.Invoke(new List<IItemReward> { reward });
+
+            _passSaveAdapter.SaveData(_saveData);
+            NotifyDataChanged();
+            return true;
+        }
+
+        private bool IsBonusBankConfigured()
+        {
+            var bonusBankData = _database != null ? _database.BonusBankData : null;
+            return bonusBankData != null &&
+                   bonusBankData.maxRewardAmount > 0 &&
+                   bonusBankData.expConvertToAmount > 0 &&
+                   !string.IsNullOrEmpty(bonusBankData.ResourceId);
+        }
+
+        private IItemReward CreateBonusBankReward(int amount)
+        {
+            if (!IsBonusBankConfigured() || amount <= 0) return null;
+            return new BonusBankReward(_database.BonusBankData, amount);
+        }
+
         public MilestoneState GetBonusMilestoneState(int index)
         {
             return GetBonusMilestoneState(index, _saveData.currentExp);
@@ -484,6 +585,24 @@ namespace ChieChie.GamePass
         public void Cleanup()
         {
             OnDataChanged = null;
+        }
+
+        private class BonusBankReward : IItemReward
+        {
+            private readonly PassBonusBankData _bonusBankData;
+
+            public BonusBankReward(PassBonusBankData bonusBankData, long amount)
+            {
+                _bonusBankData = bonusBankData;
+                Amount = amount;
+            }
+
+            public string ResourceId => _bonusBankData.ResourceId;
+            public long Amount { get; }
+            public bool IsInfiniteReward => false;
+            public float InfinityDuration => 0f;
+            public UnityEngine.Sprite IconReward => _bonusBankData.Identity != null ? _bonusBankData.Identity.Icon : null;
+            public UnityEngine.Sprite InfinityRewardIcon => _bonusBankData.Identity != null ? _bonusBankData.Identity.InfinityIcon : null;
         }
     }
 }
