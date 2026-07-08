@@ -10,6 +10,7 @@ namespace ChieChie.Shop
         private readonly IShopIapBrigde _iapBridge;
         private readonly ShopConfig _shopConfig;
         private readonly ShopStorage _shopStorage;
+        private readonly ShopOfferAvailabilityService _offerAvailabilityService;
         private readonly Dictionary<string, IShopItemData> _shopItemCache;
 
         public event Action<string, string> OnPurchaseSuccess;
@@ -21,15 +22,17 @@ namespace ChieChie.Shop
         public event Action<string> OnBuySuccessExternal;
         public event Action<List<ResourceRewardCommand>> OnRequestAddResource;
 
-        public ShopModel(IShopIapBrigde iapBridge, IShopSaveAdapter saveAdapter, ShopConfig shopConfig)
+        public ShopModel(IShopIapBrigde iapBridge, IShopSaveAdapter saveAdapter, ShopConfig shopConfig, ShopOfferAvailabilityService offerAvailabilityService = null)
         {
             _iapBridge = iapBridge;
             _shopConfig = shopConfig;
             _shopStorage = new ShopStorage(saveAdapter);
+            _offerAvailabilityService = offerAvailabilityService ?? new ShopOfferAvailabilityService();
             
             _shopItemCache = new Dictionary<string, IShopItemData>();
             foreach (var item in _shopConfig.ShopItems)
             {
+                if (item == null) continue;
                 if (string.IsNullOrEmpty(item.ProductID)) continue;
 
                 if (!_shopItemCache.ContainsKey(item.ProductID))
@@ -47,7 +50,36 @@ namespace ChieChie.Shop
             _iapBridge.OnPriceUpdated += HandlePriceUpdated;
         }
 
-        public IReadOnlyList<IShopItemData> GetShopItems() => _shopConfig.ShopItems;
+        public IReadOnlyList<IShopItemData> GetShopItems()
+        {
+            var visibleItems = new List<(IShopItemData item, int priority, int index)>();
+            for (int i = 0; i < _shopConfig.ShopItems.Count; i++)
+            {
+                var item = _shopConfig.ShopItems[i];
+                if (item == null) continue;
+                if (_offerAvailabilityService.ShouldShow(item))
+                {
+                    visibleItems.Add((item, _offerAvailabilityService.GetPriority(item), i));
+                }
+            }
+
+            visibleItems.Sort((left, right) =>
+            {
+                int priorityComparison = right.priority.CompareTo(left.priority);
+                if (priorityComparison != 0) return priorityComparison;
+                return left.index.CompareTo(right.index);
+            });
+
+            var orderedItems = new List<IShopItemData>(visibleItems.Count);
+            foreach (var visibleItem in visibleItems)
+            {
+                orderedItems.Add(visibleItem.item);
+            }
+
+            return orderedItems;
+        }
+
+        public IReadOnlyList<IShopItemData> GetConfiguredShopItems() => _shopConfig.ShopItems;
         
         public bool IsItemOwned(string productId)
         {
@@ -98,7 +130,38 @@ namespace ChieChie.Shop
                 return;
             }
 
+            var availabilityStatus = _offerAvailabilityService.GetStatus(itemData);
+            if (!availabilityStatus.CanPurchase)
+            {
+                string reason = string.IsNullOrEmpty(availabilityStatus.Reason)
+                    ? "Goi nay hien khong mo ban."
+                    : availabilityStatus.Reason;
+                OnPurchaseFailed?.Invoke(productId, reason);
+                return;
+            }
+
             _iapBridge.BuyProduct(productId);
+        }
+
+        public bool IsOfferAvailable(string productId)
+        {
+            if (!_shopItemCache.TryGetValue(productId, out var itemData)) return false;
+            return _offerAvailabilityService.GetStatus(itemData).IsAvailable;
+        }
+
+        public bool TryGetOfferTimeRemaining(string productId, out TimeSpan remaining)
+        {
+            remaining = TimeSpan.Zero;
+            if (!_shopItemCache.TryGetValue(productId, out var itemData)) return false;
+
+            var status = _offerAvailabilityService.GetStatus(itemData);
+            if (!status.HasSchedule || !status.ShowCountdown || !status.IsAvailable || !status.HasEndTime)
+            {
+                return false;
+            }
+
+            remaining = status.TimeRemaining;
+            return remaining > TimeSpan.Zero;
         }
 
         private void HandlePurchaseSuccess(string productId)

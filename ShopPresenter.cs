@@ -30,9 +30,10 @@ namespace ChieChie.Shop
             if (!_activeViews.Contains(view))
             {
                 _activeViews.Add(view);
-                view.Initialize(_model.GetShopItems());
+                var shopItems = _model.GetShopItems();
+                view.Initialize(shopItems);
                 view.SetBuyItemCallback(OnBuyItemRequested);
-                foreach (var item in _model.GetShopItems())
+                foreach (var item in shopItems)
                 {
                     string price = _model.GetLocalizedPrice(item.ProductID);
                     if (!string.IsNullOrEmpty(price)) view.UpdatePrice(item.ProductID, price);
@@ -50,10 +51,11 @@ namespace ChieChie.Shop
         private void BuildRewardIconCache()
         {
             _rewardIconCache.Clear();
-            var shopItems = _model.GetShopItems();
+            var shopItems = _model.GetConfiguredShopItems();
 
             foreach (var item in shopItems)
             {
+                if (item == null) continue;
                 foreach (var reward in item.Rewards)
                 {
                     if (string.IsNullOrEmpty(reward.ResourceId)) continue;
@@ -143,18 +145,17 @@ namespace ChieChie.Shop
 
         public bool IsItemOwned(string productId)
         {
-            var items = _model.GetShopItems();
-            IShopItemData itemData = null;
-            for (int i = 0; i < items.Count; i++)
-            {
-                if (items[i].ProductID == productId)
-                {
-                    itemData = items[i];
-                    break;
-                }
-            }
-            if (itemData == null) return false;
             return _model.IsItemOwned(productId);
+        }
+
+        public bool IsOfferAvailable(string productId)
+        {
+            return _model.IsOfferAvailable(productId);
+        }
+
+        public bool TryGetOfferTimeRemaining(string productId, out TimeSpan remaining)
+        {
+            return _model.TryGetOfferTimeRemaining(productId, out remaining);
         }
 
         public void RefreshShopItemsUI()
@@ -162,7 +163,13 @@ namespace ChieChie.Shop
             CleanUpDestroyedViews();
             foreach (var view in _activeViews)
             {
-                view.Initialize(_model.GetShopItems());
+                var shopItems = _model.GetShopItems();
+                view.Initialize(shopItems);
+                foreach (var item in shopItems)
+                {
+                    string price = _model.GetLocalizedPrice(item.ProductID);
+                    if (!string.IsNullOrEmpty(price)) view.UpdatePrice(item.ProductID, price);
+                }
             }
         }
 

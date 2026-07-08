@@ -15,6 +15,7 @@ namespace ChieChie.Shop
         private ShopModel _shopModel;
         private readonly IShopIapBrigde _iapBridge;
         private readonly IShopSaveAdapter _saveAdapter;
+        private readonly IShopTimeProvider _timeProvider;
         
         public event Action<string> OnBuySuccess;
         public event Action<List<ResourceRewardCommand>> OnRequestAddResource;
@@ -22,16 +23,18 @@ namespace ChieChie.Shop
        
         public bool IsInitialized { get; set; }
 
-        public ShopManager(ShopConfig shopConfig, IShopIapBrigde iapBridge, IShopSaveAdapter saveAdapter)
+        public ShopManager(ShopConfig shopConfig, IShopIapBrigde iapBridge, IShopSaveAdapter saveAdapter, IShopTimeProvider timeProvider = null)
         {
             _config = shopConfig;
             _iapBridge = iapBridge;
-            _saveAdapter = saveAdapter; 
+            _saveAdapter = saveAdapter;
+            _timeProvider = timeProvider;
         }
 
         public UniTask<bool> InitializeAsync(CancellationToken cancellationToken)
         {
-            _shopModel = new ShopModel(_iapBridge, _saveAdapter, _config);
+            var offerAvailabilityService = new ShopOfferAvailabilityService(_timeProvider);
+            _shopModel = new ShopModel(_iapBridge, _saveAdapter, _config, offerAvailabilityService);
             Presenter = new ShopPresenter(_shopModel);
             
             _shopModel.OnBuySuccessExternal += HandleBuySuccessExternal;
@@ -68,7 +71,17 @@ namespace ChieChie.Shop
 
         public Sprite GetIconResourceReward(string resourceType, bool isInfinite) => Presenter?.GetIconResourceReward(resourceType, isInfinite);
 
-        public bool IsItemOwned(string productId) => Presenter.IsItemOwned(productId);
+        public bool IsItemOwned(string productId) => Presenter != null && Presenter.IsItemOwned(productId);
+
+        public bool IsOfferAvailable(string productId) => Presenter != null && Presenter.IsOfferAvailable(productId);
+
+        public bool TryGetOfferTimeRemaining(string productId, out TimeSpan remaining)
+        {
+            remaining = TimeSpan.Zero;
+            return Presenter != null && Presenter.TryGetOfferTimeRemaining(productId, out remaining);
+        }
+
+        public void RefreshShopItems() => Presenter?.RefreshShopItemsUI();
 
         public void ResetPackTimeLimited(string id) => Presenter?.ResetPackAndRefresh(id);
        

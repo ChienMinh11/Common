@@ -6,7 +6,7 @@ using UnityEngine;
 namespace ChieChie.Shop
 {
     [CreateAssetMenu(fileName = "NewShopItem", menuName = "CORE/Feature/ShopItem")]
-    public class ShopItemData:ScriptableObject,IShopItemData
+    public class ShopItemData:ScriptableObject,IShopItemData,IShopOfferAvailabilityData
     {
         [Header("Identity Reference")]
         [Tooltip("Kéo thả ScriptableObject (có implement IShopProductIdentitySource) vào đây")]
@@ -33,6 +33,10 @@ namespace ChieChie.Shop
         public List<ItemReward> rewards = new List<ItemReward>();
         public bool isOneTimePurchase;
         public bool isTimeLimited;
+
+        [Header("Offer Availability")]
+        [SerializeField] private ShopOfferAvailability offerAvailability = new ShopOfferAvailability();
+
         [Header("Exclusive Settings")]
         [Tooltip("Khi mua gói này, các gói có ProductID trong danh sách này cũng sẽ được ẩn đi / coi như đã sở hữu")]
         [SerializeField] private List<UnityEngine.Object> exclusiveProductSources = new List<UnityEngine.Object>();
@@ -76,6 +80,18 @@ namespace ChieChie.Shop
         public Sprite Icon => icon;
         public bool IsOneTimePurchase => isOneTimePurchase;
         public bool IsTimeLimited => isTimeLimited;
+        public IShopOfferAvailability OfferAvailability
+        {
+            get
+            {
+                if (offerAvailability == null)
+                {
+                    offerAvailability = new ShopOfferAvailability();
+                }
+
+                return offerAvailability;
+            }
+        }
 
         public List<IItemReward> Rewards => rewards.ConvertAll(x => (IItemReward)x);
 

@@ -10,6 +10,9 @@ namespace ChieChie.Constracts
         void UnregisterView(IShopView view);
         Sprite GetIconResourceReward(string resourceType, bool isInfinite);
         bool IsItemOwned(string productId);
+        bool IsOfferAvailable(string productId);
+        bool TryGetOfferTimeRemaining(string productId, out TimeSpan remaining);
+        void RefreshShopItems();
         void ResetPackTimeLimited(string id);
         event Action<string> OnBuySuccess;
         event Action<List<ResourceRewardCommand>> OnRequestAddResource;
