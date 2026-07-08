@@ -1,22 +1,21 @@
-using ChieChie.Constracts;
 using ChieChie.Core;
 using UnityEngine;
 using VContainer;
 
 namespace Game.GamePlay
 {
-    public class ButtonShowPopupShop : MonoBehaviour
+    public class ButtonShowPopupPass : MonoBehaviour
     {
         private IPopupService _popupService;
         [Inject]
-        private void Construct(IPopupService popupService)
+        private void Contructor(IPopupService popupService)
         {
             _popupService = popupService;
         }
 
-        public void OnShowPopupShop()
+        public void OnShowPopup()
         {
-            _popupService.ShowPopup("PopupTest1");
+            _popupService.ShowPopup("PopupGamePass","",false,true);
         }
     }
 }

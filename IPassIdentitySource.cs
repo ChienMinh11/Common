@@ -1,8 +1,8 @@
 using UnityEngine;
 
-namespace ChieChie.Shop
+namespace ChieChie.GamePass
 {
-    public interface IShopIdentitySource 
+    public interface IPassIdentitySource
     {
         string ResourceId { get; }
         Sprite Icon { get; }
