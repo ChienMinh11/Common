@@ -8,21 +8,22 @@ namespace ChieChie.Shop
     public class ShopOfferAvailability : IShopOfferAvailability
     {
         [SerializeField] private bool useSchedule;
-
-        [Tooltip("UTC start time. Empty means available immediately. Supports ISO text like 2026-07-08T00:00:00Z or Unix seconds.")]
+        [SerializeField] private ShopScheduleType scheduleType;
         [SerializeField] private string startTimeUtc;
-
-        [Tooltip("UTC end time. Empty means no end time. Supports ISO text like 2026-07-15T00:00:00Z or Unix seconds.")]
         [SerializeField] private string endTimeUtc;
-
+        [SerializeField] private long relativeDurationSeconds;
+        [SerializeField] private string periodicDaysOfWeek;
         [SerializeField] private bool hideWhenUnavailable = true;
         [SerializeField] private bool blockPurchaseWhenUnavailable = true;
         [SerializeField] private bool showCountdown = true;
         [SerializeField] private int priority;
 
         public bool UseSchedule => useSchedule;
+        public ShopScheduleType ScheduleType => scheduleType;
         public string StartTimeUtc => startTimeUtc;
         public string EndTimeUtc => endTimeUtc;
+        public long RelativeDurationSeconds => relativeDurationSeconds;
+        public string PeriodicDaysOfWeek => periodicDaysOfWeek;
         public bool HideWhenUnavailable => hideWhenUnavailable;
         public bool BlockPurchaseWhenUnavailable => blockPurchaseWhenUnavailable;
         public bool ShowCountdown => showCountdown;

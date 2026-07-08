@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Collections.Generic;
 using ChieChie.Constracts;
 
 namespace ChieChie.Shop
@@ -7,15 +8,15 @@ namespace ChieChie.Shop
     public class ShopOfferAvailabilityService
     {
         private static readonly DateTime UnixEpochUtc = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-
         private readonly ITimeProvider _timeProvider;
 
-        public ShopOfferAvailabilityService( ITimeProvider timeProvider = null)
+        public ShopOfferAvailabilityService(ITimeProvider timeProvider = null)
         {
             _timeProvider = timeProvider;
         }
 
-        public ShopOfferAvailabilityStatus GetStatus(IShopItemData itemData)
+        // Thêm tham số optional dynamicTriggerTime để xử lý thời gian tương đối (ví dụ: Ngày tạo account)
+        public ShopOfferAvailabilityStatus GetStatus(IShopItemData itemData, DateTime? dynamicTriggerTime = null)
         {
             var availability = GetAvailability(itemData);
             if (availability == null || !availability.UseSchedule)
@@ -29,47 +30,115 @@ namespace ChieChie.Shop
                 ShowCountdown = availability.ShowCountdown
             };
 
+            var nowUtc = _timeProvider.UtcNow;
+            if (nowUtc.Kind != DateTimeKind.Utc) nowUtc = nowUtc.ToUniversalTime();
+
+            // Phân nhánh xử lý theo từng loại ScheduleType
+            switch (availability.ScheduleType)
+            {
+                case ShopScheduleType.RelativeDuration:
+                    ProcessRelativeSchedule(availability, status, nowUtc, dynamicTriggerTime);
+                    break;
+
+                case ShopScheduleType.PeriodicWeekly:
+                    ProcessPeriodicSchedule(availability, status, nowUtc);
+                    break;
+
+                case ShopScheduleType.FixedSchedule:
+                default:
+                    ProcessFixedSchedule(availability, status, nowUtc);
+                    break;
+            }
+
+            return status;
+        }
+
+        private void ProcessFixedSchedule(IShopOfferAvailability availability, ShopOfferAvailabilityStatus status, DateTime nowUtc)
+        {
             DateTime startTimeUtc;
             DateTime endTimeUtc;
             bool hasStartTime = TryReadOptionalUtc(availability.StartTimeUtc, out startTimeUtc);
             bool hasEndTime = TryReadOptionalUtc(availability.EndTimeUtc, out endTimeUtc);
 
-            if (HasValue(availability.StartTimeUtc) && !hasStartTime)
-            {
-                return CreateInvalidStatus(availability, "Cau hinh start time cua goi khong hop le.");
-            }
-
-            if (HasValue(availability.EndTimeUtc) && !hasEndTime)
-            {
-                return CreateInvalidStatus(availability, "Cau hinh end time cua goi khong hop le.");
-            }
-
-            if (hasStartTime && hasEndTime && startTimeUtc >= endTimeUtc)
-            {
-                return CreateInvalidStatus(availability, "Start time phai nho hon end time.");
-            }
-
-            var nowUtc = _timeProvider.UtcNow;
-            if (nowUtc.Kind != DateTimeKind.Utc)
-            {
-                nowUtc = nowUtc.ToUniversalTime();
-            }
-
-            bool notStarted = hasStartTime && nowUtc < startTimeUtc;
-            bool expired = hasEndTime && nowUtc >= endTimeUtc;
-            bool isAvailable = !notStarted && !expired;
+            if (HasValue(availability.StartTimeUtc) && !hasStartTime) { SetInvalid(status, availability, "Cau hinh start time khong hop le."); return; }
+            if (HasValue(availability.EndTimeUtc) && !hasEndTime) { SetInvalid(status, availability, "Cau hinh end time khong hop le."); return; }
+            if (hasStartTime && hasEndTime && startTimeUtc >= endTimeUtc) { SetInvalid(status, availability, "Start time phai nho hon end time."); return; }
 
             status.HasStartTime = hasStartTime;
             status.HasEndTime = hasEndTime;
             status.StartTimeUtc = startTimeUtc;
             status.EndTimeUtc = endTimeUtc;
+
+            EvaluateAvailabilityTimings(status, nowUtc, startTimeUtc, endTimeUtc, hasStartTime, hasEndTime, availability);
+        }
+
+        private void ProcessRelativeSchedule(IShopOfferAvailability availability, ShopOfferAvailabilityStatus status, DateTime nowUtc, DateTime? dynamicTriggerTime)
+        {
+            // Nếu không truyền mốc thời gian bắt đầu của user, coi như gói chạy từ lúc mở game (hoặc bạn gán cụ thể ngày tạo tài khoản vào đây)
+            DateTime startPoint = dynamicTriggerTime ?? nowUtc;
+            DateTime endPoint = startPoint.AddSeconds(availability.RelativeDurationSeconds);
+
+            status.HasStartTime = true;
+            status.HasEndTime = true;
+            status.StartTimeUtc = startPoint;
+            status.EndTimeUtc = endPoint;
+
+            EvaluateAvailabilityTimings(status, nowUtc, startPoint, endPoint, true, true, availability);
+        }
+
+        private void ProcessPeriodicSchedule(IShopOfferAvailability availability, ShopOfferAvailabilityStatus status, DateTime nowUtc)
+        {
+            if (string.IsNullOrEmpty(availability.PeriodicDaysOfWeek))
+            {
+                SetInvalid(status, availability, "Chua cau hinh cac ngay lap lai trong tuan.");
+                return;
+            }
+
+            // Phân tích chuỗi ngày: "Friday,Saturday,Sunday"
+            var activeDays = new HashSet<DayOfWeek>();
+            var tokens = availability.PeriodicDaysOfWeek.Split(',');
+            foreach (var token in tokens)
+            {
+                if (Enum.TryParse<DayOfWeek>(token.Trim(), true, out var day))
+                {
+                    activeDays.Add(day);
+                }
+            }
+
+            bool isTodayAvailable = activeDays.Contains(nowUtc.DayOfWeek);
+            status.IsAvailable = isTodayAvailable;
+            status.ShouldShow = isTodayAvailable || !availability.HideWhenUnavailable;
+            status.CanPurchase = isTodayAvailable || !availability.BlockPurchaseWhenUnavailable;
+
+            if (isTodayAvailable)
+            {
+                // Thời gian kết thúc của ngày hôm nay (23:59:59)
+                DateTime endOfToday = nowUtc.Date.AddDays(1);
+                status.TimeRemaining = endOfToday - nowUtc;
+                status.HasEndTime = true;
+                status.EndTimeUtc = endOfToday;
+                status.Reason = string.Empty;
+            }
+            else
+            {
+                status.TimeRemaining = TimeSpan.Zero;
+                status.Reason = "Goi nay khong mo ban trong ngay hom nay.";
+            }
+        }
+
+        private void EvaluateAvailabilityTimings(ShopOfferAvailabilityStatus status, DateTime nowUtc, DateTime start, DateTime end, bool hasStart, bool hasEnd, IShopOfferAvailability availability)
+        {
+            bool notStarted = hasStart && nowUtc < start;
+            bool expired = hasEnd && nowUtc >= end;
+            bool isAvailable = !notStarted && !expired;
+
             status.IsAvailable = isAvailable;
             status.ShouldShow = isAvailable || !availability.HideWhenUnavailable;
             status.CanPurchase = isAvailable || !availability.BlockPurchaseWhenUnavailable;
 
             if (notStarted)
             {
-                status.TimeUntilStart = startTimeUtc - nowUtc;
+                status.TimeUntilStart = start - nowUtc;
                 status.Reason = "Goi nay chua mo ban.";
             }
             else if (expired)
@@ -79,98 +148,44 @@ namespace ChieChie.Shop
             }
             else
             {
-                status.TimeRemaining = hasEndTime ? endTimeUtc - nowUtc : TimeSpan.Zero;
+                status.TimeRemaining = hasEnd ? end - nowUtc : TimeSpan.Zero;
                 status.Reason = string.Empty;
             }
-
-            return status;
         }
 
-        public bool ShouldShow(IShopItemData itemData)
+        private void SetInvalid(ShopOfferAvailabilityStatus status, IShopOfferAvailability availability, string reason)
         {
-            return GetStatus(itemData).ShouldShow;
+            status.IsAvailable = false;
+            status.ShouldShow = !availability.HideWhenUnavailable;
+            status.CanPurchase = false;
+            status.ShowCountdown = false;
+            status.Reason = reason;
         }
-
-        public bool CanPurchase(IShopItemData itemData)
-        {
-            return GetStatus(itemData).CanPurchase;
-        }
-
-        public int GetPriority(IShopItemData itemData)
-        {
-            var availability = GetAvailability(itemData);
-            return availability == null ? 0 : availability.Priority;
-        }
-
-        private static IShopOfferAvailability GetAvailability(IShopItemData itemData)
-        {
-            var availabilityData = itemData as IShopOfferAvailabilityData;
-            return availabilityData?.OfferAvailability;
-        }
-
-        private static ShopOfferAvailabilityStatus CreateAlwaysAvailableStatus()
-        {
-            return new ShopOfferAvailabilityStatus
-            {
-                HasSchedule = false,
-                IsAvailable = true,
-                ShouldShow = true,
-                CanPurchase = true,
-                ShowCountdown = false,
-                Reason = string.Empty
-            };
-        }
-
-        private static ShopOfferAvailabilityStatus CreateInvalidStatus(IShopOfferAvailability availability, string reason)
-        {
-            return new ShopOfferAvailabilityStatus
-            {
-                HasSchedule = true,
-                IsAvailable = false,
-                ShouldShow = !availability.HideWhenUnavailable,
-                CanPurchase = false,
-                ShowCountdown = false,
-                Reason = reason
-            };
-        }
-
+  
+        public bool ShouldShow(IShopItemData itemData) => GetStatus(itemData).ShouldShow;
+        public bool CanPurchase(IShopItemData itemData) => GetStatus(itemData).CanPurchase;
+        public int GetPriority(IShopItemData itemData) { var av = GetAvailability(itemData); return av == null ? 0 : av.Priority; }
+        private static IShopOfferAvailability GetAvailability(IShopItemData itemData) => (itemData as IShopOfferAvailabilityData)?.OfferAvailability;
+        private static ShopOfferAvailabilityStatus CreateAlwaysAvailableStatus() => new ShopOfferAvailabilityStatus { HasSchedule = false, IsAvailable = true, ShouldShow = true, CanPurchase = true, ShowCountdown = false, Reason = string.Empty };
+        private static bool HasValue(string value) => !string.IsNullOrWhiteSpace(value);
         private static bool TryReadOptionalUtc(string rawTime, out DateTime utcTime)
         {
             utcTime = default(DateTime);
             if (!HasValue(rawTime)) return false;
-
             string trimmed = rawTime.Trim();
             long unixSeconds;
             if (long.TryParse(trimmed, NumberStyles.Integer, CultureInfo.InvariantCulture, out unixSeconds))
             {
-                try
-                {
-                    utcTime = UnixEpochUtc.AddSeconds(unixSeconds);
-                    return true;
-                }
-                catch (ArgumentOutOfRangeException)
-                {
-                    return false;
-                }
+                try { utcTime = UnixEpochUtc.AddSeconds(unixSeconds); return true; }
+                catch (ArgumentOutOfRangeException) { return false; }
             }
-
             DateTimeOffset dateTimeOffset;
-            if (DateTimeOffset.TryParse(
-                    trimmed,
-                    CultureInfo.InvariantCulture,
-                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
-                    out dateTimeOffset))
+            if (DateTimeOffset.TryParse(trimmed, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out dateTimeOffset))
             {
                 utcTime = dateTimeOffset.UtcDateTime;
                 return true;
             }
-
             return false;
-        }
-
-        private static bool HasValue(string value)
-        {
-            return !string.IsNullOrWhiteSpace(value);
         }
     }
 }
