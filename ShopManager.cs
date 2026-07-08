@@ -15,7 +15,7 @@ namespace ChieChie.Shop
         private ShopModel _shopModel;
         private readonly IShopIapBrigde _iapBridge;
         private readonly IShopSaveAdapter _saveAdapter;
-        private readonly IShopTimeProvider _timeProvider;
+        private readonly ITimeProvider _timeProvider;
         
         public event Action<string> OnBuySuccess;
         public event Action<List<ResourceRewardCommand>> OnRequestAddResource;
@@ -23,7 +23,7 @@ namespace ChieChie.Shop
        
         public bool IsInitialized { get; set; }
 
-        public ShopManager(ShopConfig shopConfig, IShopIapBrigde iapBridge, IShopSaveAdapter saveAdapter, IShopTimeProvider timeProvider = null)
+        public ShopManager(ShopConfig shopConfig, IShopIapBrigde iapBridge, IShopSaveAdapter saveAdapter, ITimeProvider timeProvider = null)
         {
             _config = shopConfig;
             _iapBridge = iapBridge;

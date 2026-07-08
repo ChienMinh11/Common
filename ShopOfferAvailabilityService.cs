@@ -8,11 +8,11 @@ namespace ChieChie.Shop
     {
         private static readonly DateTime UnixEpochUtc = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
-        private readonly IShopTimeProvider _timeProvider;
+        private readonly ITimeProvider _timeProvider;
 
-        public ShopOfferAvailabilityService(IShopTimeProvider timeProvider = null)
+        public ShopOfferAvailabilityService( ITimeProvider timeProvider = null)
         {
-            _timeProvider = timeProvider ?? new SystemUtcShopTimeProvider();
+            _timeProvider = timeProvider;
         }
 
         public ShopOfferAvailabilityStatus GetStatus(IShopItemData itemData)
