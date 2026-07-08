@@ -15,7 +15,6 @@ namespace ChieChie.Shop
             _timeProvider = timeProvider;
         }
 
-        // Thêm tham số optional dynamicTriggerTime để xử lý thời gian tương đối (ví dụ: Ngày tạo account)
         public ShopOfferAvailabilityStatus GetStatus(IShopItemData itemData, DateTime? dynamicTriggerTime = null)
         {
             var availability = GetAvailability(itemData);
@@ -33,7 +32,6 @@ namespace ChieChie.Shop
             var nowUtc = _timeProvider.UtcNow;
             if (nowUtc.Kind != DateTimeKind.Utc) nowUtc = nowUtc.ToUniversalTime();
 
-            // Phân nhánh xử lý theo từng loại ScheduleType
             switch (availability.ScheduleType)
             {
                 case ShopScheduleType.RelativeDuration:
@@ -53,28 +51,44 @@ namespace ChieChie.Shop
             return status;
         }
 
-        private void ProcessFixedSchedule(IShopOfferAvailability availability, ShopOfferAvailabilityStatus status, DateTime nowUtc)
+        private void ProcessFixedSchedule(IShopOfferAvailability availability, ShopOfferAvailabilityStatus status,
+            DateTime nowUtc)
         {
             DateTime startTimeUtc;
             DateTime endTimeUtc;
             bool hasStartTime = TryReadOptionalUtc(availability.StartTimeUtc, out startTimeUtc);
             bool hasEndTime = TryReadOptionalUtc(availability.EndTimeUtc, out endTimeUtc);
 
-            if (HasValue(availability.StartTimeUtc) && !hasStartTime) { SetInvalid(status, availability, "Cau hinh start time khong hop le."); return; }
-            if (HasValue(availability.EndTimeUtc) && !hasEndTime) { SetInvalid(status, availability, "Cau hinh end time khong hop le."); return; }
-            if (hasStartTime && hasEndTime && startTimeUtc >= endTimeUtc) { SetInvalid(status, availability, "Start time phai nho hon end time."); return; }
+            if (HasValue(availability.StartTimeUtc) && !hasStartTime)
+            {
+                SetInvalid(status, availability, "Cau hinh start time khong hop le.");
+                return;
+            }
+
+            if (HasValue(availability.EndTimeUtc) && !hasEndTime)
+            {
+                SetInvalid(status, availability, "Cau hinh end time khong hop le.");
+                return;
+            }
+
+            if (hasStartTime && hasEndTime && startTimeUtc >= endTimeUtc)
+            {
+                SetInvalid(status, availability, "Start time phai nho hon end time.");
+                return;
+            }
 
             status.HasStartTime = hasStartTime;
             status.HasEndTime = hasEndTime;
             status.StartTimeUtc = startTimeUtc;
             status.EndTimeUtc = endTimeUtc;
 
-            EvaluateAvailabilityTimings(status, nowUtc, startTimeUtc, endTimeUtc, hasStartTime, hasEndTime, availability);
+            EvaluateAvailabilityTimings(status, nowUtc, startTimeUtc, endTimeUtc, hasStartTime, hasEndTime,
+                availability);
         }
 
-        private void ProcessRelativeSchedule(IShopOfferAvailability availability, ShopOfferAvailabilityStatus status, DateTime nowUtc, DateTime? dynamicTriggerTime)
+        private void ProcessRelativeSchedule(IShopOfferAvailability availability, ShopOfferAvailabilityStatus status,
+            DateTime nowUtc, DateTime? dynamicTriggerTime)
         {
-            // Nếu không truyền mốc thời gian bắt đầu của user, coi như gói chạy từ lúc mở game (hoặc bạn gán cụ thể ngày tạo tài khoản vào đây)
             DateTime startPoint = dynamicTriggerTime ?? nowUtc;
             DateTime endPoint = startPoint.AddSeconds(availability.RelativeDurationSeconds);
 
@@ -86,7 +100,8 @@ namespace ChieChie.Shop
             EvaluateAvailabilityTimings(status, nowUtc, startPoint, endPoint, true, true, availability);
         }
 
-        private void ProcessPeriodicSchedule(IShopOfferAvailability availability, ShopOfferAvailabilityStatus status, DateTime nowUtc)
+        private void ProcessPeriodicSchedule(IShopOfferAvailability availability, ShopOfferAvailabilityStatus status,
+            DateTime nowUtc)
         {
             if (string.IsNullOrEmpty(availability.PeriodicDaysOfWeek))
             {
@@ -94,7 +109,6 @@ namespace ChieChie.Shop
                 return;
             }
 
-            // Phân tích chuỗi ngày: "Friday,Saturday,Sunday"
             var activeDays = new HashSet<DayOfWeek>();
             var tokens = availability.PeriodicDaysOfWeek.Split(',');
             foreach (var token in tokens)
@@ -112,11 +126,29 @@ namespace ChieChie.Shop
 
             if (isTodayAvailable)
             {
-                // Thời gian kết thúc của ngày hôm nay (23:59:59)
-                DateTime endOfToday = nowUtc.Date.AddDays(1);
-                status.TimeRemaining = endOfToday - nowUtc;
+             
+                int continuousDaysCount = 1;
+
+                for (int i = 1; i <= 7; i++)
+                {
+                   
+                    DayOfWeek nextDay = nowUtc.AddDays(i).DayOfWeek;
+                    if (activeDays.Contains(nextDay))
+                    {
+                        continuousDaysCount++;
+                    }
+                    else
+                    {
+                        
+                        break;
+                    }
+                }
+
+                DateTime endOfContinuousPeriod = nowUtc.Date.AddDays(continuousDaysCount);
+
+                status.TimeRemaining = endOfContinuousPeriod - nowUtc;
                 status.HasEndTime = true;
-                status.EndTimeUtc = endOfToday;
+                status.EndTimeUtc = endOfContinuousPeriod;
                 status.Reason = string.Empty;
             }
             else
@@ -126,7 +158,8 @@ namespace ChieChie.Shop
             }
         }
 
-        private void EvaluateAvailabilityTimings(ShopOfferAvailabilityStatus status, DateTime nowUtc, DateTime start, DateTime end, bool hasStart, bool hasEnd, IShopOfferAvailability availability)
+        private void EvaluateAvailabilityTimings(ShopOfferAvailabilityStatus status, DateTime nowUtc, DateTime start,
+            DateTime end, bool hasStart, bool hasEnd, IShopOfferAvailability availability)
         {
             bool notStarted = hasStart && nowUtc < start;
             bool expired = hasEnd && nowUtc >= end;
@@ -161,13 +194,27 @@ namespace ChieChie.Shop
             status.ShowCountdown = false;
             status.Reason = reason;
         }
-  
+
         public bool ShouldShow(IShopItemData itemData) => GetStatus(itemData).ShouldShow;
         public bool CanPurchase(IShopItemData itemData) => GetStatus(itemData).CanPurchase;
-        public int GetPriority(IShopItemData itemData) { var av = GetAvailability(itemData); return av == null ? 0 : av.Priority; }
-        private static IShopOfferAvailability GetAvailability(IShopItemData itemData) => (itemData as IShopOfferAvailabilityData)?.OfferAvailability;
-        private static ShopOfferAvailabilityStatus CreateAlwaysAvailableStatus() => new ShopOfferAvailabilityStatus { HasSchedule = false, IsAvailable = true, ShouldShow = true, CanPurchase = true, ShowCountdown = false, Reason = string.Empty };
+
+        public int GetPriority(IShopItemData itemData)
+        {
+            var av = GetAvailability(itemData);
+            return av == null ? 0 : av.Priority;
+        }
+
+        private static IShopOfferAvailability GetAvailability(IShopItemData itemData) =>
+            (itemData as IShopOfferAvailabilityData)?.OfferAvailability;
+
+        private static ShopOfferAvailabilityStatus CreateAlwaysAvailableStatus() => new ShopOfferAvailabilityStatus
+        {
+            HasSchedule = false, IsAvailable = true, ShouldShow = true, CanPurchase = true, ShowCountdown = false,
+            Reason = string.Empty
+        };
+
         private static bool HasValue(string value) => !string.IsNullOrWhiteSpace(value);
+
         private static bool TryReadOptionalUtc(string rawTime, out DateTime utcTime)
         {
             utcTime = default(DateTime);
@@ -176,15 +223,25 @@ namespace ChieChie.Shop
             long unixSeconds;
             if (long.TryParse(trimmed, NumberStyles.Integer, CultureInfo.InvariantCulture, out unixSeconds))
             {
-                try { utcTime = UnixEpochUtc.AddSeconds(unixSeconds); return true; }
-                catch (ArgumentOutOfRangeException) { return false; }
+                try
+                {
+                    utcTime = UnixEpochUtc.AddSeconds(unixSeconds);
+                    return true;
+                }
+                catch (ArgumentOutOfRangeException)
+                {
+                    return false;
+                }
             }
+
             DateTimeOffset dateTimeOffset;
-            if (DateTimeOffset.TryParse(trimmed, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out dateTimeOffset))
+            if (DateTimeOffset.TryParse(trimmed, CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out dateTimeOffset))
             {
                 utcTime = dateTimeOffset.UtcDateTime;
                 return true;
             }
+
             return false;
         }
     }
