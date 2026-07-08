@@ -8,5 +8,7 @@ namespace ChieChie.Shop
         void SaveOneTimePurchases(string data);
         string LoadTimeLimitedPurchases();
         void SaveTimeLimitedPurchases(string data);
+        string LoadRelativeOfferStartTimes();
+        void SaveRelativeOfferStartTimes(string data);
     }
 }

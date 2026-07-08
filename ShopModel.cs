@@ -57,7 +57,8 @@ namespace ChieChie.Shop
             {
                 var item = _shopConfig.ShopItems[i];
                 if (item == null) continue;
-                if (_offerAvailabilityService.ShouldShow(item))
+                var availabilityStatus = GetAvailabilityStatus(item);
+                if (availabilityStatus.ShouldShow)
                 {
                     visibleItems.Add((item, _offerAvailabilityService.GetPriority(item), i));
                 }
@@ -130,7 +131,7 @@ namespace ChieChie.Shop
                 return;
             }
 
-            var availabilityStatus = _offerAvailabilityService.GetStatus(itemData);
+            var availabilityStatus = GetAvailabilityStatus(itemData);
             if (!availabilityStatus.CanPurchase)
             {
                 string reason = string.IsNullOrEmpty(availabilityStatus.Reason)
@@ -146,7 +147,7 @@ namespace ChieChie.Shop
         public bool IsOfferAvailable(string productId)
         {
             if (!_shopItemCache.TryGetValue(productId, out var itemData)) return false;
-            return _offerAvailabilityService.GetStatus(itemData).IsAvailable;
+            return GetAvailabilityStatus(itemData).IsAvailable;
         }
 
         public bool TryGetOfferTimeRemaining(string productId, out TimeSpan remaining)
@@ -154,7 +155,7 @@ namespace ChieChie.Shop
             remaining = TimeSpan.Zero;
             if (!_shopItemCache.TryGetValue(productId, out var itemData)) return false;
 
-            var status = _offerAvailabilityService.GetStatus(itemData);
+            var status = GetAvailabilityStatus(itemData);
             if (!status.HasSchedule || !status.ShowCountdown || !status.IsAvailable || !status.HasEndTime)
             {
                 return false;
@@ -162,6 +163,41 @@ namespace ChieChie.Shop
 
             remaining = status.TimeRemaining;
             return remaining > TimeSpan.Zero;
+        }
+
+        private ShopOfferAvailabilityStatus GetAvailabilityStatus(IShopItemData itemData)
+        {
+            if (!TryGetRelativeAvailability(itemData, out _))
+            {
+                return _offerAvailabilityService.GetStatus(itemData);
+            }
+
+            DateTime startTimeUtc = GetOrCreateRelativeOfferStartTime(itemData);
+            return _offerAvailabilityService.GetStatus(itemData, startTimeUtc);
+        }
+
+        private DateTime GetOrCreateRelativeOfferStartTime(IShopItemData itemData)
+        {
+            string productId = itemData.ProductID;
+            if (_shopStorage.TryGetRelativeOfferStartTime(productId, out DateTime savedStartTimeUtc))
+            {
+                return savedStartTimeUtc;
+            }
+
+            var initialStatus = _offerAvailabilityService.GetStatus(itemData);
+            DateTime startTimeUtc = initialStatus.HasStartTime ? initialStatus.StartTimeUtc : DateTime.UtcNow;
+            if (startTimeUtc.Kind != DateTimeKind.Utc) startTimeUtc = startTimeUtc.ToUniversalTime();
+
+            _shopStorage.SetRelativeOfferStartTime(productId, startTimeUtc);
+            return startTimeUtc;
+        }
+
+        private static bool TryGetRelativeAvailability(IShopItemData itemData, out IShopOfferAvailability availability)
+        {
+            availability = (itemData as IShopOfferAvailabilityData)?.OfferAvailability;
+            return availability != null
+                   && availability.UseSchedule
+                   && availability.ScheduleType == ShopScheduleType.RelativeDuration;
         }
 
         private void HandlePurchaseSuccess(string productId)

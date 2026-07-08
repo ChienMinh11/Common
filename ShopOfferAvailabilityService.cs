@@ -29,7 +29,7 @@ namespace ChieChie.Shop
                 ShowCountdown = availability.ShowCountdown
             };
 
-            var nowUtc = _timeProvider.UtcNow;
+            var nowUtc = _timeProvider != null ? _timeProvider.UtcNow : DateTime.UtcNow;
             if (nowUtc.Kind != DateTimeKind.Utc) nowUtc = nowUtc.ToUniversalTime();
 
             switch (availability.ScheduleType)

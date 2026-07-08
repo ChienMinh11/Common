@@ -16,6 +16,8 @@ namespace Game.GamePlay
         private DateTime _targetEndTime;
         private string _lastTimeStr = string.Empty;
         private ITimeProvider _timeProvider;
+        private Action _onCompleted;
+        private bool _hasCompleted;
 
         [Inject]
         private void Construct(ITimeProvider timeProvider)
@@ -23,19 +25,23 @@ namespace Game.GamePlay
             _timeProvider = timeProvider;
         }
 
-        public void Setup(DateTime endTime)
+        public void Setup(DateTime endTime, Action onCompleted = null)
         {
             _targetEndTime = endTime;
+            _onCompleted = onCompleted;
+            _hasCompleted = false;
             if (gameObject.activeInHierarchy)
             {
                 StartCountdown();
             }
         }
         
-        public void Setup(TimeSpan remainingTime)
+        public void Setup(TimeSpan remainingTime, Action onCompleted = null)
         {
             var now = _timeProvider != null ? _timeProvider.UtcNow : DateTime.UtcNow;
             _targetEndTime = now + remainingTime;
+            _onCompleted = onCompleted;
+            _hasCompleted = false;
     
             if (gameObject.activeInHierarchy)
             {
@@ -45,7 +51,7 @@ namespace Game.GamePlay
 
         private void OnEnable()
         {
-            if (_targetEndTime != default && _timeProvider != null)
+            if (_targetEndTime != default)
             {
                 StartCountdown();
             }
@@ -81,36 +87,50 @@ namespace Game.GamePlay
 
         private async UniTaskVoid CountdownLoop(CancellationToken token)
         {
-            while (!token.IsCancellationRequested)
+            try
             {
-                var now = _timeProvider != null ? _timeProvider.UtcNow : DateTime.UtcNow;
-                
-                if (now >= _targetEndTime)
+                while (!token.IsCancellationRequested)
                 {
-                    UpdateTextTime("Event End!");
-                    break;
-                }
+                    var now = _timeProvider != null ? _timeProvider.UtcNow : DateTime.UtcNow;
 
-                TimeSpan remaining = _targetEndTime - now;
-                float delaySeconds = 1f;
-                if (remaining.TotalDays >= 1)
-                {
-                    UpdateTextTime($"{Math.Floor(remaining.TotalDays):00}d:{(int)remaining.Hours:00}h");
-                    delaySeconds = 60f; 
-                }
-                else if (remaining.TotalHours >= 1)
-                {
-                    UpdateTextTime($"{Math.Floor(remaining.TotalHours):00}h:{(int)remaining.Minutes:00}");
-                    delaySeconds = 10f;
-                }
-                else
-                {
-                    UpdateTextTime($"{(int)remaining.Minutes:00}:{(int)remaining.Seconds:00}");
-                    delaySeconds = 1f;
-                }
+                    if (now >= _targetEndTime)
+                    {
+                        UpdateTextTime("Event End!");
+                        NotifyCompleted();
+                        break;
+                    }
 
-                await UniTask.Delay(TimeSpan.FromSeconds(delaySeconds), delayType: DelayType.Realtime, cancellationToken: token);
+                    TimeSpan remaining = _targetEndTime - now;
+                    float delaySeconds = 1f;
+                    if (remaining.TotalDays >= 1)
+                    {
+                        UpdateTextTime($"{Math.Floor(remaining.TotalDays):00}d:{(int)remaining.Hours:00}h");
+                        delaySeconds = 60f;
+                    }
+                    else if (remaining.TotalHours >= 1)
+                    {
+                        UpdateTextTime($"{Math.Floor(remaining.TotalHours):00}h:{(int)remaining.Minutes:00}");
+                        delaySeconds = 10f;
+                    }
+                    else
+                    {
+                        UpdateTextTime($"{(int)remaining.Minutes:00}:{(int)remaining.Seconds:00}");
+                        delaySeconds = 1f;
+                    }
+
+                    await UniTask.Delay(TimeSpan.FromSeconds(delaySeconds), delayType: DelayType.Realtime, cancellationToken: token);
+                }
             }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+            }
+        }
+
+        private void NotifyCompleted()
+        {
+            if (_hasCompleted) return;
+            _hasCompleted = true;
+            _onCompleted?.Invoke();
         }
 
         private void UpdateTextTime(string timeStr)

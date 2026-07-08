@@ -1,20 +1,24 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using ChieChie.Constracts;
 
 namespace ChieChie.Shop
 {
     public class ShopStorage
     {
+        private static readonly DateTime UnixEpochUtc = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         private readonly IShopSaveAdapter _saveAdapter;
         private readonly HashSet<string> _oneTimePurchases = new HashSet<string>();
         private readonly HashSet<string> _timeLimitedPurchases = new HashSet<string>();
+        private readonly Dictionary<string, long> _relativeOfferStartTimes = new Dictionary<string, long>();
         
         public ShopStorage(IShopSaveAdapter saveAdapter)
         {
             this._saveAdapter = saveAdapter;
             LoadOneTimePurchases();
             LoadTimeLimitedPurchases();
+            LoadRelativeOfferStartTimes();
         }
         
         #region One-Time Purchases
@@ -116,6 +120,90 @@ namespace ChieChie.Shop
             SaveTimeLimitedPurchases();
         }
         
+        #endregion
+
+        #region Relative Offer Start Times
+
+        private void LoadRelativeOfferStartTimes()
+        {
+            var savedData = _saveAdapter.LoadRelativeOfferStartTimes();
+            if (string.IsNullOrEmpty(savedData)) return;
+
+            var entries = savedData.Split('|');
+            foreach (var entry in entries)
+            {
+                if (string.IsNullOrEmpty(entry)) continue;
+
+                int separatorIndex = entry.LastIndexOf(':');
+                if (separatorIndex <= 0 || separatorIndex >= entry.Length - 1) continue;
+
+                string productId = Uri.UnescapeDataString(entry.Substring(0, separatorIndex));
+                string rawUnixSeconds = entry.Substring(separatorIndex + 1);
+
+                if (string.IsNullOrEmpty(productId)) continue;
+                if (long.TryParse(rawUnixSeconds, NumberStyles.Integer, CultureInfo.InvariantCulture,
+                        out long unixSeconds))
+                {
+                    _relativeOfferStartTimes[productId] = unixSeconds;
+                }
+            }
+        }
+
+        private void SaveRelativeOfferStartTimes()
+        {
+            var entries = new List<string>(_relativeOfferStartTimes.Count);
+            foreach (var kvp in _relativeOfferStartTimes)
+            {
+                string productId = Uri.EscapeDataString(kvp.Key);
+                string unixSeconds = kvp.Value.ToString(CultureInfo.InvariantCulture);
+                entries.Add($"{productId}:{unixSeconds}");
+            }
+
+            _saveAdapter.SaveRelativeOfferStartTimes(string.Join("|", entries));
+        }
+
+        public bool TryGetRelativeOfferStartTime(string productId, out DateTime startTimeUtc)
+        {
+            startTimeUtc = default(DateTime);
+            if (string.IsNullOrEmpty(productId)) return false;
+            if (!_relativeOfferStartTimes.TryGetValue(productId, out long unixSeconds)) return false;
+
+            try
+            {
+                startTimeUtc = UnixEpochUtc.AddSeconds(unixSeconds);
+                return true;
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return false;
+            }
+        }
+
+        public void SetRelativeOfferStartTime(string productId, DateTime startTimeUtc)
+        {
+            if (string.IsNullOrEmpty(productId)) return;
+            if (startTimeUtc.Kind != DateTimeKind.Utc) startTimeUtc = startTimeUtc.ToUniversalTime();
+
+            long unixSeconds = (long)Math.Floor((startTimeUtc - UnixEpochUtc).TotalSeconds);
+            if (_relativeOfferStartTimes.TryGetValue(productId, out long existingUnixSeconds)
+                && existingUnixSeconds == unixSeconds)
+            {
+                return;
+            }
+
+            _relativeOfferStartTimes[productId] = unixSeconds;
+            SaveRelativeOfferStartTimes();
+        }
+
+        public void ResetRelativeOfferStartTime(string productId)
+        {
+            if (string.IsNullOrEmpty(productId)) return;
+            if (_relativeOfferStartTimes.Remove(productId))
+            {
+                SaveRelativeOfferStartTimes();
+            }
+        }
+
         #endregion
        
         public bool IsPurchaseActive(string productId, IShopItemData itemData)

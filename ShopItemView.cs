@@ -52,8 +52,8 @@ namespace Game.GamePlay
                
                 if (shopService != null && shopService.TryGetOfferTimeRemaining(itemData.ProductID, out TimeSpan remaining))
                 {
+                    countdownWidget.Setup(remaining, shopService.RefreshShopItems);
                     countdownWidget.gameObject.SetActive(true);
-                    countdownWidget.Setup(remaining); 
                 }
                 else
                 {
