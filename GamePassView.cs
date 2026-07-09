@@ -200,7 +200,8 @@ namespace Game.GamePlay
             {
                 if (viewData.BonusBank != null && viewData.BonusBank.IsAvailable)
                 {
-                    _bonusBankMilestoneUiItem.Setup(viewData.BonusBank, HandleClaimBonusBankItem, HandleRewardInfoRequest);
+                    var bankDataToSetup = shouldAnimateManualRefresh ? _lastViewData.BonusBank : viewData.BonusBank;
+                    _bonusBankMilestoneUiItem.Setup(bankDataToSetup, HandleClaimBonusBankItem, HandleRewardInfoRequest);
                 }
                 else
                 {
@@ -270,6 +271,11 @@ namespace Game.GamePlay
                 await AnimateMilestoneHighlightAsync(fromMilestoneIndex, 0f, ct, 0.5f);
 
                 await PlayContinuousMilestoneFlowAsync(fromViewData, toViewData, nextMilestoneIndex, ct);
+                if (_bonusBankMilestoneUiItem != null && fromViewData.BonusBank != null && toViewData.BonusBank != null)
+                {
+                    await _bonusBankMilestoneUiItem.PlayAmountAnimationAsync(fromViewData.BonusBank, toViewData.BonusBank, ct);
+                    _bonusBankMilestoneUiItem.Setup(toViewData.BonusBank, HandleClaimBonusBankItem, HandleRewardInfoRequest);
+                }
 
                 SetCompletedMilestoneSlidersByExp(toViewData, toViewData.CurrentExp);
                 await AnimateMilestoneHighlightAsync(nextMilestoneIndex, 1f, ct, 0.5f);
@@ -323,6 +329,7 @@ namespace Game.GamePlay
                 item.SetExpSliderProgress(1f);
             }
         }
+        
 
         private float GetMilestoneFlowItemDuration(int completedCount)
         {

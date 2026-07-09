@@ -205,15 +205,27 @@ namespace Game.GamePlay
             expText = string.Empty;
             progressFraction = 0f;
 
-            var bonusBank = viewData.BonusBank;
+            var bonusBank = viewData?.BonusBank;
             if (bonusBank == null || !bonusBank.IsAvailable)
             {
                 return false;
             }
 
-            int currentAmount = Mathf.Clamp(bonusBank.CurrentAmount, 0, bonusBank.MaxAmount);
-            expText = $"{currentAmount}/{bonusBank.MaxAmount}";
-            progressFraction = bonusBank.MaxAmount > 0 ? (float)currentAmount / bonusBank.MaxAmount : 0f;
+            int currentBonusExp = viewData.TotalBonusExpEarned;
+            int maxRequiredExp = bonusBank.RequiredExpToMax;
+
+            currentBonusExp = Mathf.Clamp(currentBonusExp, 0, maxRequiredExp);
+         
+            if (currentBonusExp >= maxRequiredExp)
+            {
+                expText = COMPLETED; 
+            }
+            else
+            {
+                expText = $"{currentBonusExp}/{maxRequiredExp}";
+            }
+
+            progressFraction = maxRequiredExp > 0 ? (float)currentBonusExp / maxRequiredExp : 0f;
             return true;
         }
 
@@ -228,8 +240,19 @@ namespace Game.GamePlay
             if (totalExp < totalNormalRequiredExp) return false;
 
             int bonusExp = Mathf.Max(0, totalExp - totalNormalRequiredExp);
-            int currentAmount = bonusBank.ConvertBonusExpToAmount(bonusExp);
-            progressText = $"{currentAmount}/{bonusBank.MaxAmount}";
+            int maxRequiredExp = bonusBank.RequiredExpToMax;
+    
+            int displayedBonusExp = Mathf.Min(bonusExp, maxRequiredExp);
+
+            if (displayedBonusExp >= maxRequiredExp)
+            {
+                progressText = COMPLETED; 
+            }
+            else
+            {
+                progressText = $"{displayedBonusExp}/{maxRequiredExp}";
+            }
+
             return true;
         }
 
@@ -284,6 +307,8 @@ namespace Game.GamePlay
                 _animationCts = null;
             }
         }
+        
+      
 
         private void OnDisable() => StopAnimation();
     }

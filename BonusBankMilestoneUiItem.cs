@@ -115,5 +115,28 @@ namespace Game.GamePlay
             _cachedIcons[prefab] = newInstance;
             _currentActiveIcon = newInstance;
         }
+        public async Cysharp.Threading.Tasks.UniTask PlayAmountAnimationAsync(BonusBankUIData fromData, BonusBankUIData toData, System.Threading.CancellationToken ct)
+        {
+            if (amountSlider == null || fromData == null || toData == null || !toData.IsAvailable) return;
+
+            int fromAmount = Mathf.Clamp(fromData.CurrentAmount, 0, fromData.MaxAmount);
+            int toAmount = Mathf.Clamp(toData.CurrentAmount, 0, toData.MaxAmount);
+
+            float fromProgress = fromData.MaxAmount > 0 ? (float)fromAmount / fromData.MaxAmount : 0f;
+            float toProgress = toData.MaxAmount > 0 ? (float)toAmount / toData.MaxAmount : 0f;
+
+            // Chạy animation tăng chỉ số trên Slider của BonusBank
+            await amountSlider.PlaySliderAnimationAsync(
+                fromProgress,
+                toProgress,
+                $"{fromAmount}/{fromData.MaxAmount}",
+                $"{toAmount}/{toData.MaxAmount}",
+                ct
+            );
+        }
     }
+    
+   
 }
+
+
