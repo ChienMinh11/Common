@@ -12,12 +12,7 @@ namespace Game.GamePlay
 {
     public class PopupBonusBankShowReward : PopupBase
     {
-        
-        
-         [Header("UI References")] 
-        [SerializeField] private TextMeshProUGUI txtTitle;
-        [SerializeField] private TextMeshProUGUI txtDescription;
-        [SerializeField] private RewardSlotView rewardView;
+        [SerializeField] private TMP_Text amount;
 
         [SerializeField] private TweenUI buttonFade;
         [SerializeField] private Button claimButton;
@@ -25,6 +20,7 @@ namespace Game.GamePlay
         private RewardDisplayService _rewardDisplayService;
         private IEventService _eventService;
         private IEffectSequenceService _effectSequenceService;
+   
       
         [Inject]
         public void Construct(RewardDisplayService rewardDisplayService, IEventService eventService,
@@ -42,17 +38,15 @@ namespace Game.GamePlay
 
         protected override void OnShow()
         {
-           
+            
             buttonFade.SetDefautCanvasGroup();
             claimButton.interactable = false;
 
             var data = _rewardDisplayService.CurrentData;
             if (data == null) return;
-
-            if (txtTitle != null) txtTitle.text = data.GetTitle();
-            if (txtDescription != null) txtDescription.text = data.GetDescription();
-
+            
             var rewards = data.GetRewards();
+            var reward = rewards[0];
       
             PlayChestAnimationSequenceAsync().Forget();
         }
@@ -67,13 +61,19 @@ namespace Game.GamePlay
                 if (buttonFade.Rect != null) buttonFade.Rect.localScale = Vector3.zero;
             }
 
+            await PlayTextAmountAnimation();
+
             if (buttonFade != null)
             {
                 await buttonFade.PlayShowAsync(token);
                 claimButton.interactable = true;
             }
         }
-    
+
+        private async UniTask PlayTextAmountAnimation()
+        {
+            
+        }
 
         protected override void OnHide()
         {
