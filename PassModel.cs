@@ -57,7 +57,7 @@ namespace ChieChie.GamePass
                  
                     if (_timeProvider.UtcNow > endTemp)
                     {
-                        // Tiến hành xử lý gom quà tự động
+                        
                         ProcessAutoClaimUnclaimedRewards(_saveData);
                         _saveData = new PassSaveData { currentEventId = string.Empty };
                         _passSaveAdapter.SaveData(_saveData);
@@ -255,6 +255,12 @@ namespace ChieChie.GamePass
         
         public void TriggerAutoClaimNotifications()
         {
+            //// Phát theo thứ tự thì việc show popup mới đúng flow
+            if (AutoClaimedBonusBankRewards.Count > 0)
+            {
+                OnAutoClaimNotificationTriggered?.Invoke(
+                    new PassNotificationEventData(AutoClaimedBonusBankRewards, false, true));
+            }
             if (AutoClaimedBonusRewards.Count > 0)
             {
                 OnAutoClaimNotificationTriggered?.Invoke(new PassNotificationEventData(AutoClaimedBonusRewards, true,false));
@@ -263,11 +269,7 @@ namespace ChieChie.GamePass
             {
                 OnAutoClaimNotificationTriggered?.Invoke(new PassNotificationEventData(AutoClaimedNormalRewards, false,false));
             }
-            if (AutoClaimedBonusBankRewards.Count > 0)
-            {
-                OnAutoClaimNotificationTriggered?.Invoke(
-                    new PassNotificationEventData(AutoClaimedBonusBankRewards, false, true));
-            }
+           
         }
 
         public bool AddExp(int amount)

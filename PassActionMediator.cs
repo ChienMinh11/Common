@@ -96,8 +96,13 @@ namespace Game.GamePlay
 
             List<IItemReward> targetRewards;
 
-            if (!eventData.IsBonusData || !eventData.IsBonusBank)
+            if (eventData.IsBonusBank)
             {
+                targetRewards = eventData.Rewards;
+            }
+            else
+            {
+                // Quà của Normal Pass hoặc Bonus Milestone thì gộp lại thành cụm
                 var mergedDict = new Dictionary<string, AutoClaimMergedReward>();
                 foreach (var r in eventData.Rewards)
                 {
@@ -128,11 +133,8 @@ namespace Game.GamePlay
                         };
                     }
                 }
+
                 targetRewards = mergedDict.Values.Cast<IItemReward>().ToList();
-            }
-            else
-            {
-                targetRewards = eventData.Rewards;
             }
 
             if (targetRewards.Count == 0) return;
@@ -141,24 +143,33 @@ namespace Game.GamePlay
             _rewardDisplayService.EnqueueContextData(displayData);
             if (_popupService is IPopupQueueService queueService)
             {
-                queueService.Enqueue(new PopupQueueRequest(
-                    popupNameId: "PopupBonusBankShowReward",
-                    message: "",
-                    priority: 1,
-                    closeAndRestore: false
-                ));
-                queueService.Enqueue(new PopupQueueRequest(
-                    popupNameId: "PopupDisplayReward",
-                    message: "",
-                    priority: 0,
-                    closeAndRestore: false
-                ));
-            }
-            else
-            {
-                _popupService.ShowPopup("PopupDisplayReward").Forget();
+                var requests = new List<PopupQueueRequest>();
+
+                // TỐI ƯU & SỬA LỖI: Chỉ mở popup tương ứng với loại quà hiển thị
+                if (eventData.IsBonusBank)
+                {
+                    requests.Add(new PopupQueueRequest(
+                        popupNameId: "PopupBonusBankShowReward",
+                        message: "",
+                        priority: 1,
+                        closeAndRestore: false
+                    ));
+                }
+                else
+                {
+                    requests.Add(new PopupQueueRequest(
+                        popupNameId: "PopupDisplayReward",
+                        message: "",
+                        priority: 0,
+                        closeAndRestore: false
+                    ));
+                }
+
+                // BẮT BUỘC: Sử dụng EnqueueMultiple để đưa danh sách vào sắp xếp Priority chuẩn xác
+                queueService.EnqueueMultiple(requests);
             }
         }
+
 
         #endregion
     }
