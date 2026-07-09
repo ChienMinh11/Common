@@ -1,0 +1,84 @@
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace ChieChie.Constracts
+{
+    public struct AvatarDisplayData
+    {
+        public int Id;
+        public string Name;
+        public Sprite Sprite;
+        public bool IsUnlocked;
+
+        public AvatarDisplayData(int id, string name, Sprite sprite, bool isUnlocked)
+        {
+            Id = id;
+            Name = name;
+            Sprite = sprite;
+            IsUnlocked = isUnlocked;
+        }
+    }
+
+    // Thêm mới Struct hiển thị cho Frame
+    public struct FrameDisplayData
+    {
+        public int Id;
+        public string Name;
+        public Sprite Icon;
+        public GameObject Prefab; // THÊM MỚI
+
+        public bool IsUnlocked;
+
+        public FrameDisplayData(int id, string name, Sprite icon, GameObject prefab, bool isUnlocked)
+        {
+            Id = id;
+            Name = name;
+            Icon = icon;
+            Prefab = prefab; // THÊM MỚI
+            IsUnlocked = isUnlocked;
+        }
+    }
+
+    // Thêm mới Struct hiển thị cho Badge
+    public struct BadgeDisplayData
+    {
+        public int Id;
+        public string Name;
+        public Sprite Icon;
+        public GameObject Prefab;
+        public bool IsUnlocked;
+
+        public BadgeDisplayData(int id, string name, Sprite icon, GameObject prefab, bool isUnlocked)
+        {
+            Id = id;
+            Name = name;
+            Icon = icon;
+            Prefab = prefab; 
+            IsUnlocked = isUnlocked;
+        }
+    }
+
+    public interface IProfileView
+    {
+        event Action OnEditNameRequested;
+        event Action<string> OnTemporaryNameChanged;
+        event Action<int> OnAvatarSelected;
+        event Action<int> OnFrameSelected; // Thêm mới
+        event Action<int> OnBadgeSelected; // Thêm mới
+        event Action OnSaveRequested;
+        event Action OnCloseRequested;
+   
+        void ShowProfileData(string playerName, Sprite avatarSprite, GameObject framePrefab, GameObject badgePrefab);
+        void UpdatePlayerNameDisplay(string name);
+        void UpdateAvatarDisplay(int avatarId, Sprite avatarSprite);
+        void UpdateFrameDisplay(int frameId, GameObject framePrefab); // Nhận vào Prefab
+        void UpdateBadgeDisplay(int badgeId, GameObject badgePrefab); // Nhận vào Prefab
+        
+        
+        void PopulateAvatarGrid(List<AvatarDisplayData> avatars); 
+        void PopulateFrameGrid(List<FrameDisplayData> frames);   
+        void PopulateBadgeGrid(List<BadgeDisplayData> badges);   
+        void SetSaveButtonInteractable(bool interactable);
+    }
+}
