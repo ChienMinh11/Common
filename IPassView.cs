@@ -36,7 +36,6 @@ namespace ChieChie.GamePass
         public int ExpConvertToAmount;
         public int RequiredExpToMax;
         public bool IsUnlocked;
-        public List<IItemReward> Rewards;
         public MilestoneState State;
         public UnityEngine.GameObject BonusBankIcon;
         public bool IsAvailable => MaxAmount > 0 && ExpConvertToAmount > 0;

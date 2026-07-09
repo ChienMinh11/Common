@@ -16,19 +16,15 @@ namespace Game.GamePlay
         [SerializeField] private GameObject objClaimed;
         [SerializeField] private GamePassExpSlider amountSlider;
         [SerializeField] private Button btnShowRewardInfo;
-        [SerializeField] private RewardSlotView rewardSlotView;
         [SerializeField] private Transform customBonusBankIconContainer;
 
         private Action _onClaimClicked;
-        private Action<IReadOnlyList<IItemReward>, Transform> _onRewardInfoClicked;
-        private IReadOnlyList<IItemReward> _rewards;
         private readonly Dictionary<GameObject, GameObject> _cachedIcons = new Dictionary<GameObject, GameObject>();
         private GameObject _currentActiveIcon;
 
         private void Awake()
         {
             if (btnClaim != null) btnClaim.onClick.AddListener(() => _onClaimClicked?.Invoke());
-            if (btnShowRewardInfo != null) btnShowRewardInfo.onClick.AddListener(HandleRewardInfoClicked);
         }
 
         public void Setup(
@@ -44,8 +40,6 @@ namespace Game.GamePlay
 
             gameObject.SetActive(true);
             _onClaimClicked = onClaimClicked;
-            _onRewardInfoClicked = onRewardInfoClicked;
-            _rewards = data.Rewards;
 
             bool isClaimed = data.State == MilestoneState.Claimed;
             bool isReadyToClaim = data.State == MilestoneState.ReadyToClaim;
@@ -56,7 +50,6 @@ namespace Game.GamePlay
             if (objLocked != null) objLocked.SetActive(!showUnlocked);
             if (objClaimed != null) objClaimed.SetActive(isClaimed);
             if (btnClaim != null) btnClaim.gameObject.SetActive(isReadyToClaim);
-            if (btnShowRewardInfo != null) btnShowRewardInfo.gameObject.SetActive(_rewards != null && _rewards.Count > 0);
 
             if (amountSlider != null)
             {
@@ -64,30 +57,12 @@ namespace Game.GamePlay
                 float progress = data.MaxAmount > 0 ? (float)currentAmount / data.MaxAmount : 0f;
                 amountSlider.SetProgress(progress, $"{currentAmount}/{data.MaxAmount}");
             }
-
-            if (rewardSlotView != null && _rewards != null && _rewards.Count > 0)
-            {
-                rewardSlotView.Setup(_rewards[0]);
-            }
+          
 
             UpdateCustomIcon(data.BonusBankIcon);
         }
 
-        public Transform GetRewardIconTransform()
-        {
-            if (_currentActiveIcon != null && _currentActiveIcon.activeSelf && customBonusBankIconContainer != null)
-            {
-                return customBonusBankIconContainer;
-            }
-
-            return rewardSlotView != null ? rewardSlotView.transform : transform;
-        }
-
-        private void HandleRewardInfoClicked()
-        {
-            if (_rewards == null || _rewards.Count == 0) return;
-            _onRewardInfoClicked?.Invoke(_rewards, GetRewardIconTransform());
-        }
+       
 
         private void UpdateCustomIcon(GameObject prefab)
         {

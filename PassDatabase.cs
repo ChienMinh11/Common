@@ -10,7 +10,7 @@ namespace ChieChie.GamePass
         [SerializeField] GamePassSettings gamePassSettings;
         [SerializeField] private List<PassData> passItems = new List<PassData>();
         [SerializeField] private List<PassBonusData > bonusPassItems = new List<PassBonusData>();
-        [SerializeField] private PassBonusBankData bonusBankData = new PassBonusBankData();
+        [SerializeField] private PassBonusBankData bonusBankData;
 
         public IReadOnlyList<PassData> PassItems => passItems; public IReadOnlyList<PassBonusData> BonusPassItems => bonusPassItems;
         public PassBonusBankData BonusBankData => bonusBankData;

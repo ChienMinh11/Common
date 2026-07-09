@@ -96,7 +96,7 @@ namespace Game.GamePlay
 
             List<IItemReward> targetRewards;
 
-            if (!eventData.IsBonusData)
+            if (!eventData.IsBonusData || !eventData.IsBonusBank)
             {
                 var mergedDict = new Dictionary<string, AutoClaimMergedReward>();
                 foreach (var r in eventData.Rewards)
@@ -141,6 +141,12 @@ namespace Game.GamePlay
             _rewardDisplayService.EnqueueContextData(displayData);
             if (_popupService is IPopupQueueService queueService)
             {
+                queueService.Enqueue(new PopupQueueRequest(
+                    popupNameId: "PopupBonusBankShowReward",
+                    message: "",
+                    priority: 1,
+                    closeAndRestore: false
+                ));
                 queueService.Enqueue(new PopupQueueRequest(
                     popupNameId: "PopupDisplayReward",
                     message: "",

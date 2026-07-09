@@ -7,6 +7,6 @@ namespace ChieChie.GamePass
     {
         System.Collections.Generic.List<IItemReward> Rewards { get; }
         bool IsBonusData { get; }
-        
+        bool IsBonusBank { get; }
     }
 }

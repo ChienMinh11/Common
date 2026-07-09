@@ -9,10 +9,13 @@ namespace ChieChie.GamePass
          public List<IItemReward> Rewards { get; }
         public bool IsBonusData { get; }
 
-        public PassNotificationEventData(List<IItemReward> rewards, bool isBonusData)
+        public bool IsBonusBank { get; } 
+
+        public PassNotificationEventData(List<IItemReward> rewards, bool isBonusData, bool isBonusBank = false)
         {
             Rewards = rewards;
             IsBonusData = isBonusData;
+            IsBonusBank = isBonusBank;
         }
     }
 }

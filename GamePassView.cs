@@ -105,10 +105,12 @@ namespace Game.GamePlay
                 timeCountdownWidget.Setup(viewData.EventEndTime);
             }
 
+            int maxMilestoneIndex = GetMaxMilestoneIndex(viewData);
             bool shouldAnimateManualRefresh = _playManualRefreshAnimation &&
                                               _lastViewData != null &&
                                               expSlider != null &&
                                               viewData.CurrentExp > _lastViewData.CurrentExp;
+                                            
             PassViewData initialViewData = shouldAnimateManualRefresh ? _lastViewData : viewData;
 
             UpdateExpProgressUI(initialViewData);
@@ -153,8 +155,17 @@ namespace Game.GamePlay
                     }
 
                     item.Setup(sortedMilestones[i], HandleClaimRewardItem, showClaimButtons, HandleRewardInfoRequest);
-                    item.UpdateHighlightState(highlightedMilestoneIndex);
+                    if(highlightedMilestoneIndex < GetMaxMilestoneIndex(viewData)){}
+                    if (item.MilestoneIndex == maxMilestoneIndex)
+                    {
+                        item.UpdateHighlightState(-1); 
+                    }
+                    else
+                    {
+                        item.UpdateHighlightState(highlightedMilestoneIndex);
+                    }
                     item.SetExpSliderProgress(GetCompletedMilestoneSliderProgress(initialViewData, initialViewData.CurrentExp, item.MilestoneIndex));
+                   
                 }
 
                 if (endIndex != null && startIndex != null)
@@ -278,7 +289,10 @@ namespace Game.GamePlay
                 }
 
                 SetCompletedMilestoneSlidersByExp(toViewData, toViewData.CurrentExp);
-                await AnimateMilestoneHighlightAsync(nextMilestoneIndex, 1f, ct, 0.5f);
+                if (nextMilestoneIndex < GetMaxMilestoneIndex(toViewData))
+                {
+                    await AnimateMilestoneHighlightAsync(nextMilestoneIndex, 1f, ct, 0.5f);
+                }
                 UpdateMilestoneHighlightState(nextMilestoneIndex);
                 SetClaimButtonsVisible(true);
                 OnEndFlow();
@@ -422,10 +436,21 @@ namespace Game.GamePlay
 
         private void SetClaimButtonsVisible(bool visible)
         {
+            int currentMilestoneIndex = GetCompletedMilestoneIndex(_lastViewData, _lastViewData.CurrentExp);
+            int maxMilestoneIndex = GetMaxMilestoneIndex(_lastViewData);
             foreach (var item in _milestonePool)
             {
                 if (item == null || !item.gameObject.activeSelf) continue;
-                item.SetClaimButtonsVisible(visible);
+                if (item.MilestoneIndex < currentMilestoneIndex || currentMilestoneIndex >= maxMilestoneIndex)
+                {
+                   
+                    item.SetClaimButtonsVisible(true);
+                }
+                else
+                {
+                    // Chỉ những mốc đang ở hiện tại hoặc tương lai mới bật/tắt theo hiệu ứng
+                    item.SetClaimButtonsVisible(visible);
+                }
             }
         }
 
@@ -439,10 +464,22 @@ namespace Game.GamePlay
 
         private void UpdateMilestoneHighlightState(int milestoneIndex)
         {
+           
+            int maxMilestoneIndex = GetMaxMilestoneIndex(_lastViewData);
+
             foreach (var item in _milestonePool)
             {
                 if (item == null || !item.gameObject.activeSelf) continue;
-                item.UpdateHighlightState(milestoneIndex);
+
+              
+                if (item.MilestoneIndex == maxMilestoneIndex)
+                {
+                    item.UpdateHighlightState(-1);
+                }
+                else
+                {
+                    item.UpdateHighlightState(milestoneIndex);
+                }
             }
         }
 
@@ -455,7 +492,6 @@ namespace Game.GamePlay
         {
             var targetItem = GetMilestoneItem(milestoneIndex);
             if (targetItem == null) return;
-
             await targetItem.SetHighlightByAnimationAsync(value, ct, duration);
         }
 
@@ -470,20 +506,11 @@ namespace Game.GamePlay
 
         private void HandleClaimBonusItem(int index)
         {
-            // var item = GetMilestoneItem(index);
-            // Transform spawnTransform = item != null ? item.GetRewardIconTransform(isPremium) : this.transform;
-            //
-            // PublishClaimedRewards(GetClaimableMilestoneRewards(index, isPremium), spawnTransform);
             OnClaimBonusClicked?.Invoke(index);
         }
 
         private void HandleClaimBonusBankItem()
         {
-            Transform spawnTransform = _bonusBankMilestoneUiItem != null
-                ? _bonusBankMilestoneUiItem.GetRewardIconTransform()
-                : transform;
-
-            PublishClaimedRewards(GetClaimableBonusBankRewards(), spawnTransform);
             OnClaimBonusBankClicked?.Invoke();
         }
 
@@ -513,6 +540,13 @@ namespace Game.GamePlay
 
             return ItemRewardInfoPanel.RewardDescriptionState.Unclaimed;
         }
+        private  int GetMaxMilestoneIndex(PassViewData viewData)
+        {
+            if (viewData?.Milestones == null || viewData.Milestones.Count == 0) 
+                return -1;
+
+            return viewData.Milestones.Max(m => m.Index);
+        }
 
         private List<IItemReward> GetClaimableMilestoneRewards(int index, bool isPremium)
         {
@@ -533,13 +567,6 @@ namespace Game.GamePlay
             return bonusMilestone.Rewards;
         }
 
-        private List<IItemReward> GetClaimableBonusBankRewards()
-        {
-            var bonusBank = _lastViewData?.BonusBank;
-            if (bonusBank == null || bonusBank.State != MilestoneState.ReadyToClaim) return null;
-
-            return bonusBank.Rewards;
-        }
 
         private void PublishClaimedRewards(IEnumerable<IItemReward> rewards, Transform spawnTransform)
         {

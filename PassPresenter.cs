@@ -152,7 +152,6 @@ namespace ChieChie.GamePass
                     ExpConvertToAmount = bonusBankData.expConvertToAmount,
                     RequiredExpToMax = _model.GetBonusBankRequiredExpToMax(),
                     IsUnlocked = _model.IsNormalPassCompleted(displayedExp),
-                    Rewards = _model.GetBonusBankRewards(displayedExp),
                     State = _model.GetBonusBankState(displayedExp),
                     BonusBankIcon = bonusBankData.bonusBankIcon
                 };

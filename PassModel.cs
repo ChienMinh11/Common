@@ -27,6 +27,7 @@ namespace ChieChie.GamePass
         
         public List<IItemReward> AutoClaimedNormalRewards { get; private set; } = new List<IItemReward>();
         public List<IItemReward> AutoClaimedBonusRewards { get; private set; } = new List<IItemReward>();
+        public List<IItemReward> AutoClaimedBonusBankRewards { get; private set; } = new();
         public event Action<IPassNotificationEventData> OnAutoClaimNotificationTriggered;
 
         private readonly ITimeProvider _timeProvider;
@@ -233,7 +234,7 @@ namespace ChieChie.GamePass
                 var bonusBankReward = CreateBonusBankReward(GetBonusBankMaxAmount());
                 if (bonusBankReward != null)
                 {
-                    AutoClaimedBonusRewards.Add(bonusBankReward);
+                    AutoClaimedBonusBankRewards.Add(bonusBankReward);
                     AutoClaimedRewards.Add(bonusBankReward);
                 }
             }
@@ -256,11 +257,16 @@ namespace ChieChie.GamePass
         {
             if (AutoClaimedBonusRewards.Count > 0)
             {
-                OnAutoClaimNotificationTriggered?.Invoke(new PassNotificationEventData(AutoClaimedBonusRewards, true));
+                OnAutoClaimNotificationTriggered?.Invoke(new PassNotificationEventData(AutoClaimedBonusRewards, true,false));
             }
             if (AutoClaimedNormalRewards.Count > 0)
             {
-                OnAutoClaimNotificationTriggered?.Invoke(new PassNotificationEventData(AutoClaimedNormalRewards, false));
+                OnAutoClaimNotificationTriggered?.Invoke(new PassNotificationEventData(AutoClaimedNormalRewards, false,false));
+            }
+            if (AutoClaimedBonusBankRewards.Count > 0)
+            {
+                OnAutoClaimNotificationTriggered?.Invoke(
+                    new PassNotificationEventData(AutoClaimedBonusBankRewards, false, true));
             }
         }
 
