@@ -73,17 +73,13 @@ namespace ChieChie.GamePass
             }
         }
 
-        public void FlushDelayedUIUpdate()
+        public void ForceUpdateUI(IPassView view)
         {
+            if (view == null) return;
             CleanUpDestroyedViews();
-            _model.FlushDelayedUIUpdate();
-
+            if (!_activeViews.Contains(view)) return;
             var freshData = UpdateViewData(_model.CurrentExp);
-
-            foreach (var view in _activeViews)
-            {
-                RefreshView(view, freshData);
-            }
+            RefreshView(view, freshData);
         }
 
         public void FlushDelayedUIUpdate(IPassView view)

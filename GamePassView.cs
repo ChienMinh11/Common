@@ -695,7 +695,7 @@ namespace Game.GamePlay
             
                 _passService.MarkFirstOpenCompleted();
                 OnEndFlow();
-                _eventService.PublishEvent(GameEvent.OnGamePassViewFirstOpen);
+                _eventService.PublishEvent(GameEvent.OnGamePassViewShowPopupTutorial);
             }
             catch (OperationCanceledException) { Debug.Log("[GamePassView] Hiệu ứng cuộn DOTween đã bị hủy."); }
             catch (Exception ex) { Debug.LogError($"[GamePassView] Lỗi hiệu ứng cuộn DOTween: {ex.Message}"); }
@@ -760,6 +760,11 @@ namespace Game.GamePlay
 
             CancelRefreshAnimation();
             CancelScrollAnimation();
+        }
+
+        public void OnShowTutorialPopupByClick()
+        {
+            _eventService.PublishEvent(GameEvent.OnGamePassViewShowPopupTutorial);
         }
 
         private void OnDestroy()

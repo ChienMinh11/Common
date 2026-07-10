@@ -37,13 +37,13 @@ namespace Game.GamePlay
         public event Action OnBuyPremiumClicked;
         public string ViewId => string.IsNullOrEmpty(viewId) ? nameof(GamePassWidget) : viewId;
         public SideWidgetStructConfig Config => config;
-      
-
+  
         [Inject]
         public void Constructor(IPassService passService,IEventService eventService)
         {
             _passService = passService;
             _eventService = eventService;
+            
            
         }
         
@@ -51,12 +51,13 @@ namespace Game.GamePlay
         {
             gameObject.SetActive(true);
             _passService.RegisterView(this);
+            _passService.ForceUpdateUIWidget(this);
         }
 
         private void OnDestroy()
         {
             CancelRefreshAnimation();
-
+         
             if (_passService != null)
             {
                 _passService.UnregisterView(this);
@@ -251,8 +252,5 @@ namespace Game.GamePlay
             _refreshAnimationCts.Dispose();
             _refreshAnimationCts = null;
         }
-
-
-       
     }
 }

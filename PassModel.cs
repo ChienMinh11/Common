@@ -375,6 +375,12 @@ namespace ChieChie.GamePass
         {
             if (_saveData.isPremiumUnlocked) return;
             _saveData.isPremiumUnlocked = true;
+          
+            if (!_saveData.claimedPremiumMilestones.Contains(0))
+            {
+                _saveData.claimedPremiumMilestones.Add(0);
+            }
+
             _passSaveAdapter.SaveData(_saveData);
             NotifyDataChanged();
         }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using ChieChie.Constracts;
 using Cysharp.Threading.Tasks;
+using UnityEngine;
 
 namespace ChieChie.GamePass
 {
@@ -24,6 +25,7 @@ namespace ChieChie.GamePass
         private readonly ITimeProvider _timeProvider;
         public DateTime EventEndTime => _passModel?.EventEndTime ?? DateTime.MinValue;
         public bool IsEventActive => _passModel?.IsEventActive ?? false;
+        private bool _firstLaunch = false;
 
         public PassManager(PassDatabase database, IPassSaveAdapter saveAdapter, ITimeProvider timeProvider)
         {
@@ -94,11 +96,7 @@ namespace ChieChie.GamePass
         
         public void RegisterRewardModifier(IPassRewardModifier modifier) => _passModel?.RegisterModifier(modifier);
         public void UnregisterRewardModifier(IPassRewardModifier modifier) => _passModel?.UnregisterModifier(modifier);
-        public void AddExp(int amount)
-        {
-            AddExp(amount, false);
-        }
-
+      
         public void AddExp(int amount, bool delayUpdateUI)
         {
             if (_passModel == null) return;
@@ -106,9 +104,14 @@ namespace ChieChie.GamePass
             _passModel.AddExp(amount, delayUpdateUI);
         }
 
-        public void FlushDelayedUIUpdate()
+        public void ForceUpdateUIWidget(IPassView view)
         {
-            _passPresenter?.FlushDelayedUIUpdate();
+            if (!_firstLaunch)
+            {
+                _passPresenter.ForceUpdateUI(view);
+                _firstLaunch = true;
+            }
+           
         }
 
         public void FlushDelayedUIUpdate(IPassView view)

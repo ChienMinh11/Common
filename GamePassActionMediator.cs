@@ -49,7 +49,7 @@ namespace Game.GamePlay
             _passService.OnAutoClaimedRewardsProcessed += HandleAutoClaimedRewards;
             _passService.OnAutoClaimNotificationTriggered += HandleAutoClaimNotification;
             _passService.OnBonusBankClaimNotificationTriggered += HandleBonusBankClaimNotification;
-            _gamePassViewFirstOpenedSubscription = _eventService.ObserveEvent(GameEvent.OnGamePassViewFirstOpen)
+            _gamePassViewFirstOpenedSubscription = _eventService.ObserveEvent(GameEvent.OnGamePassViewShowPopupTutorial)
                 .Subscribe(_ => { HandleShowpopupTutorialOnFirstOpened(); });
         }
 
