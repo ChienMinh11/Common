@@ -125,7 +125,7 @@ namespace Game.GamePlay
                 if (premiumRewardSlotView != null && data.PremiumRewards != null && data.PremiumRewards.Count > 0)
                 {
                     var premiumReward = data.PremiumRewards[0];
-                    freeRewardSlotView.Setup(premiumReward);
+                    premiumRewardSlotView.Setup(premiumReward);
                 }
             }
 

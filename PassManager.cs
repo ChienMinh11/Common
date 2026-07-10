@@ -134,5 +134,8 @@ namespace ChieChie.GamePass
         {
             _passModel.RefreshData();
         }
+
+        public bool IsFirstOpen => _passModel?.IsFirstOpen ?? true;
+        public void MarkFirstOpenCompleted() => _passModel?.MarkFirstOpenCompleted();
     }
 }

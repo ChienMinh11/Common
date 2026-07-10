@@ -33,6 +33,7 @@ namespace ChieChie.GamePass
 
         private readonly ITimeProvider _timeProvider;
         public bool IsEventActive => _eventScheduler != null && _eventScheduler.isActive;
+        public bool IsFirstOpen => _saveData != null && _saveData.isFirstOpen;
 
         public PassModel(PassDatabase database, IPassSaveAdapter passSaveAdapter, PassEventScheduler eventScheduler, ITimeProvider timeProvider)
         {
@@ -128,6 +129,13 @@ namespace ChieChie.GamePass
                     _eventScheduler.isActive = _timeProvider.UtcNow >= _eventScheduler.startTime && _timeProvider.UtcNow <= _eventScheduler.endTime;
                 }
             }
+        }
+        public void MarkFirstOpenCompleted()
+        {
+            if (_saveData == null || _saveData.isFirstOpen) return;
+        
+            _saveData.isFirstOpen = true;
+            _passSaveAdapter.SaveData(_saveData);
         }
 
         private void CacheStaticDatabaseData()

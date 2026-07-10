@@ -36,6 +36,8 @@ namespace ChieChie.GamePass
         void ActiveNewEvent();
         void UnlockPremiumPass();
         void RefreshData();
+        bool IsFirstOpen { get; }
+        void MarkFirstOpenCompleted();
 
     }
 }

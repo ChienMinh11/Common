@@ -7,6 +7,7 @@ using ChieChie.Core;
 using ChieChie.Core.Utilities;
 using ChieChie.GamePass;
 using Cysharp.Threading.Tasks;
+using DG.Tweening;
 using Sirenix.OdinInspector;
 using TMPro;
 using UnityEngine;
@@ -16,20 +17,20 @@ using VContainer;
 
 namespace Game.GamePlay
 {
-    public class GamePassView : MonoBehaviour, IPassView 
+    public class GamePassView : MonoBehaviour, IPassView
     {
         [SerializeField] private string viewId = nameof(GamePassView);
-        [Header("Top Bar")] 
-        [SerializeField] private UITimeCountdownWidget timeCountdownWidget;
+        [Header("Top Bar")] [SerializeField] private UITimeCountdownWidget timeCountdownWidget;
         [SerializeField] private TMP_Text txtCurrentLevel;
         [SerializeField] private GamePassExpSlider expSlider;
         [SerializeField] private Button btnBuyPremium;
         [SerializeField] private GameObject objPremiumBadge;
         [SerializeField] private GameObject objBonusPassActiveVisual;
-       
+
 
         [Header("Milestones List")] [SerializeField]
         private Transform milestoneContainer;
+
         [SerializeField] private Transform startIndex;
         [SerializeField] private Transform endIndex;
         [SerializeField] private ScrollRect milestoneScrollRect;
@@ -39,19 +40,18 @@ namespace Game.GamePlay
 
         [SerializeField] private MilestoneUIItem milestonePrefab;
 
-        [Header("Bonus Milestones List")] 
-        [SerializeField] private Transform bonusContainer;
+        [Header("Bonus Milestones List")] [SerializeField]
+        private Transform bonusContainer;
+
         [SerializeField] private BonusMilestoneUIItem bonusPrefab;
 
-        [Header("Bonus Bank Milestone")] 
-        [SerializeField] private BonusBankMilestoneUiItem _bonusBankMilestoneUiItem;
+        [Header("Bonus Bank Milestone")] [SerializeField]
+        private BonusBankMilestoneUiItem _bonusBankMilestoneUiItem;
 
-        [Header("Reward Info")]
-        [SerializeField] private ItemRewardInfoPanel rewardInfoPanel;
-        
-        [Header("Flow Events")]
+        [Header("Reward Info")] [SerializeField]
+        private ItemRewardInfoPanel rewardInfoPanel;
 
-        public UnityEvent OnFlowStarted;
+        [Header("Flow Events")] public UnityEvent OnFlowStarted;
         public UnityEvent OnFlowEnded;
 
         private readonly List<MilestoneUIItem> _milestonePool = new List<MilestoneUIItem>();
@@ -73,7 +73,7 @@ namespace Game.GamePlay
         private CancellationTokenSource _scrollCts;
         private bool _isScrollFirstTime = false;
 
-        public void Initialize(IPassService passService,IEventService eventService)
+        public void Initialize(IPassService passService, IEventService eventService)
         {
             _passService = passService;
             _eventService = eventService;
@@ -87,7 +87,6 @@ namespace Game.GamePlay
 
         private void OnEnable()
         {
-           
         }
 
         public void RefreshUIManual()
@@ -110,7 +109,7 @@ namespace Game.GamePlay
                                               _lastViewData != null &&
                                               expSlider != null &&
                                               viewData.CurrentExp > _lastViewData.CurrentExp;
-                                            
+
             PassViewData initialViewData = shouldAnimateManualRefresh ? _lastViewData : viewData;
 
             UpdateExpProgressUI(initialViewData);
@@ -148,24 +147,28 @@ namespace Game.GamePlay
                         item = Instantiate(milestonePrefab, milestoneContainer);
                         _milestonePool.Add(item);
                     }
-        
+
                     if (startIndex != null)
                     {
                         item.transform.SetSiblingIndex(startIndex.GetSiblingIndex() + i + 1);
                     }
 
                     item.Setup(sortedMilestones[i], HandleClaimRewardItem, showClaimButtons, HandleRewardInfoRequest);
-                    if(highlightedMilestoneIndex < GetMaxMilestoneIndex(viewData)){}
+                    if (highlightedMilestoneIndex < GetMaxMilestoneIndex(viewData))
+                    {
+                    }
+
                     if (item.MilestoneIndex == maxMilestoneIndex)
                     {
-                        item.UpdateHighlightState(-1); 
+                        item.UpdateHighlightState(-1);
                     }
                     else
                     {
                         item.UpdateHighlightState(highlightedMilestoneIndex);
                     }
-                    item.SetExpSliderProgress(GetCompletedMilestoneSliderProgress(initialViewData, initialViewData.CurrentExp, item.MilestoneIndex));
-                   
+
+                    item.SetExpSliderProgress(GetCompletedMilestoneSliderProgress(initialViewData,
+                        initialViewData.CurrentExp, item.MilestoneIndex));
                 }
 
                 if (endIndex != null && startIndex != null)
@@ -225,20 +228,30 @@ namespace Game.GamePlay
                 _refreshAnimationCts = new CancellationTokenSource();
                 AnimateManualRefreshAsync(_lastViewData, viewData, _refreshAnimationCts.Token).Forget();
             }
+
             _lastViewData = viewData;
         }
 
         public void RunScrollFirstTimeOpenPopup()
         {
-            if(!_isScrollFirstTime)
+            if (!_isScrollFirstTime)
             {
                 _isScrollFirstTime = true;
-                ScrollToMilestone(_lastViewData.CurrentMilestoneIndex, animate: false).Forget();
-                
+
+                // Thay đổi logic kiểm tra từ biến IsFirstOpen trong SaveData qua Service
+                if (_passService != null && !_passService.IsFirstOpen)
+                {
+                    HandleFirstOpenScrollAsync().Forget();
+                }
+                else
+                {
+                    ScrollToMilestone(_lastViewData.CurrentMilestoneIndex, animate: false).Forget();
+                }
             }
         }
 
-        private async UniTask AnimateManualRefreshAsync(PassViewData fromViewData, PassViewData toViewData, CancellationToken ct)
+        private async UniTask AnimateManualRefreshAsync(PassViewData fromViewData, PassViewData toViewData,
+            CancellationToken ct)
         {
             try
             {
@@ -248,7 +261,7 @@ namespace Game.GamePlay
 
                 int fromMilestoneIndex = GetNextMilestoneIndex(toViewData, fromViewData.CurrentExp);
                 int nextMilestoneIndex = GetNextMilestoneIndex(toViewData, toViewData.CurrentExp);
-                
+
                 UpdateLevelText(toViewData, fromViewData.CurrentExp);
                 SetCompletedMilestoneSlidersByExp(toViewData, fromViewData.CurrentExp);
                 SetClaimButtonsVisible(false);
@@ -260,8 +273,10 @@ namespace Game.GamePlay
                 {
                     ct.ThrowIfCancellationRequested();
 
-                    string fromProgressText = GetAnimationProgressText(toViewData, stepStartExp, stepStartExp, step.FromProgressText);
-                    string toProgressText = GetAnimationProgressText(toViewData, stepStartExp, step.EvaluatedExpForClaimableCheck, step.ToProgressText);
+                    string fromProgressText =
+                        GetAnimationProgressText(toViewData, stepStartExp, stepStartExp, step.FromProgressText);
+                    string toProgressText = GetAnimationProgressText(toViewData, stepStartExp,
+                        step.EvaluatedExpForClaimableCheck, step.ToProgressText);
 
                     await expSlider.PlaySliderAnimationAsync(
                         step.FromProgressPercentage,
@@ -284,8 +299,10 @@ namespace Game.GamePlay
                 await PlayContinuousMilestoneFlowAsync(fromViewData, toViewData, nextMilestoneIndex, ct);
                 if (_bonusBankMilestoneUiItem != null && fromViewData.BonusBank != null && toViewData.BonusBank != null)
                 {
-                    await _bonusBankMilestoneUiItem.PlayAmountAnimationAsync(fromViewData.BonusBank, toViewData.BonusBank, ct);
-                    _bonusBankMilestoneUiItem.Setup(toViewData.BonusBank, HandleClaimBonusBankItem, HandleRewardInfoRequest);
+                    await _bonusBankMilestoneUiItem.PlayAmountAnimationAsync(fromViewData.BonusBank,
+                        toViewData.BonusBank, ct);
+                    _bonusBankMilestoneUiItem.Setup(toViewData.BonusBank, HandleClaimBonusBankItem,
+                        HandleRewardInfoRequest);
                 }
 
                 SetCompletedMilestoneSlidersByExp(toViewData, toViewData.CurrentExp);
@@ -293,19 +310,21 @@ namespace Game.GamePlay
                 {
                     await AnimateMilestoneHighlightAsync(nextMilestoneIndex, 1f, ct, 0.5f);
                 }
+
                 UpdateMilestoneHighlightState(nextMilestoneIndex);
                 SetClaimButtonsVisible(true);
                 OnEndFlow();
             }
             catch (OperationCanceledException)
             {
-              
             }
         }
 
-        private async UniTask PlayContinuousMilestoneFlowAsync(PassViewData fromViewData, PassViewData toViewData, int nextMilestoneIndex, CancellationToken ct)
+        private async UniTask PlayContinuousMilestoneFlowAsync(PassViewData fromViewData, PassViewData toViewData,
+            int nextMilestoneIndex, CancellationToken ct)
         {
-            var completedMilestoneIndices = GetCompletedMilestoneIndicesBetween(fromViewData.CurrentExp, toViewData.CurrentExp, toViewData);
+            var completedMilestoneIndices =
+                GetCompletedMilestoneIndicesBetween(fromViewData.CurrentExp, toViewData.CurrentExp, toViewData);
 
             if (completedMilestoneIndices.Count == 0)
             {
@@ -324,7 +343,8 @@ namespace Game.GamePlay
             }
         }
 
-        private async UniTask PlayCompletedMilestoneFlowItemsAsync(List<int> completedMilestoneIndices, float itemDuration, CancellationToken ct)
+        private async UniTask PlayCompletedMilestoneFlowItemsAsync(List<int> completedMilestoneIndices,
+            float itemDuration, CancellationToken ct)
         {
             foreach (int milestoneIndex in completedMilestoneIndices)
             {
@@ -343,7 +363,7 @@ namespace Game.GamePlay
                 item.SetExpSliderProgress(1f);
             }
         }
-        
+
 
         private float GetMilestoneFlowItemDuration(int completedCount)
         {
@@ -378,8 +398,8 @@ namespace Game.GamePlay
         private static int GetNextMilestoneIndex(PassViewData viewData, int currentExp)
         {
             int calculatedMilestoneIndex = GetCompletedMilestoneIndex(viewData, currentExp);
-            int maxMilestoneIndex = viewData.Milestones != null && viewData.Milestones.Count > 0 
-                ? viewData.Milestones.Max(m => m.Index) 
+            int maxMilestoneIndex = viewData.Milestones != null && viewData.Milestones.Count > 0
+                ? viewData.Milestones.Max(m => m.Index)
                 : calculatedMilestoneIndex;
 
             int nextMilestoneIndex = Mathf.Min(calculatedMilestoneIndex + 1, maxMilestoneIndex);
@@ -407,7 +427,8 @@ namespace Game.GamePlay
             return calculatedMilestoneIndex;
         }
 
-        private static string GetAnimationProgressText(PassViewData viewData, int stepStartExp, int totalExp, string fallbackText)
+        private static string GetAnimationProgressText(PassViewData viewData, int stepStartExp, int totalExp,
+            string fallbackText)
         {
             if (!GamePassExpSlider.TryGetBonusBankProgressTextAtExp(viewData, stepStartExp, out _))
             {
@@ -419,7 +440,8 @@ namespace Game.GamePlay
                 : fallbackText;
         }
 
-        private static float GetCompletedMilestoneSliderProgress(PassViewData viewData, int currentExp, int milestoneIndex)
+        private static float GetCompletedMilestoneSliderProgress(PassViewData viewData, int currentExp,
+            int milestoneIndex)
         {
             int completedMilestoneIndex = GetCompletedMilestoneIndex(viewData, currentExp);
             return milestoneIndex <= completedMilestoneIndex ? 1f : 0f;
@@ -430,7 +452,8 @@ namespace Game.GamePlay
             foreach (var item in _milestonePool)
             {
                 if (item == null || !item.gameObject.activeSelf) continue;
-                item.SetExpSliderProgress(GetCompletedMilestoneSliderProgress(viewData, currentExp, item.MilestoneIndex));
+                item.SetExpSliderProgress(
+                    GetCompletedMilestoneSliderProgress(viewData, currentExp, item.MilestoneIndex));
             }
         }
 
@@ -443,7 +466,6 @@ namespace Game.GamePlay
                 if (item == null || !item.gameObject.activeSelf) continue;
                 if (item.MilestoneIndex < currentMilestoneIndex || currentMilestoneIndex >= maxMilestoneIndex)
                 {
-                   
                     item.SetClaimButtonsVisible(true);
                 }
                 else
@@ -464,14 +486,13 @@ namespace Game.GamePlay
 
         private void UpdateMilestoneHighlightState(int milestoneIndex)
         {
-           
             int maxMilestoneIndex = GetMaxMilestoneIndex(_lastViewData);
 
             foreach (var item in _milestonePool)
             {
                 if (item == null || !item.gameObject.activeSelf) continue;
 
-              
+
                 if (item.MilestoneIndex == maxMilestoneIndex)
                 {
                     item.UpdateHighlightState(-1);
@@ -485,10 +506,12 @@ namespace Game.GamePlay
 
         private MilestoneUIItem GetMilestoneItem(int milestoneIndex)
         {
-            return _milestonePool.FirstOrDefault(item => item != null && item.gameObject.activeSelf && item.MilestoneIndex == milestoneIndex);
+            return _milestonePool.FirstOrDefault(item =>
+                item != null && item.gameObject.activeSelf && item.MilestoneIndex == milestoneIndex);
         }
 
-        private async UniTask AnimateMilestoneHighlightAsync(int milestoneIndex, float value, CancellationToken ct, float duration)
+        private async UniTask AnimateMilestoneHighlightAsync(int milestoneIndex, float value, CancellationToken ct,
+            float duration)
         {
             var targetItem = GetMilestoneItem(milestoneIndex);
             if (targetItem == null) return;
@@ -520,13 +543,15 @@ namespace Game.GamePlay
             rewardInfoPanel.ShowRewards(rewards, anchor);
         }
 
-        private void HandleRewardInfoRequest(IReadOnlyList<IItemReward> rewards, Transform anchor, MilestoneState state, bool isPremium)
+        private void HandleRewardInfoRequest(IReadOnlyList<IItemReward> rewards, Transform anchor, MilestoneState state,
+            bool isPremium)
         {
             if (rewardInfoPanel == null) return;
             rewardInfoPanel.ShowRewards(rewards, anchor, GetRewardDescriptionState(state, isPremium));
         }
 
-        private static ItemRewardInfoPanel.RewardDescriptionState GetRewardDescriptionState(MilestoneState state, bool isPremium)
+        private static ItemRewardInfoPanel.RewardDescriptionState GetRewardDescriptionState(MilestoneState state,
+            bool isPremium)
         {
             if (state == MilestoneState.Claimed)
             {
@@ -540,9 +565,10 @@ namespace Game.GamePlay
 
             return ItemRewardInfoPanel.RewardDescriptionState.Unclaimed;
         }
-        private  int GetMaxMilestoneIndex(PassViewData viewData)
+
+        private int GetMaxMilestoneIndex(PassViewData viewData)
         {
-            if (viewData?.Milestones == null || viewData.Milestones.Count == 0) 
+            if (viewData?.Milestones == null || viewData.Milestones.Count == 0)
                 return -1;
 
             return viewData.Milestones.Max(m => m.Index);
@@ -572,7 +598,7 @@ namespace Game.GamePlay
         {
             if (_eventService == null || rewards == null) return;
 
-            var rewardEventData = RewardItemDataHelper.FromItemRewards(rewards,true,true);
+            var rewardEventData = RewardItemDataHelper.FromItemRewards(rewards, true, true);
             if (rewardEventData.Count == 0) return;
 
             var args = new RewardClaimedArgs
@@ -584,7 +610,8 @@ namespace Game.GamePlay
             _eventService.Publish(GameEvent.OnRewardClaimByGamePass, args);
         }
 
-        private async UniTask ScrollToMilestone(int milestoneIndex, bool animate = false, float duration = 0.5f, CancellationToken ct = default(CancellationToken))
+        private async UniTask ScrollToMilestone(int milestoneIndex, bool animate = false, float duration = 0.5f,
+            CancellationToken ct = default(CancellationToken))
         {
             if (milestoneScrollRect == null) return;
 
@@ -614,14 +641,64 @@ namespace Game.GamePlay
                     try
                     {
                         float finalDuration = animate ? duration : 0f;
-                        await milestoneScrollRect.FocusOnItemAsync(rectTransform, finalDuration, _scrollCts.Token, bias: 0.5f);
+                        await milestoneScrollRect.FocusOnItemAsync(rectTransform, finalDuration, _scrollCts.Token,
+                            bias: 0.5f);
                     }
                     catch (System.OperationCanceledException)
                     {
-                       
                     }
                 }
             }
+        }
+        private async UniTaskVoid HandleFirstOpenScrollAsync()
+        {
+            if (milestoneScrollRect == null) return;
+
+            var token = this.destroyCancellationToken;
+            CancelScrollAnimation();
+
+            try
+            {
+                OnStartFlow();
+                if (endIndex != null && endIndex is RectTransform endRect)
+                {
+                    ForceRebuildMilestoneScrollLayout();
+                    milestoneScrollRect.FocusOnItem(endRect, bias: 0.5f);
+                }
+                else if (_milestonePool.Count > 0)
+                {
+                    var lastItem = _milestonePool.LastOrDefault(item => item != null && item.gameObject.activeSelf);
+                    if (lastItem != null)
+                    {
+                        ForceRebuildMilestoneScrollLayout();
+                        milestoneScrollRect.FocusOnItem(lastItem.GetComponent<RectTransform>(), bias: 0.5f);
+                    }
+                }
+
+                Vector2 startNormalizedPos = milestoneScrollRect.normalizedPosition;
+                Vector2 targetNormalizedPos = Vector2.zero;
+
+                if (startIndex != null && startIndex is RectTransform startRect)
+                {
+                    milestoneScrollRect.FocusOnItem(startRect, bias: 0.5f);
+                    targetNormalizedPos = milestoneScrollRect.normalizedPosition;
+                    milestoneScrollRect.normalizedPosition = startNormalizedPos;
+                }
+                await UniTask.Delay(1000,false, PlayerLoopTiming.Update, token);
+                float duration = 3f; 
+                await milestoneScrollRect.DONormalizedPos(targetNormalizedPos, duration)
+                    .SetEase(Ease.OutQuad) 
+                    .SetUpdate(UpdateType.Normal,
+                        isIndependentUpdate: false) 
+                    .WithCancellation(token);
+
+            
+                _passService.MarkFirstOpenCompleted();
+                OnEndFlow();
+                _eventService.PublishEvent(GameEvent.OnGamePassViewFirstOpen);
+            }
+            catch (OperationCanceledException) { Debug.Log("[GamePassView] Hiệu ứng cuộn DOTween đã bị hủy."); }
+            catch (Exception ex) { Debug.LogError($"[GamePassView] Lỗi hiệu ứng cuộn DOTween: {ex.Message}"); }
         }
 
         private void ForceRebuildMilestoneScrollLayout()
@@ -648,7 +725,7 @@ namespace Game.GamePlay
             _refreshAnimationCts.Dispose();
             _refreshAnimationCts = null;
         }
-        
+
         private void CancelScrollAnimation()
         {
             if (_scrollCts != null)
@@ -668,7 +745,7 @@ namespace Game.GamePlay
         {
             OnFlowEnded?.Invoke();
         }
-       
+
         private void OnDisable()
         {
             if (rewardInfoPanel != null)
@@ -691,6 +768,7 @@ namespace Game.GamePlay
             {
                 _passService.UnregisterView(this);
             }
+
             CancelRefreshAnimation();
             CancelScrollAnimation();
         }
