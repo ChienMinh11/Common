@@ -26,6 +26,7 @@ namespace Game.GamePlay
         [SerializeField] private GameObject objNotificationBadge; 
         [SerializeField] private TMP_Text txtClaimableCount;
         private IPassService _passService;
+        private IPopupService _popupService;
         private IEventService _eventService;
         private PassViewData _lastViewData;
         private bool _playManualRefreshAnimation;
@@ -39,18 +40,27 @@ namespace Game.GamePlay
         public SideWidgetStructConfig Config => config;
   
         [Inject]
-        public void Constructor(IPassService passService,IEventService eventService)
+        public void Constructor(IPassService passService,IEventService eventService,IPopupService popupService)
         {
             _passService = passService;
             _eventService = eventService;
-            
-           
+            _popupService = popupService;
         }
         
         public void Initialize()
         {
             gameObject.SetActive(true);
             _passService.RegisterView(this);
+        }
+
+        private void Start()
+        {
+            ExecuteForceUpdateNextFrame().Forget();
+        }
+
+        public async UniTaskVoid ExecuteForceUpdateNextFrame()
+        {
+            await UniTask.WaitForEndOfFrame();
             _passService.ForceUpdateUIWidget(this);
         }
 
@@ -251,6 +261,11 @@ namespace Game.GamePlay
             _refreshAnimationCts.Cancel();
             _refreshAnimationCts.Dispose();
             _refreshAnimationCts = null;
+        }
+
+        public void OnClickShowPopupEndPass()
+        {
+            _popupService.ShowPopup("PopupGamePassEnd", "");
         }
     }
 }

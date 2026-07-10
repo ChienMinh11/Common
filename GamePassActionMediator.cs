@@ -154,8 +154,6 @@ namespace Game.GamePlay
             if (_popupService is IPopupQueueService queueService)
             {
                 var requests = new List<PopupQueueRequest>();
-
-                // TỐI ƯU & SỬA LỖI: Chỉ mở popup tương ứng với loại quà hiển thị
                 if (eventData.IsBonusBank)
                 {
                     requests.Add(new PopupQueueRequest(
@@ -174,8 +172,6 @@ namespace Game.GamePlay
                         closeAndRestore: false
                     ));
                 }
-
-                // BẮT BUỘC: Sử dụng EnqueueMultiple để đưa danh sách vào sắp xếp Priority chuẩn xác
                 queueService.EnqueueMultiple(requests);
             }
         }

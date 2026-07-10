@@ -1,4 +1,6 @@
+using ChieChie.GamePass;
 using UnityEngine;
+using VContainer;
 
 namespace Game.GamePlay
 {
@@ -6,6 +8,14 @@ namespace Game.GamePlay
     {
         protected override void SetPopupName() => PopupName = "PopupGamePassEnd";
         protected override void SetCacheable() => IsCache = false;
+        
+        private IPassService _passService;
+
+        [Inject]
+        private void Contructor(IPassService passService)
+        {
+            _passService = passService;
+        }
         protected override void OnShow()
         {
             
@@ -24,6 +34,12 @@ namespace Game.GamePlay
         protected override void Unload()
         {
            
+        }
+
+        public void OnCheckUpdateWhenEventEnd()
+        {
+            _passService.CheckEventUpdate();
+            OnClose();
         }
     }
 }
