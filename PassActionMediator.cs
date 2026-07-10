@@ -26,17 +26,14 @@ namespace Game.GamePlay
         private readonly IResourceService _resourceService;
         private readonly IPopupService _popupService;
         private readonly RewardDisplayService _rewardDisplayService;
-        private readonly IEventService _eventService;
-
+        
         public PassActionMediator(IPassService passService, IResourceService resourceService,
             IPopupService popupService,
-            IEventService eventService,
             RewardDisplayService rewardDisplayService)
         {
             _passService = passService;
             _resourceService = resourceService;
             _popupService = popupService;
-            _eventService = eventService;
             _rewardDisplayService = rewardDisplayService;
         }
 
@@ -45,6 +42,9 @@ namespace Game.GamePlay
             _passService.OnRewardsClaimed += HandleNormalRewardsClaimed;
             _passService.OnAutoClaimedRewardsProcessed += HandleAutoClaimedRewards;
             _passService.OnAutoClaimNotificationTriggered += HandleAutoClaimNotification;
+            _passService.OnBonusBankClaimNotificationTriggered += HandleBonusBankClaimNotification;
+           
+            
         }
 
         public void Dispose()
@@ -52,17 +52,22 @@ namespace Game.GamePlay
             _passService.OnRewardsClaimed -= HandleNormalRewardsClaimed;
             _passService.OnAutoClaimedRewardsProcessed -= HandleAutoClaimedRewards;
             _passService.OnAutoClaimNotificationTriggered -= HandleAutoClaimNotification;
+            _passService.OnBonusBankClaimNotificationTriggered -= HandleBonusBankClaimNotification;
         }
 
         #region Logic Xử Lý Tài Nguyên (Resource)
 
-        private void HandleNormalRewardsClaimed(List<IItemReward> rewards)
+        private void HandleNormalRewardsClaimed(List<IItemReward> rewards, PassRewardSource source)
         {
-            AddRewardsToResourceSystem(rewards, isAutoClaim: false);
+           
+            bool shouldDelay = (source == PassRewardSource.BonusBank);
+            
+            AddRewardsToResourceSystem(rewards, isAutoClaim: false, delayUpdate: shouldDelay);
         }
 
         private void HandleAutoClaimedRewards(List<IItemReward> rewards)
         {
+           
             AddRewardsToResourceSystem(rewards, isAutoClaim: true, delayUpdate: true);
         }
 
@@ -167,6 +172,24 @@ namespace Game.GamePlay
 
                 // BẮT BUỘC: Sử dụng EnqueueMultiple để đưa danh sách vào sắp xếp Priority chuẩn xác
                 queueService.EnqueueMultiple(requests);
+            }
+        }
+
+        private void HandleBonusBankClaimNotification(IPassNotificationEventData eventData)
+        {
+            if (eventData == null || eventData.Rewards == null || eventData.Rewards.Count == 0) return;
+
+            List<IItemReward> targetRewards = new List<IItemReward>();
+
+            if (eventData.IsBonusBank)
+            {
+                targetRewards = eventData.Rewards;
+            }
+            var displayData = new AutoClaimRewardDisplayData(targetRewards);
+            _rewardDisplayService.EnqueueContextData(displayData);
+            if (_popupService != null)
+            {
+                _popupService.ShowPopup("PopupBonusBankShowReward", "", true);
             }
         }
 

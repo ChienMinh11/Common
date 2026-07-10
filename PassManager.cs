@@ -16,9 +16,10 @@ namespace ChieChie.GamePass
         public bool IsInitialized { get; set; }
 
         private CancellationTokenSource _countdownCts;
-        public event Action<List<IItemReward>> OnRewardsClaimed;
+        public event Action<List<IItemReward>, PassRewardSource> OnRewardsClaimed;
         public event Action<List<IItemReward>> OnAutoClaimedRewardsProcessed;
         public event Action<IPassNotificationEventData> OnAutoClaimNotificationTriggered;
+        public event Action<IPassNotificationEventData> OnBonusBankClaimNotificationTriggered;
 
         private readonly ITimeProvider _timeProvider;
         public DateTime EventEndTime => _passModel?.EventEndTime ?? DateTime.MinValue;
@@ -36,6 +37,7 @@ namespace ChieChie.GamePass
             _passModel = new PassModel(_passDatabase, _passSaveAdapter, _passSchedule, _timeProvider);
             _passModel.OnRewardsClaimed += HandleModelRewardsClaimed;
             _passModel.OnAutoClaimNotificationTriggered += HandleModelAutoClaimNotification;
+            _passModel.OnBonusBankClaimNotificationTriggered += HandleModelBonusBankClaimNotification;
             _passPresenter = new PassPresenter(_passModel,_passDatabase);
             IsInitialized = true;
 
@@ -56,6 +58,7 @@ namespace ChieChie.GamePass
             {
                 _passModel.OnRewardsClaimed -= HandleModelRewardsClaimed;
                 _passModel.OnAutoClaimNotificationTriggered -= HandleModelAutoClaimNotification;
+                _passModel.OnBonusBankClaimNotificationTriggered -= HandleModelBonusBankClaimNotification;
             }
 
             _passModel?.Cleanup();
@@ -64,10 +67,9 @@ namespace ChieChie.GamePass
 
         private void CheckAndTriggerAutoClaimEvent()
         {
-            var autoRewards = GetAndClearAutoClaimedRewards(); // Hàm này lấy ra danh sách quà hiện tại từ Model
+            var autoRewards = GetAndClearAutoClaimedRewards(); 
             if (autoRewards != null && autoRewards.Count > 0)
             {
-                // Bắn event ra ngoài để hệ thống Resource tự động cập nhật và UI tự động hiển thị
                 OnAutoClaimedRewardsProcessed?.Invoke(autoRewards);
                 _passModel.TriggerAutoClaimNotifications();
             }
@@ -76,11 +78,16 @@ namespace ChieChie.GamePass
         {
             OnAutoClaimNotificationTriggered?.Invoke(eventData);
         }
+
+        private void HandleModelBonusBankClaimNotification(IPassNotificationEventData eventData)
+        {
+            OnBonusBankClaimNotificationTriggered?.Invoke(eventData);
+        }
         public List<IItemReward> GetAndClearAutoClaimedRewards() => _passModel.AutoClaimedRewards;
        
-        private void HandleModelRewardsClaimed(List<IItemReward> rewards)
+        private void HandleModelRewardsClaimed(List<IItemReward> rewards, PassRewardSource source)
         {
-            OnRewardsClaimed?.Invoke(rewards);
+            OnRewardsClaimed?.Invoke(rewards, source);
         }
         public void RegisterView(IPassView view)=> _passPresenter.RegisterView(view);
         public void UnregisterView(IPassView view) => _passPresenter.UnregisterView(view);

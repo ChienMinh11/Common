@@ -15,7 +15,7 @@ namespace ChieChie.GamePass
         private Dictionary<int, PassBonusData> _bonusItemsCache;
  
         public event Action OnDataChanged;
-        public event Action<List<IItemReward>> OnRewardsClaimed;
+        public event Action<List<IItemReward>, PassRewardSource> OnRewardsClaimed;
 
         public int CurrentExp => _saveData.currentExp;
         public bool HasDelayedUIUpdate => _saveData != null && _saveData.hasDelayedUIUpdate;
@@ -29,6 +29,7 @@ namespace ChieChie.GamePass
         public List<IItemReward> AutoClaimedBonusRewards { get; private set; } = new List<IItemReward>();
         public List<IItemReward> AutoClaimedBonusBankRewards { get; private set; } = new();
         public event Action<IPassNotificationEventData> OnAutoClaimNotificationTriggered;
+        public event Action<IPassNotificationEventData> OnBonusBankClaimNotificationTriggered; 
 
         private readonly ITimeProvider _timeProvider;
         public bool IsEventActive => _eventScheduler != null && _eventScheduler.isActive;
@@ -475,10 +476,12 @@ namespace ChieChie.GamePass
             if (reward == null) return false;
 
             _saveData.isBonusBankClaimed = true;
-            OnRewardsClaimed?.Invoke(new List<IItemReward> { reward });
+            OnRewardsClaimed?.Invoke(new List<IItemReward> { reward }, PassRewardSource.BonusBank);
 
             _passSaveAdapter.SaveData(_saveData);
             NotifyDataChanged();
+            OnBonusBankClaimNotificationTriggered?.Invoke(
+                new PassNotificationEventData(new List<IItemReward> { reward }, false, true));
             return true;
         }
 
@@ -535,7 +538,9 @@ namespace ChieChie.GamePass
             if (_bonusItemsCache.TryGetValue(index, out var bonusItem))
             {
                 var finalRewards = GetFinalRewards(index, false, true, bonusItem.BonusPassrewards);
-                OnRewardsClaimed?.Invoke(finalRewards);
+        
+                
+                OnRewardsClaimed?.Invoke(finalRewards, PassRewardSource.Bonus);
             }
 
             _passSaveAdapter.SaveData(_passSaveAdapter.LoadData() ?? _saveData);
@@ -564,19 +569,21 @@ namespace ChieChie.GamePass
         public bool ClaimReward(int index, bool isPremium)
         {
             if (GetMilestoneState(index, isPremium) != MilestoneState.ReadyToClaim) return false;
-            
+    
             if (isPremium) _saveData.claimedPremiumMilestones.Add(index);
             else _saveData.claimedFreeMilestones.Add(index);
-            
+    
             var originalRewards = isPremium ? _database.PassItems.FirstOrDefault(i => i.index == index)?.PremiumPassrewards 
                 : _database.PassItems.FirstOrDefault(i => i.index == index)?.FreePassrewards;
 
             if (originalRewards != null)
             {
                 var finalRewards = GetFinalRewards(index, isPremium, false, originalRewards);
-                OnRewardsClaimed?.Invoke(finalRewards);
+        
+                var source = isPremium ? PassRewardSource.Premium : PassRewardSource.Normal;
+                OnRewardsClaimed?.Invoke(finalRewards, source);
             }
-          
+  
             _passSaveAdapter.SaveData(_saveData);
             NotifyDataChanged();
             return true;
