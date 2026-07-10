@@ -29,7 +29,7 @@ namespace Game.GamePlay
         {
             if (gamePassView != null)
             {
-                gamePassView.RunScrollFirstTime();
+                gamePassView.RunScrollFirstTimeOpenPopup();
                 gamePassView.RefreshUIManual();
             }
         }

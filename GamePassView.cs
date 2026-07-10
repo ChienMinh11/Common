@@ -228,7 +228,7 @@ namespace Game.GamePlay
             _lastViewData = viewData;
         }
 
-        public void RunScrollFirstTime()
+        public void RunScrollFirstTimeOpenPopup()
         {
             if(!_isScrollFirstTime)
             {
