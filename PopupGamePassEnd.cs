@@ -1,3 +1,4 @@
+using System;
 using ChieChie.GamePass;
 using UnityEngine;
 using VContainer;
@@ -28,7 +29,10 @@ namespace Game.GamePlay
 
         protected override bool CheckAutoShow()
         {
-            return true;
+            return _passService != null &&
+                   _passService.IsEventActive &&
+                   _passService.EventEndTime != DateTime.MinValue &&
+                   DateTime.UtcNow >= _passService.EventEndTime;
         }
 
         protected override void Unload()
