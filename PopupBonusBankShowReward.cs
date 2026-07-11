@@ -41,12 +41,18 @@ namespace Game.GamePlay
 
         public UniTask WaitForClose()
         {
-            _closeTaskSource = new UniTaskCompletionSource();
+            if (_closeTaskSource == null)
+            {
+                _closeTaskSource = new UniTaskCompletionSource();
+            }
+
             return _closeTaskSource.Task;
         }
         
         protected override void OnShow()
         {
+            _closeTaskSource = new UniTaskCompletionSource();
+
             if (amount != null)
                 amount.text = "0"; 
             rewardDisplay.SetDefaultState();
@@ -129,7 +135,7 @@ namespace Game.GamePlay
         {
             _rewardDisplayService.CurrentData?.OnClosePopup();
             _rewardDisplayService.SetContextData(null);
-          
+            _closeTaskSource?.TrySetResult();
         }
 
         public void OnClickClaimAndClose()
@@ -156,7 +162,6 @@ namespace Game.GamePlay
             }
 
             OnClose();
-            _closeTaskSource?.TrySetResult();
         }
 
         private void PublishRewardClaimedEvents(IBaseRewardDisplayData data)

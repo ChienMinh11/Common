@@ -30,6 +30,8 @@ namespace Game.GamePlay
         private readonly RewardDisplayService _rewardDisplayService;
         private IDisposable _gamePassViewFirstOpenedSubscription;
         private readonly IEventService _eventService;
+        private readonly Queue<RewardPopupRequest> _rewardPopupRequests = new Queue<RewardPopupRequest>();
+        private bool _isShowingRewardPopup;
 
         public GamePassActionMediator(IPassService passService, IEventService eventService,
             IResourceService resourceService,
@@ -105,7 +107,7 @@ namespace Game.GamePlay
             if (eventData == null || eventData.Rewards == null || eventData.Rewards.Count == 0) return;
 
             List<IItemReward> normalRewards = new List<IItemReward>();
-            List<IItemReward>bonusBankRewards = new List<IItemReward>();
+            List<IItemReward> bonusBankRewards = new List<IItemReward>();
 
             if (eventData.IsBonusBank)
             {
@@ -147,46 +149,103 @@ namespace Game.GamePlay
                 normalRewards = mergedDict.Values.Cast<IItemReward>().ToList();
             }
 
-            ShowPopupsRewardAsync(eventData, normalRewards, bonusBankRewards).Forget();
+            EnqueueRewardPopup(new RewardPopupRequest(eventData.IsBonusBank, normalRewards, bonusBankRewards, false));
 
         }
-        private async UniTaskVoid ShowPopupsRewardAsync(IPassNotificationEventData itemNotificationData, List<IItemReward> normalRewards, List<IItemReward> bonusBankRewards)
+
+        private void EnqueueRewardPopup(RewardPopupRequest request)
         {
-            if (itemNotificationData == null) return;
-            
-            if (itemNotificationData.IsBonusBank)
+            if (request == null || !request.HasRewards) return;
+
+            _rewardPopupRequests.Enqueue(request);
+            ProcessRewardPopupQueueAsync().Forget();
+        }
+
+        private async UniTaskVoid ProcessRewardPopupQueueAsync()
+        {
+            if (_isShowingRewardPopup) return;
+
+            _isShowingRewardPopup = true;
+
+            try
             {
-                if (bonusBankRewards != null && bonusBankRewards.Count > 0)
+                while (_rewardPopupRequests.Count > 0)
                 {
-                    if (_rewardDisplayService == null) return;
-                    var bonusBankDisplayData = new BonusBankRewardDisplayData(bonusBankRewards);
-                    _rewardDisplayService.EnqueueContextData(bonusBankDisplayData);
-                    _rewardDisplayService.SetContextData(bonusBankDisplayData);
-                    bool isOpened = await _popupService.ShowPopup("PopupBonusBankShowReward");
-                    if (isOpened)
-                    {
-                        var popupBonusBankShowReward = _popupService.GetPopup<PopupBonusBankShowReward>("PopupBonusBankShowReward");
-                        if (popupBonusBankShowReward != null)
-                        {
-                            await popupBonusBankShowReward.WaitForClose(); 
-                        }
-                    }
+                    var request = _rewardPopupRequests.Dequeue();
+                    await ShowPopupsRewardAsync(request);
                 }
             }
-            
-            if (normalRewards != null && normalRewards.Count > 0)
+            catch (OperationCanceledException)
             {
-              
-                if (_rewardDisplayService != null)
+                _rewardPopupRequests.Clear();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+            finally
+            {
+                _isShowingRewardPopup = false;
+
+                if (_rewardPopupRequests.Count > 0)
                 {
-                    var normalRewardDisplayData = new AutoClaimRewardDisplayData(normalRewards);
-                    _rewardDisplayService.EnqueueContextData(normalRewardDisplayData);
-                    _rewardDisplayService.SetContextData( normalRewardDisplayData);
-                    await _popupService.ShowPopup("PopupDisplayReward");
+                    ProcessRewardPopupQueueAsync().Forget();
+                }
+            }
+        }
+
+        private async UniTask ShowPopupsRewardAsync(RewardPopupRequest request)
+        {
+            if (request == null || _rewardDisplayService == null || _popupService == null) return;
+
+            if (request.IsBonusBank && request.BonusBankRewards != null && request.BonusBankRewards.Count > 0)
+            {
+                var bonusBankDisplayData = new BonusBankRewardDisplayData(request.BonusBankRewards);
+                _rewardDisplayService.SetContextData(bonusBankDisplayData);
+
+                bool isOpened = await _popupService.ShowPopup("PopupBonusBankShowReward", "", request.CloseAndRestore);
+                if (isOpened)
+                {
+                    var popupBonusBankShowReward = _popupService.GetPopup<PopupBonusBankShowReward>("PopupBonusBankShowReward");
+                    if (popupBonusBankShowReward != null)
+                    {
+                        await popupBonusBankShowReward.WaitForClose();
+                    }
+                    else
+                    {
+                        _rewardDisplayService.SetContextData(null);
+                    }
+                }
+                else
+                {
+                    _rewardDisplayService.SetContextData(null);
                 }
             }
 
-            await UniTask.CompletedTask;
+            if (request.NormalRewards != null && request.NormalRewards.Count > 0)
+            {
+                var normalRewardDisplayData = new AutoClaimRewardDisplayData(request.NormalRewards);
+                _rewardDisplayService.SetContextData(normalRewardDisplayData);
+
+                bool isOpened = await _popupService.ShowPopup("PopupDisplayReward");
+                if (isOpened)
+                {
+                    var popupDisplayReward = _popupService.GetPopup<PopupDisplayReward>("PopupDisplayReward");
+                    if (popupDisplayReward != null)
+                    {
+                        await popupDisplayReward.WaitForClose();
+                    }
+                    else
+                    {
+                        _rewardDisplayService.SetContextData(null);
+                    }
+                }
+                else
+                {
+                    _rewardDisplayService.SetContextData(null);
+                }
+            }
+
         }
 
         private void HandleBonusBankClaimNotification(IPassNotificationEventData eventData)
@@ -200,12 +259,7 @@ namespace Game.GamePlay
                 targetRewards = eventData.Rewards;
             }
 
-            var displayData = new AutoClaimRewardDisplayData(targetRewards);
-            _rewardDisplayService.EnqueueContextData(displayData);
-            if (_popupService != null)
-            {
-                _popupService.ShowPopup("PopupBonusBankShowReward", "", true);
-            }
+            EnqueueRewardPopup(new RewardPopupRequest(true, null, targetRewards, true));
         }
 
         private void HandleShowpopupTutorialOnFirstOpened()
@@ -214,5 +268,29 @@ namespace Game.GamePlay
         }
 
         #endregion
+
+        private class RewardPopupRequest
+        {
+            public bool IsBonusBank { get; }
+            public List<IItemReward> NormalRewards { get; }
+            public List<IItemReward> BonusBankRewards { get; }
+            public bool CloseAndRestore { get; }
+
+            public bool HasRewards =>
+                (NormalRewards != null && NormalRewards.Count > 0) ||
+                (BonusBankRewards != null && BonusBankRewards.Count > 0);
+
+            public RewardPopupRequest(
+                bool isBonusBank,
+                List<IItemReward> normalRewards,
+                List<IItemReward> bonusBankRewards,
+                bool closeAndRestore)
+            {
+                IsBonusBank = isBonusBank;
+                NormalRewards = normalRewards;
+                BonusBankRewards = bonusBankRewards;
+                CloseAndRestore = closeAndRestore;
+            }
+        }
     }
 }

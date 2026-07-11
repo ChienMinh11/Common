@@ -27,6 +27,7 @@ namespace Game.GamePlay
 
         private readonly List<RewardSlotView> _spawnedSlots = new List<RewardSlotView>();
         private readonly List<RewardSlotView> _activeRewardViews = new List<RewardSlotView>();
+        private UniTaskCompletionSource _closeTaskSource;
 
         [Inject]
         public void Construct(RewardDisplayService rewardDisplayService, IEventService eventService,
@@ -42,8 +43,20 @@ namespace Game.GamePlay
 
         protected override bool CheckAutoShow() => true;
 
+        public UniTask WaitForClose()
+        {
+            if (_closeTaskSource == null)
+            {
+                _closeTaskSource = new UniTaskCompletionSource();
+            }
+
+            return _closeTaskSource.Task;
+        }
+
         protected override void OnShow()
         {
+            _closeTaskSource = new UniTaskCompletionSource();
+
             foreach (var slot in _spawnedSlots)
             {
                 if (slot != null)
@@ -132,6 +145,7 @@ namespace Game.GamePlay
         {
             _rewardDisplayService.CurrentData?.OnClosePopup();
             _rewardDisplayService.SetContextData(null);
+            _closeTaskSource?.TrySetResult();
         }
 
         public async void OnClickClaimAndClose()
@@ -167,6 +181,11 @@ namespace Game.GamePlay
 
         protected override void Unload()
         {
+            if (_closeTaskSource != null && !_closeTaskSource.Task.Status.IsCompleted())
+            {
+                _closeTaskSource.TrySetCanceled();
+            }
+
             OnClose();
         }
     }
