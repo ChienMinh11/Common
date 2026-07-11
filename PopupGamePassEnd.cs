@@ -38,8 +38,8 @@ namespace Game.GamePlay
 
         public void OnCheckUpdateWhenEventEnd()
         {
-            _passService.CheckEventUpdate();
             OnClose();
+            _passService.CheckEventUpdate();
         }
     }
 }

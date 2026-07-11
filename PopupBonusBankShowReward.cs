@@ -22,6 +22,7 @@ namespace Game.GamePlay
         private RewardDisplayService _rewardDisplayService;
         private IEventService _eventService;
         private IEffectSequenceService _effectSequenceService;
+        private UniTaskCompletionSource _closeTaskSource;
    
         private long _targetAmount = 0;
         [Inject]
@@ -38,6 +39,12 @@ namespace Game.GamePlay
 
         protected override bool CheckAutoShow() => true;
 
+        public UniTask WaitForClose()
+        {
+            _closeTaskSource = new UniTaskCompletionSource();
+            return _closeTaskSource.Task;
+        }
+        
         protected override void OnShow()
         {
             if (amount != null)
@@ -122,6 +129,7 @@ namespace Game.GamePlay
         {
             _rewardDisplayService.CurrentData?.OnClosePopup();
             _rewardDisplayService.SetContextData(null);
+          
         }
 
         public void OnClickClaimAndClose()
@@ -148,6 +156,7 @@ namespace Game.GamePlay
             }
 
             OnClose();
+            _closeTaskSource?.TrySetResult();
         }
 
         private void PublishRewardClaimedEvents(IBaseRewardDisplayData data)
@@ -162,6 +171,10 @@ namespace Game.GamePlay
 
         protected override void Unload()
         {
+            if (_closeTaskSource != null && !_closeTaskSource.Task.Status.IsCompleted())
+            {
+                _closeTaskSource.TrySetCanceled();
+            }
             OnClose();
         }
     }

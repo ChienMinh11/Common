@@ -108,7 +108,6 @@ namespace ChieChie.GamePass
         {
             if (!_firstLaunch)
             {
-                Debug.LogWarning("[PassManager] Force update UI widget");
                 _passPresenter.ForceUpdateUI(view);
                 _firstLaunch = true;
             }

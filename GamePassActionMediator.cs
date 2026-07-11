@@ -104,15 +104,15 @@ namespace Game.GamePlay
         {
             if (eventData == null || eventData.Rewards == null || eventData.Rewards.Count == 0) return;
 
-            List<IItemReward> targetRewards;
+            List<IItemReward> normalRewards = new List<IItemReward>();
+            List<IItemReward>bonusBankRewards = new List<IItemReward>();
 
             if (eventData.IsBonusBank)
             {
-                targetRewards = eventData.Rewards;
+                bonusBankRewards = eventData.Rewards;
             }
             else
             {
-                // Quà của Normal Pass hoặc Bonus Milestone thì gộp lại thành cụm
                 var mergedDict = new Dictionary<string, AutoClaimMergedReward>();
                 foreach (var r in eventData.Rewards)
                 {
@@ -144,36 +144,49 @@ namespace Game.GamePlay
                     }
                 }
 
-                targetRewards = mergedDict.Values.Cast<IItemReward>().ToList();
+                normalRewards = mergedDict.Values.Cast<IItemReward>().ToList();
             }
 
-            if (targetRewards.Count == 0) return;
+            ShowPopupsRewardAsync(eventData, normalRewards, bonusBankRewards).Forget();
 
-            var displayData = new AutoClaimRewardDisplayData(targetRewards);
-            _rewardDisplayService.EnqueueContextData(displayData);
-            if (_popupService is IPopupQueueService queueService)
+        }
+        private async UniTaskVoid ShowPopupsRewardAsync(IPassNotificationEventData itemNotificationData, List<IItemReward> normalRewards, List<IItemReward> bonusBankRewards)
+        {
+            if (itemNotificationData == null) return;
+            
+            if (itemNotificationData.IsBonusBank)
             {
-                var requests = new List<PopupQueueRequest>();
-                if (eventData.IsBonusBank)
+                if (bonusBankRewards != null && bonusBankRewards.Count > 0)
                 {
-                    requests.Add(new PopupQueueRequest(
-                        popupNameId: "PopupBonusBankShowReward",
-                        message: "",
-                        priority: 1,
-                        closeAndRestore: false
-                    ));
+                    if (_rewardDisplayService == null) return;
+                    var bonusBankDisplayData = new BonusBankRewardDisplayData(bonusBankRewards);
+                    _rewardDisplayService.EnqueueContextData(bonusBankDisplayData);
+                    _rewardDisplayService.SetContextData(bonusBankDisplayData);
+                    bool isOpened = await _popupService.ShowPopup("PopupBonusBankShowReward");
+                    if (isOpened)
+                    {
+                        var popupBonusBankShowReward = _popupService.GetPopup<PopupBonusBankShowReward>("PopupBonusBankShowReward");
+                        if (popupBonusBankShowReward != null)
+                        {
+                            await popupBonusBankShowReward.WaitForClose(); 
+                        }
+                    }
                 }
-                else
-                {
-                    requests.Add(new PopupQueueRequest(
-                        popupNameId: "PopupDisplayReward",
-                        message: "",
-                        priority: 0,
-                        closeAndRestore: false
-                    ));
-                }
-                queueService.EnqueueMultiple(requests);
             }
+            
+            if (normalRewards != null && normalRewards.Count > 0)
+            {
+              
+                if (_rewardDisplayService != null)
+                {
+                    var normalRewardDisplayData = new AutoClaimRewardDisplayData(normalRewards);
+                    _rewardDisplayService.EnqueueContextData(normalRewardDisplayData);
+                    _rewardDisplayService.SetContextData( normalRewardDisplayData);
+                    await _popupService.ShowPopup("PopupDisplayReward");
+                }
+            }
+
+            await UniTask.CompletedTask;
         }
 
         private void HandleBonusBankClaimNotification(IPassNotificationEventData eventData)
