@@ -69,11 +69,15 @@ namespace ChieChie.GamePass
 
         private void CheckAndTriggerAutoClaimEvent()
         {
-            var autoRewards = GetAndClearAutoClaimedRewards(); 
+            var autoRewards = _passModel != null
+                ? new List<IItemReward>(_passModel.AutoClaimedRewards)
+                : new List<IItemReward>();
+
             if (autoRewards != null && autoRewards.Count > 0)
             {
                 OnAutoClaimedRewardsProcessed?.Invoke(autoRewards);
                 _passModel.TriggerAutoClaimNotifications();
+                _passModel.ClearAutoClaimedRewards();
             }
         }
         private void HandleModelAutoClaimNotification(IPassNotificationEventData eventData)
@@ -85,7 +89,14 @@ namespace ChieChie.GamePass
         {
             OnBonusBankClaimNotificationTriggered?.Invoke(eventData);
         }
-        public List<IItemReward> GetAndClearAutoClaimedRewards() => _passModel.AutoClaimedRewards;
+        public List<IItemReward> GetAndClearAutoClaimedRewards()
+        {
+            if (_passModel == null) return new List<IItemReward>();
+
+            var rewards = new List<IItemReward>(_passModel.AutoClaimedRewards);
+            _passModel.ClearAutoClaimedRewards();
+            return rewards;
+        }
        
         private void HandleModelRewardsClaimed(List<IItemReward> rewards, PassRewardSource source)
         {

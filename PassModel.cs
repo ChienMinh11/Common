@@ -48,6 +48,7 @@ namespace ChieChie.GamePass
         public void Initialize()
         {
             _saveData = _passSaveAdapter.LoadData() ?? new PassSaveData();
+            ClearAutoClaimedRewardCaches();
             EnsureSaveDataDefaults();
             if (!string.IsNullOrEmpty(_saveData.currentEventId))
             {
@@ -173,11 +174,22 @@ namespace ChieChie.GamePass
             }
         }
         
-       private void ProcessAutoClaimUnclaimedRewards(PassSaveData oldData)
+        public void ClearAutoClaimedRewards()
+        {
+            ClearAutoClaimedRewardCaches();
+        }
+
+        private void ClearAutoClaimedRewardCaches()
         {
             AutoClaimedNormalRewards.Clear();
             AutoClaimedBonusRewards.Clear();
+            AutoClaimedBonusBankRewards.Clear();
             AutoClaimedRewards.Clear();
+        }
+
+        private void ProcessAutoClaimUnclaimedRewards(PassSaveData oldData)
+        {
+            ClearAutoClaimedRewardCaches();
 
             if (oldData == null) return;
             int tempExp = oldData.currentExp;
@@ -268,15 +280,15 @@ namespace ChieChie.GamePass
             if (AutoClaimedBonusBankRewards.Count > 0)
             {
                 OnAutoClaimNotificationTriggered?.Invoke(
-                    new PassNotificationEventData(AutoClaimedBonusBankRewards, false, true));
+                    new PassNotificationEventData(new List<IItemReward>(AutoClaimedBonusBankRewards), false, true));
             }
             if (AutoClaimedBonusRewards.Count > 0)
             {
-                OnAutoClaimNotificationTriggered?.Invoke(new PassNotificationEventData(AutoClaimedBonusRewards, true,false));
+                OnAutoClaimNotificationTriggered?.Invoke(new PassNotificationEventData(new List<IItemReward>(AutoClaimedBonusRewards), true,false));
             }
             if (AutoClaimedNormalRewards.Count > 0)
             {
-                OnAutoClaimNotificationTriggered?.Invoke(new PassNotificationEventData(AutoClaimedNormalRewards, false,false));
+                OnAutoClaimNotificationTriggered?.Invoke(new PassNotificationEventData(new List<IItemReward>(AutoClaimedNormalRewards), false,false));
             }
            
         }
