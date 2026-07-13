@@ -3,14 +3,10 @@ using System;
 namespace ChieChie.Constracts
 {
     [Serializable]
-    public class MonthlyEventScheduler
+    public class MonthlyEventScheduler : EventSchedulerBase
     {
+        private const string EventIdDateFormat = "yyyyMM";
         private readonly string _eventIdPrefix;
-
-        public string eventId;
-        public DateTime startTime;
-        public DateTime endTime;
-        public bool isActive;
 
         public MonthlyEventScheduler(string eventIdPrefix)
         {
@@ -20,33 +16,10 @@ namespace ChieChie.Constracts
 
         public void UpdateMonthlySchedule(ITimeProvider timeProvider)
         {
-            var now = timeProvider.UtcNow;
-            startTime = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-            endTime = startTime.AddMonths(1).AddSeconds(-1);
-            eventId = $"{_eventIdPrefix}_{startTime:yyyyMM}";
-            isActive = now >= startTime && now <= endTime;
+            UpdateSchedule(timeProvider);
         }
 
-        public bool SyncFromEventId(string savedEventId, ITimeProvider timeProvider)
-        {
-            eventId = savedEventId ?? string.Empty;
-
-            if (!TryGetEventWindow(eventId, out var parsedStartTime, out var parsedEndTime))
-            {
-                startTime = DateTime.MinValue;
-                endTime = DateTime.MinValue;
-                isActive = false;
-                return false;
-            }
-
-            startTime = parsedStartTime;
-            endTime = parsedEndTime;
-            var now = timeProvider.UtcNow;
-            isActive = now >= startTime && now <= endTime;
-            return true;
-        }
-
-        public bool TryGetEventWindow(string candidateEventId, out DateTime parsedStartTime, out DateTime parsedEndTime)
+        public override bool TryGetEventWindow(string candidateEventId, out DateTime parsedStartTime, out DateTime parsedEndTime)
         {
             parsedStartTime = DateTime.MinValue;
             parsedEndTime = DateTime.MinValue;
@@ -67,7 +40,7 @@ namespace ChieChie.Constracts
 
             if (!DateTime.TryParseExact(
                     idToken,
-                    "yyyyMM",
+                    EventIdDateFormat,
                     System.Globalization.CultureInfo.InvariantCulture,
                     System.Globalization.DateTimeStyles.None,
                     out var eventMonth))
@@ -80,25 +53,22 @@ namespace ChieChie.Constracts
             return true;
         }
 
-        public void Clear()
+        protected override bool TryCreateCurrentEvent(
+            DateTime now,
+            out string currentEventId,
+            out DateTime currentStartTime,
+            out DateTime currentEndTime)
         {
-            eventId = string.Empty;
-            isActive = false;
-            startTime = DateTime.MinValue;
-            endTime = DateTime.MinValue;
+            currentStartTime = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            currentEndTime = currentStartTime.AddMonths(1).AddSeconds(-1);
+            currentEventId = BuildEventId(currentStartTime);
+            return true;
         }
 
-        public TimeSpan GetRemainingTime(ITimeProvider timeProvider)
+        private string BuildEventId(DateTime eventStartTime)
         {
-            var now = timeProvider.UtcNow;
-            var remaining = endTime - now;
-            return remaining.TotalSeconds < 1.0 ? TimeSpan.Zero : remaining;
-        }
-
-        public bool IsExpired(ITimeProvider timeProvider)
-        {
-            var now = timeProvider.UtcNow;
-            return now >= endTime;
+            var idToken = eventStartTime.ToString(EventIdDateFormat, System.Globalization.CultureInfo.InvariantCulture);
+            return string.IsNullOrEmpty(_eventIdPrefix) ? idToken : $"{_eventIdPrefix}_{idToken}";
         }
     }
 }

@@ -10,7 +10,7 @@ namespace ChieChie.GamePass
         private readonly PassDatabase _database;
         private readonly EventSaveController<PassSaveData> _saveController;
         private readonly EventProgressTracker<PassSaveData, PassViewDisplayState> _progressTracker = new EventProgressTracker<PassSaveData, PassViewDisplayState>();
-        private readonly PassEventScheduler _eventScheduler;
+        private readonly IEventScheduler _eventScheduler;
         private PassSaveData _saveData;
         private int _totalRequiredNormalExp;
         private Dictionary<int, PassBonusData> _bonusItemsCache;
@@ -33,10 +33,10 @@ namespace ChieChie.GamePass
         public event Action<IPassNotificationEventData> OnBonusBankClaimNotificationTriggered; 
 
         private readonly ITimeProvider _timeProvider;
-        public bool IsEventActive => _eventScheduler != null && _eventScheduler.isActive;
+        public bool IsEventActive => _eventScheduler != null && _eventScheduler.IsActive;
         public bool IsFirstOpen => _saveData != null && _saveData.isFirstOpen;
 
-        public PassModel(PassDatabase database, IPassSaveAdapter passSaveAdapter, PassEventScheduler eventScheduler, ITimeProvider timeProvider)
+        public PassModel(PassDatabase database, IPassSaveAdapter passSaveAdapter, IEventScheduler eventScheduler, ITimeProvider timeProvider)
         {
             _database = database;
             _saveController = new EventSaveController<PassSaveData>(passSaveAdapter, EnsureSaveDataDefaults);
@@ -91,10 +91,10 @@ namespace ChieChie.GamePass
       
         public void ActivateNewEventManual()
         {
-            _eventScheduler.UpdateMonthlySchedule(_timeProvider);
-            if (_saveData.currentEventId != _eventScheduler.eventId)
+            _eventScheduler.UpdateSchedule(_timeProvider);
+            if (_saveData.currentEventId != _eventScheduler.EventId)
             {
-                _saveData = _saveController.Replace(new PassSaveData { currentEventId = _eventScheduler.eventId });
+                _saveData = _saveController.Replace(new PassSaveData { currentEventId = _eventScheduler.EventId });
             }
             NotifyDataChanged();
         }
@@ -279,7 +279,7 @@ namespace ChieChie.GamePass
 
         public bool AddExp(int amount, bool delayUpdateUI)
         {
-            if (!_eventScheduler.isActive) return false;
+            if (!_eventScheduler.IsActive) return false;
 
             _progressTracker.AddPoints(_saveData, amount, delayUpdateUI);
             _saveController.Save();
@@ -541,7 +541,7 @@ namespace ChieChie.GamePass
             NotifyDataChanged();
             return true;
         }
-        public DateTime EventEndTime => _eventScheduler.endTime;
+        public DateTime EventEndTime => _eventScheduler.EndTime;
 
         public void RefreshData()
         {

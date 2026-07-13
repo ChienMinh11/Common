@@ -10,7 +10,7 @@ namespace ChieChie.GamePass
     public class PassManager: IPassService, IDisposable
     {
         private readonly PassDatabase _passDatabase;
-        private readonly PassEventScheduler _passSchedule = new PassEventScheduler();
+        private readonly IEventScheduler _passSchedule;
         private readonly IPassSaveAdapter _passSaveAdapter;
         private PassModel _passModel;
         private PassPresenter _passPresenter;
@@ -28,10 +28,16 @@ namespace ChieChie.GamePass
         private bool _firstLaunch = false;
 
         public PassManager(PassDatabase database, IPassSaveAdapter saveAdapter, ITimeProvider timeProvider)
+            : this(database, saveAdapter, timeProvider, new PassEventScheduler())
+        {
+        }
+
+        public PassManager(PassDatabase database, IPassSaveAdapter saveAdapter, ITimeProvider timeProvider, IEventScheduler eventScheduler)
         {
             _passDatabase = database;
             _passSaveAdapter = saveAdapter;
             _timeProvider = timeProvider;
+            _passSchedule = eventScheduler ?? throw new ArgumentNullException(nameof(eventScheduler));
         }
 
         public async UniTask<bool> InitializeAsync(CancellationToken cancellationToken)
