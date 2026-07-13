@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using ChieChie.Constracts;
+using ChieChie.GenericLiveOps;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -27,17 +28,13 @@ namespace ChieChie.GamePass
         public bool IsEventActive => _passModel?.IsEventActive ?? false;
         private bool _firstLaunch = false;
 
+ 
         public PassManager(PassDatabase database, IPassSaveAdapter saveAdapter, ITimeProvider timeProvider)
-            : this(database, saveAdapter, timeProvider, new PassEventScheduler())
-        {
-        }
-
-        public PassManager(PassDatabase database, IPassSaveAdapter saveAdapter, ITimeProvider timeProvider, IEventScheduler eventScheduler)
         {
             _passDatabase = database;
             _passSaveAdapter = saveAdapter;
             _timeProvider = timeProvider;
-            _passSchedule = eventScheduler ?? throw new ArgumentNullException(nameof(eventScheduler));
+            _passSchedule = new PassEventScheduler();
         }
 
         public async UniTask<bool> InitializeAsync(CancellationToken cancellationToken)

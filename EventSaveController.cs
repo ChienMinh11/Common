@@ -1,6 +1,6 @@
 using System;
 
-namespace ChieChie.Constracts
+namespace ChieChie.GenericLiveOps
 {
     public interface IEventSaveAdapter<TSaveData> where TSaveData : class
     {

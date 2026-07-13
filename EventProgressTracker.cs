@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace ChieChie.Constracts
+namespace ChieChie.GenericLiveOps
 {
     public interface IEventViewDisplayState
     {

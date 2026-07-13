@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using ChieChie.Constracts;
+using ChieChie.GenericLiveOps;
 
 namespace ChieChie.GamePass
 {
@@ -185,8 +186,7 @@ namespace ChieChie.GamePass
                 }
                 else break;
             }
-
-            // 1. Thu thập Normal Rewards (Free và Premium)
+          
             foreach (var item in sortedPassItems)
             {
                 if (oldMaxMilestoneIndex >= item.index)

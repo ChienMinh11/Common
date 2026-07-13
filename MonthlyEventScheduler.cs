@@ -1,6 +1,7 @@
 using System;
+using ChieChie.Constracts;
 
-namespace ChieChie.Constracts
+namespace ChieChie.GenericLiveOps
 {
     [Serializable]
     public class MonthlyEventScheduler : EventSchedulerBase

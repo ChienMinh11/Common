@@ -1,5 +1,6 @@
 using System;
 using ChieChie.Constracts;
+using ChieChie.GenericLiveOps;
 
 namespace ChieChie.GamePass
 {
