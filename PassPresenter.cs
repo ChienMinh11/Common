@@ -1,166 +1,72 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-
 namespace ChieChie.GamePass
 {
     public class PassPresenter
     {
         private readonly PassModel _model;
-        private readonly PassDatabase _database;
-        private readonly List<IPassView> _activeViews = new List<IPassView>();
-        private List<PassBonusData> _sortedBonusItemsCache;
-        public PassPresenter(PassModel model, PassDatabase database)
+        private IPassView _view;
+
+        public PassPresenter(PassModel model)
         {
             _model = model;
-            _database = database;
-            Initialize();
-        }
-
-        private void Initialize()
-        {
             _model.OnDataChanged += HandleModelDataChanged;
-            _sortedBonusItemsCache = _database.BonusPassItems.OrderBy(b => b.index).ToList();
         }
 
-        public void RegisterView(IPassView view)
+        public void BindView(IPassView view)
         {
             if (view == null) return;
 
-            CleanUpDestroyedViews();
-            if (!_activeViews.Contains(view))
-            {
-                _activeViews.Add(view);
-                view.OnClaimRewardClicked += HandleClaimReward;
-                view.OnClaimBonusClicked += HandleClaimBonus;
-                view.OnClaimBonusBankClicked += HandleClaimBonusBank;
-                view.OnBuyPremiumClicked += HandleBuyPremium;
+            CleanUpDestroyedView();
+            if (ReferenceEquals(_view, view)) return;
 
-                RefreshView(view, UpdateViewDataForView(view));
-            }
+            UnbindCurrentView();
+
+            _view = view;
+            _view.OnClaimRewardClicked += HandleClaimReward;
+            _view.OnClaimBonusClicked += HandleClaimBonus;
+            _view.OnClaimBonusBankClicked += HandleClaimBonusBank;
+            _view.OnBuyPremiumClicked += HandleBuyPremium;
+
+            RefreshView(_model.GetViewData(_view.ViewId));
         }
 
-        public void UnregisterView(IPassView view)
+        public void UnbindView(IPassView view)
         {
-            if (_activeViews.Contains(view))
-            {
-                view.OnClaimRewardClicked -= HandleClaimReward;
-                view.OnClaimBonusClicked -= HandleClaimBonus;
-                view.OnClaimBonusBankClicked -= HandleClaimBonusBank;
-                view.OnBuyPremiumClicked -= HandleBuyPremium;
-                _activeViews.Remove(view);
-            }
+            if (!ReferenceEquals(_view, view)) return;
+
+            UnbindCurrentView();
+        }
+
+        public void ForceUpdateUI()
+        {
+            CleanUpDestroyedView();
+            if (_view == null) return;
+
+            RefreshView(_model.GetCurrentViewData());
+        }
+
+        public void RefreshView(string viewId, PassViewData viewData)
+        {
+            CleanUpDestroyedView();
+            if (_view == null || _view.ViewId != viewId) return;
+
+            RefreshView(viewData);
         }
 
         private void HandleModelDataChanged()
         {
-            CleanUpDestroyedViews();
-            if (_model.HasDelayedUIUpdate)
-            {
-                foreach (var view in _activeViews)
-                {
-                    RefreshView(view, UpdateViewDataForView(view));
-                }
+            CleanUpDestroyedView();
+            if (_view == null) return;
 
-                return;
-            }
-
-            var freshData = UpdateViewData(_model.CurrentExp);
-
-            foreach (var view in _activeViews)
-            {
-                RefreshView(view, freshData);
-            }
+            RefreshView(_model.HasDelayedUIUpdate
+                ? _model.GetViewData(_view.ViewId)
+                : _model.GetCurrentViewData());
         }
 
-        public void ForceUpdateUI(IPassView view)
+        private void RefreshView(PassViewData viewData)
         {
-            if (view == null) return;
-            CleanUpDestroyedViews();
-            if (!_activeViews.Contains(view)) return;
-            var freshData = UpdateViewData(_model.CurrentExp);
-            RefreshView(view, freshData);
-        }
+            if (_view == null || viewData == null) return;
 
-        public void FlushDelayedUIUpdate(IPassView view)
-        {
-            if (view == null) return;
-
-            CleanUpDestroyedViews();
-            if (!_activeViews.Contains(view)) return;
-
-            _model.FlushDelayedUIUpdate(view.ViewId);
-            RefreshView(view, UpdateViewDataForView(view));
-        }
-
-        private PassViewData UpdateViewDataForView(IPassView view)
-        {
-            return UpdateViewData(_model.GetDisplayedExp(view.ViewId));
-        }
-
-        private PassViewData UpdateViewData(int displayedExp)
-        {
-            var viewData = new PassViewData
-            {
-                CurrentExp = displayedExp,
-                IsPremiumUnlocked = _model.IsPremiumUnlocked,
-                CurrentMilestoneIndex = _model.GetCurrentMilestoneIndex(displayedExp),
-                EventEndTime = _model.EventEndTime,
-                Milestones = new List<MilestoneUIData>(),
-                BonusMilestones = new List<BonusMilestoneUIData>(),
-                TotalBonusExpEarned = _model.GetBonusExp(displayedExp)
-            };
-
-            foreach (var item in _database.PassItems)
-            {
-                viewData.Milestones.Add(new MilestoneUIData
-                {
-                    Index = item.index,
-                    RequiredExp = item.expRequired,
-                    FreeRewards = _model.GetFinalRewards(item.index, false, false, item.FreePassrewards), 
-                    PremiumRewards = _model.GetFinalRewards(item.index, true, false, item.PremiumPassrewards),
-                    FreeState = _model.GetMilestoneState(item.index, false, displayedExp),
-                    PremiumState = _model.GetMilestoneState(item.index, true, displayedExp),
-                    CustomIconFreePass = item.customIconFreePass,
-                    CustomIconPremiumPass = item.customIconPremiumPass
-                });
-            }
-
-            foreach (var bonusItem in _sortedBonusItemsCache)
-            {
-                viewData.BonusMilestones.Add(new BonusMilestoneUIData
-                {
-                    Index = bonusItem.index,
-                    RequiredExp = bonusItem.expRequied,
-                    Rewards = _model.GetFinalRewards(bonusItem.index, false, true, bonusItem.BonusPassrewards), 
-                    State = _model.GetBonusMilestoneState(bonusItem.index, displayedExp),
-                    BonusIcon = bonusItem.bonusIcon
-                });
-            }
-
-            if (_model.HasBonusBank)
-            {
-                var bonusBankData = _database.BonusBankData;
-                viewData.BonusBank = new BonusBankUIData
-                {
-                    CurrentAmount = _model.GetBonusBankAmount(displayedExp),
-                    MaxAmount = bonusBankData.maxRewardAmount,
-                    ExpConvertToAmount = bonusBankData.expConvertToAmount,
-                    RequiredExpToMax = _model.GetBonusBankRequiredExpToMax(),
-                    IsUnlocked = _model.IsNormalPassCompleted(displayedExp),
-                    State = _model.GetBonusBankState(displayedExp),
-                    BonusBankIcon = bonusBankData.bonusBankIcon
-                };
-            }
-
-            return viewData;
-        }
-
-        private void RefreshView(IPassView view, PassViewData viewData)
-        {
-            if (view == null || viewData == null) return;
-
-            view.RefreshUI(viewData);
+            _view.RefreshUI(viewData);
         }
 
         private void HandleClaimReward(int index, bool isPremium)
@@ -183,22 +89,31 @@ namespace ChieChie.GamePass
             _model.UnlockPremium();
         }
 
-        private void CleanUpDestroyedViews()
+        private void CleanUpDestroyedView()
         {
-            for (int i = _activeViews.Count - 1; i >= 0; i--)
+            if (_view == null) return;
+
+            if (_view is UnityEngine.MonoBehaviour mb && mb == null)
             {
-                var view = _activeViews[i];
-                if (view == null || (view is UnityEngine.MonoBehaviour mb && mb == null))
-                {
-                    _activeViews.RemoveAt(i);
-                }
+                _view = null;
             }
+        }
+
+        private void UnbindCurrentView()
+        {
+            if (_view == null) return;
+
+            _view.OnClaimRewardClicked -= HandleClaimReward;
+            _view.OnClaimBonusClicked -= HandleClaimBonus;
+            _view.OnClaimBonusBankClicked -= HandleClaimBonusBank;
+            _view.OnBuyPremiumClicked -= HandleBuyPremium;
+            _view = null;
         }
 
         public void Cleanup()
         {
             _model.OnDataChanged -= HandleModelDataChanged;
-            _activeViews.Clear();
+            UnbindCurrentView();
         }
     }
 }

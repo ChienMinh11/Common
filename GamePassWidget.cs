@@ -13,7 +13,7 @@ using VContainer.Unity;
 
 namespace Game.GamePlay
 {
-    public class GamePassWidget : MonoBehaviour, IPassView,IWidgetIdentity
+    public class GamePassWidget : MonoBehaviour, IWidgetIdentity
     {
         [SerializeField] private SideWidgetStructConfig config;
         [SerializeField] private string viewId = nameof(GamePassWidget);
@@ -31,11 +31,8 @@ namespace Game.GamePlay
         private PassViewData _lastViewData;
         private bool _playManualRefreshAnimation;
         private CancellationTokenSource _refreshAnimationCts;
+        private bool _isSubscribed;
 
-        public event Action<int, bool> OnClaimRewardClicked;
-        public event Action<int> OnClaimBonusClicked;
-        public event Action OnClaimBonusBankClicked;
-        public event Action OnBuyPremiumClicked;
         public string ViewId => string.IsNullOrEmpty(viewId) ? nameof(GamePassWidget) : viewId;
         public SideWidgetStructConfig Config => config;
   
@@ -50,7 +47,8 @@ namespace Game.GamePlay
         public void Initialize()
         {
             gameObject.SetActive(true);
-            _passService.RegisterView(this);
+            SubscribeToPassService();
+            RefreshUI(_passService.GetViewData(ViewId));
         }
 
         private void Start()
@@ -61,17 +59,13 @@ namespace Game.GamePlay
         public async UniTaskVoid ExecuteForceUpdateNextFrame()
         {
             await UniTask.WaitForEndOfFrame();
-            _passService.ForceUpdateUIWidget(this);
+            RefreshUI(_passService.GetCurrentViewData());
         }
 
         private void OnDestroy()
         {
             CancelRefreshAnimation();
-         
-            if (_passService != null)
-            {
-                _passService.UnregisterView(this);
-            }
+            UnsubscribeFromPassService();
         }
 
         private void OnDisable()
@@ -83,7 +77,28 @@ namespace Game.GamePlay
         private void RefreshUIManual()
         {
             _playManualRefreshAnimation = true;
-            _passService.FlushDelayedUIUpdate(this);
+            RefreshUI(_passService.FlushDelayedUIUpdate(ViewId));
+        }
+
+        private void HandlePassDataChanged()
+        {
+            RefreshUI(_passService.GetViewData(ViewId));
+        }
+
+        private void SubscribeToPassService()
+        {
+            if (_passService == null || _isSubscribed) return;
+
+            _passService.OnDataChanged += HandlePassDataChanged;
+            _isSubscribed = true;
+        }
+
+        private void UnsubscribeFromPassService()
+        {
+            if (_passService == null || !_isSubscribed) return;
+
+            _passService.OnDataChanged -= HandlePassDataChanged;
+            _isSubscribed = false;
         }
 
         public void RefreshUI(PassViewData viewData)

@@ -177,7 +177,7 @@ namespace Game.DependencyInjection
                     {
                         new ActionInitialisable(token => container.Resolve<ProfileManager>().InitializeAsync(token)),
                         new ActionInitialisable(token => container.Resolve<ShopManager>().InitializeAsync(token)),
-                        new ActionInitialisable(token => container.Resolve<PassManager>().InitializeAsync(token))
+                        new ActionInitialisable(token => container.Resolve<PassModel>().InitializeAsync(token))
                     }
                 })
                 .WithParameter("showLog",showLog);

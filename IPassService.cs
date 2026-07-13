@@ -1,9 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using ChieChie.Constracts;
-using Cysharp.Threading.Tasks;
-using UnityEngine;
 
 namespace ChieChie.GamePass
 {
@@ -16,16 +13,18 @@ namespace ChieChie.GamePass
     }
     public interface IPassService 
     { 
+        event Action OnDataChanged;
         event Action<List<IItemReward>, PassRewardSource> OnRewardsClaimed;
         event Action<List<IItemReward>> OnAutoClaimedRewardsProcessed;
         event Action<IPassNotificationEventData> OnAutoClaimNotificationTriggered;
         event Action<IPassNotificationEventData> OnBonusBankClaimNotificationTriggered;
         List<IItemReward> GetAndClearAutoClaimedRewards();
-        void RegisterView(IPassView view);
-        void UnregisterView(IPassView view);
+        void BindView(IPassView view);
+        void UnbindView(IPassView view);
+        PassViewData GetViewData(string viewId);
+        PassViewData GetCurrentViewData();
         void AddExp(int amount, bool delayUpdateUI);
-        void ForceUpdateUIWidget(IPassView view);
-        void FlushDelayedUIUpdate(IPassView view);
+        PassViewData FlushDelayedUIUpdate(string viewId);
         void RegisterRewardModifier(IPassRewardModifier modifier);
         void UnregisterRewardModifier(IPassRewardModifier modifier);
         void CheckEventUpdate();

@@ -76,7 +76,7 @@ namespace Game.GamePlay
         {
             _passService = passService;
             _eventService = eventService;
-            _passService.RegisterView(this);
+            _passService.BindView(this);
         }
 
         private void Awake()
@@ -92,7 +92,7 @@ namespace Game.GamePlay
         public void RefreshUIManual()
         {
             _playManualRefreshAnimation = true;
-            _passService.FlushDelayedUIUpdate(this);
+            _passService.FlushDelayedUIUpdate(ViewId);
         }
 
         public void RefreshUI(PassViewData viewData)
@@ -765,7 +765,7 @@ namespace Game.GamePlay
         {
             if (_passService != null)
             {
-                _passService.UnregisterView(this);
+                _passService.UnbindView(this);
             }
 
             CancelRefreshAnimation();

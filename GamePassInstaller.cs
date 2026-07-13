@@ -18,7 +18,7 @@ namespace Game.DependencyInjection
            if(_passDatabase!=null)builder.RegisterInstance<PassDatabase>(_passDatabase);
            builder.Register<GamePassSaveAdapter>(Lifetime.Singleton)
                .As<IPassSaveAdapter>();
-           builder.Register<PassManager>(Lifetime.Singleton)
+           builder.Register<PassModel>(Lifetime.Singleton)
                .As<IPassService>()
                .AsSelf();
         }

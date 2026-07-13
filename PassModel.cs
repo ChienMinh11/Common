@@ -1,29 +1,34 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using ChieChie.Constracts;
 using ChieChie.GenericLiveOps;
+using Cysharp.Threading.Tasks;
 
 namespace ChieChie.GamePass
 {
-    public class PassModel
+    public class PassModel : IPassService, IDisposable
     {
         private readonly PassDatabase _database;
         private readonly EventSaveController<PassSaveData> _saveController;
         private readonly EventProgressTracker<PassSaveData, PassViewDisplayState> _progressTracker = new EventProgressTracker<PassSaveData, PassViewDisplayState>();
         private readonly IEventScheduler _eventScheduler;
+        private readonly PassPresenter _passPresenter;
         private PassSaveData _saveData;
         private int _totalRequiredNormalExp;
         private Dictionary<int, PassBonusData> _bonusItemsCache;
+        private List<PassBonusData> _sortedBonusItemsCache;
  
         public event Action OnDataChanged;
         public event Action<List<IItemReward>, PassRewardSource> OnRewardsClaimed;
+        public event Action<List<IItemReward>> OnAutoClaimedRewardsProcessed;
 
-        public int CurrentExp => _saveData.currentExp;
+        public int CurrentExp => _saveData?.currentExp ?? 0;
         public bool HasDelayedUIUpdate => _saveData != null && _saveData.hasDelayedUIUpdate;
-        public bool IsPremiumUnlocked => _saveData.isPremiumUnlocked;
+        public bool IsPremiumUnlocked => _saveData != null && _saveData.isPremiumUnlocked;
         public bool HasBonusBank => IsBonusBankConfigured();
-        public string EventId => _saveData.currentEventId; // Lấy theo ID đang chạy trong SaveData thay vì scheduler
+        public string EventId => _saveData?.currentEventId ?? string.Empty;
         public List<IItemReward> AutoClaimedRewards { get; private set; } = new List<IItemReward>();
         private readonly List<IPassRewardModifier> _rewardModifiers = new List<IPassRewardModifier>();
         
@@ -36,15 +41,25 @@ namespace ChieChie.GamePass
         private readonly ITimeProvider _timeProvider;
         public bool IsEventActive => _eventScheduler != null && _eventScheduler.IsActive;
         public bool IsFirstOpen => _saveData != null && _saveData.isFirstOpen;
+        public bool IsInitialized { get; private set; }
 
-        public PassModel(PassDatabase database, IPassSaveAdapter passSaveAdapter, IEventScheduler eventScheduler, ITimeProvider timeProvider)
+        public PassModel(PassDatabase database, IPassSaveAdapter passSaveAdapter, ITimeProvider timeProvider)
         {
             _database = database;
             _saveController = new EventSaveController<PassSaveData>(passSaveAdapter, EnsureSaveDataDefaults);
-            _eventScheduler = eventScheduler;
+            _eventScheduler = new PassEventScheduler();
             _timeProvider = timeProvider;
             CacheStaticDatabaseData();
+            _passPresenter = new PassPresenter(this);
+        }
+
+        public async UniTask<bool> InitializeAsync(CancellationToken cancellationToken)
+        {
             Initialize();
+            IsInitialized = true;
+            CheckAndTriggerAutoClaimEvent();
+
+            return await UniTask.FromResult(true);
         }
 
         public void Initialize()
@@ -135,6 +150,8 @@ namespace ChieChie.GamePass
                     _bonusItemsCache.Add(bonusItem.index, bonusItem);
                 }
             }
+
+            _sortedBonusItemsCache = _database.BonusPassItems.OrderBy(b => b.index).ToList();
         }
         
         public void RegisterModifier(IPassRewardModifier modifier)
@@ -157,6 +174,137 @@ namespace ChieChie.GamePass
         public void ClearAutoClaimedRewards()
         {
             ClearAutoClaimedRewardCaches();
+        }
+
+        public List<IItemReward> GetAndClearAutoClaimedRewards()
+        {
+            var rewards = new List<IItemReward>(AutoClaimedRewards);
+            ClearAutoClaimedRewardCaches();
+            return rewards;
+        }
+
+        public void BindView(IPassView view)
+        {
+            _passPresenter.BindView(view);
+        }
+
+        public void UnbindView(IPassView view)
+        {
+            _passPresenter.UnbindView(view);
+        }
+
+        public PassViewData GetViewData(string viewId)
+        {
+            return BuildViewData(GetDisplayedExp(viewId));
+        }
+
+        public PassViewData GetCurrentViewData()
+        {
+            return BuildViewData(CurrentExp);
+        }
+
+        private PassViewData BuildViewData(int displayedExp)
+        {
+            var viewData = new PassViewData
+            {
+                CurrentExp = displayedExp,
+                IsPremiumUnlocked = IsPremiumUnlocked,
+                CurrentMilestoneIndex = GetCurrentMilestoneIndex(displayedExp),
+                EventEndTime = EventEndTime,
+                Milestones = new List<MilestoneUIData>(),
+                BonusMilestones = new List<BonusMilestoneUIData>(),
+                TotalBonusExpEarned = GetBonusExp(displayedExp)
+            };
+
+            foreach (var item in _database.PassItems)
+            {
+                viewData.Milestones.Add(new MilestoneUIData
+                {
+                    Index = item.index,
+                    RequiredExp = item.expRequired,
+                    FreeRewards = GetFinalRewards(item.index, false, false, item.FreePassrewards),
+                    PremiumRewards = GetFinalRewards(item.index, true, false, item.PremiumPassrewards),
+                    FreeState = GetMilestoneState(item.index, false, displayedExp),
+                    PremiumState = GetMilestoneState(item.index, true, displayedExp),
+                    CustomIconFreePass = item.customIconFreePass,
+                    CustomIconPremiumPass = item.customIconPremiumPass
+                });
+            }
+
+            foreach (var bonusItem in _sortedBonusItemsCache)
+            {
+                viewData.BonusMilestones.Add(new BonusMilestoneUIData
+                {
+                    Index = bonusItem.index,
+                    RequiredExp = bonusItem.expRequied,
+                    Rewards = GetFinalRewards(bonusItem.index, false, true, bonusItem.BonusPassrewards),
+                    State = GetBonusMilestoneState(bonusItem.index, displayedExp),
+                    BonusIcon = bonusItem.bonusIcon
+                });
+            }
+
+            if (HasBonusBank)
+            {
+                var bonusBankData = _database.BonusBankData;
+                viewData.BonusBank = new BonusBankUIData
+                {
+                    CurrentAmount = GetBonusBankAmount(displayedExp),
+                    MaxAmount = bonusBankData.maxRewardAmount,
+                    ExpConvertToAmount = bonusBankData.expConvertToAmount,
+                    RequiredExpToMax = GetBonusBankRequiredExpToMax(),
+                    IsUnlocked = IsNormalPassCompleted(displayedExp),
+                    State = GetBonusBankState(displayedExp),
+                    BonusBankIcon = bonusBankData.bonusBankIcon
+                };
+            }
+
+            return viewData;
+        }
+
+        public PassViewData FlushDelayedUIUpdate(string viewId)
+        {
+            FlushDelayedProgress(viewId);
+
+            var viewData = GetViewData(viewId);
+            _passPresenter.RefreshView(viewId, viewData);
+            return viewData;
+        }
+
+        public void RegisterRewardModifier(IPassRewardModifier modifier)
+        {
+            RegisterModifier(modifier);
+        }
+
+        public void UnregisterRewardModifier(IPassRewardModifier modifier)
+        {
+            UnregisterModifier(modifier);
+        }
+
+        void IPassService.AddExp(int amount, bool delayUpdateUI)
+        {
+            AddExp(amount, delayUpdateUI);
+        }
+
+        public void CheckEventUpdate()
+        {
+            if (!IsInitialized)
+            {
+                UnityEngine.Debug.LogWarning("[PassModel] Chưa khởi tạo hệ thống, không thể check event update.");
+                return;
+            }
+
+            Initialize();
+            CheckAndTriggerAutoClaimEvent();
+        }
+
+        public void ActiveNewEvent()
+        {
+            ActivateNewEventManual();
+        }
+
+        public void UnlockPremiumPass()
+        {
+            UnlockPremium();
         }
 
         private void ClearAutoClaimedRewardCaches()
@@ -240,6 +388,16 @@ namespace ChieChie.GamePass
             }
         }
 
+        private void CheckAndTriggerAutoClaimEvent()
+        {
+            var autoRewards = new List<IItemReward>(AutoClaimedRewards);
+            if (autoRewards.Count == 0) return;
+
+            OnAutoClaimedRewardsProcessed?.Invoke(autoRewards);
+            TriggerAutoClaimNotifications();
+            ClearAutoClaimedRewardCaches();
+        }
+
         public List<IItemReward> GetFinalRewards(int index, bool isPremium, bool isBonus, List<IItemReward> originalRewards)
         {
             var finalRewards = originalRewards;
@@ -294,19 +452,22 @@ namespace ChieChie.GamePass
 
         public int GetDisplayedExp(string viewId)
         {
+            if (_saveData == null) return 0;
+
             return _progressTracker.GetDisplayedPoints(_saveData, viewId);
         }
 
-        public void FlushDelayedUIUpdate(string viewId)
+        private bool FlushDelayedProgress(string viewId)
         {
-            if (!_progressTracker.FlushDelayedUIUpdate(_saveData, viewId)) return;
+            if (_saveData == null || !_progressTracker.FlushDelayedUIUpdate(_saveData, viewId)) return false;
 
             _saveController.Save();
+            return true;
         }
 
         public void FlushDelayedUIUpdate()
         {
-            if (!_progressTracker.FlushDelayedUIUpdate(_saveData)) return;
+            if (_saveData == null || !_progressTracker.FlushDelayedUIUpdate(_saveData)) return;
 
             _saveController.Save();
         }
@@ -548,6 +709,12 @@ namespace ChieChie.GamePass
             NotifyDataChanged();
         }
 
+        public void Dispose()
+        {
+            _passPresenter?.Cleanup();
+            Cleanup();
+        }
+
         private void NotifyDataChanged()
         {
             OnDataChanged?.Invoke();
@@ -556,6 +723,10 @@ namespace ChieChie.GamePass
         public void Cleanup()
         {
             OnDataChanged = null;
+            OnRewardsClaimed = null;
+            OnAutoClaimedRewardsProcessed = null;
+            OnAutoClaimNotificationTriggered = null;
+            OnBonusBankClaimNotificationTriggered = null;
         }
 
         private class BonusBankReward : IItemReward
