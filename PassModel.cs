@@ -8,7 +8,8 @@ namespace ChieChie.GamePass
     public class PassModel
     {
         private readonly PassDatabase _database;
-        private readonly IPassSaveAdapter _passSaveAdapter;
+        private readonly EventSaveController<PassSaveData> _saveController;
+        private readonly EventProgressTracker<PassSaveData, PassViewDisplayState> _progressTracker = new EventProgressTracker<PassSaveData, PassViewDisplayState>();
         private readonly PassEventScheduler _eventScheduler;
         private PassSaveData _saveData;
         private int _totalRequiredNormalExp;
@@ -38,7 +39,7 @@ namespace ChieChie.GamePass
         public PassModel(PassDatabase database, IPassSaveAdapter passSaveAdapter, PassEventScheduler eventScheduler, ITimeProvider timeProvider)
         {
             _database = database;
-            _passSaveAdapter = passSaveAdapter;
+            _saveController = new EventSaveController<PassSaveData>(passSaveAdapter, EnsureSaveDataDefaults);
             _eventScheduler = eventScheduler;
             _timeProvider = timeProvider;
             CacheStaticDatabaseData();
@@ -47,23 +48,17 @@ namespace ChieChie.GamePass
 
         public void Initialize()
         {
-            _saveData = _passSaveAdapter.LoadData() ?? new PassSaveData();
+            _saveData = _saveController.LoadOrCreate();
             ClearAutoClaimedRewardCaches();
-            EnsureSaveDataDefaults();
             if (!string.IsNullOrEmpty(_saveData.currentEventId))
             {
-                if (DateTime.TryParseExact(_saveData.currentEventId.Replace("GamePass_", ""), "yyyyMM", 
-                        System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTime eventMonth))
+                if (_eventScheduler.TryGetEventWindow(_saveData.currentEventId, out _, out var savedEndTime))
                 {
-                    var startTemp = new DateTime(eventMonth.Year, eventMonth.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-                    var endTemp = startTemp.AddMonths(1).AddSeconds(-1);
-                 
-                    if (_timeProvider.UtcNow > endTemp)
+                    if (_timeProvider.UtcNow > savedEndTime)
                     {
                         
                         ProcessAutoClaimUnclaimedRewards(_saveData);
-                        _saveData = new PassSaveData { currentEventId = string.Empty };
-                        _passSaveAdapter.SaveData(_saveData);
+                        _saveData = _saveController.Replace(new PassSaveData { currentEventId = string.Empty });
                     }
                 }
             }
@@ -72,30 +67,25 @@ namespace ChieChie.GamePass
             NotifyDataChanged();
         }
 
-        private void EnsureSaveDataDefaults()
+        private void EnsureSaveDataDefaults(PassSaveData saveData)
         {
-            if (_saveData.viewDisplayStates == null)
+            if (saveData == null) return;
+
+            _progressTracker.EnsureDefaults(saveData);
+
+            if (saveData.claimedFreeMilestones == null)
             {
-                _saveData.viewDisplayStates = new List<PassViewDisplayState>();
-            }
-            else
-            {
-                _saveData.viewDisplayStates.RemoveAll(state => state == null);
+                saveData.claimedFreeMilestones = new List<int>();
             }
 
-            if (_saveData.claimedFreeMilestones == null)
+            if (saveData.claimedPremiumMilestones == null)
             {
-                _saveData.claimedFreeMilestones = new List<int>();
+                saveData.claimedPremiumMilestones = new List<int>();
             }
 
-            if (_saveData.claimedPremiumMilestones == null)
+            if (saveData.claimedBonusMilestones == null)
             {
-                _saveData.claimedPremiumMilestones = new List<int>();
-            }
-
-            if (_saveData.claimedBonusMilestones == null)
-            {
-                _saveData.claimedBonusMilestones = new List<int>();
+                saveData.claimedBonusMilestones = new List<int>();
             }
         }
       
@@ -104,8 +94,7 @@ namespace ChieChie.GamePass
             _eventScheduler.UpdateMonthlySchedule(_timeProvider);
             if (_saveData.currentEventId != _eventScheduler.eventId)
             {
-                _saveData = new PassSaveData { currentEventId = _eventScheduler.eventId };
-                _passSaveAdapter.SaveData(_saveData);
+                _saveData = _saveController.Replace(new PassSaveData { currentEventId = _eventScheduler.eventId });
             }
             NotifyDataChanged();
         }
@@ -114,21 +103,11 @@ namespace ChieChie.GamePass
         {
             if (string.IsNullOrEmpty(_saveData.currentEventId))
             {
-                _eventScheduler.eventId = string.Empty;
-                _eventScheduler.isActive = false;
-                _eventScheduler.startTime = DateTime.MinValue;
-                _eventScheduler.endTime = DateTime.MinValue;
+                _eventScheduler.Clear();
             }
             else
             {
-                _eventScheduler.eventId = _saveData.currentEventId;
-                if (DateTime.TryParseExact(_saveData.currentEventId.Replace("GamePass_", ""), "yyyyMM", 
-                    System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTime eventMonth))
-                {
-                    _eventScheduler.startTime = new DateTime(eventMonth.Year, eventMonth.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-                    _eventScheduler.endTime = _eventScheduler.startTime.AddMonths(1).AddSeconds(-1);
-                    _eventScheduler.isActive = _timeProvider.UtcNow >= _eventScheduler.startTime && _timeProvider.UtcNow <= _eventScheduler.endTime;
-                }
+                _eventScheduler.SyncFromEventId(_saveData.currentEventId, _timeProvider);
             }
         }
         public void MarkFirstOpenCompleted()
@@ -136,7 +115,7 @@ namespace ChieChie.GamePass
             if (_saveData == null || _saveData.isFirstOpen) return;
         
             _saveData.isFirstOpen = true;
-            _passSaveAdapter.SaveData(_saveData);
+            _saveController.Save();
         }
 
         private void CacheStaticDatabaseData()
@@ -302,17 +281,8 @@ namespace ChieChie.GamePass
         {
             if (!_eventScheduler.isActive) return false;
 
-            if (delayUpdateUI)
-            {
-                BeginDelayedUIUpdate();
-            }
-            else
-            {
-                ClearDelayedUIUpdate();
-            }
-
-            _saveData.currentExp += amount;
-            _passSaveAdapter.SaveData(_saveData);
+            _progressTracker.AddPoints(_saveData, amount, delayUpdateUI);
+            _saveController.Save();
             if (delayUpdateUI)
             {
                 return true;
@@ -324,63 +294,21 @@ namespace ChieChie.GamePass
 
         public int GetDisplayedExp(string viewId)
         {
-            if (!_saveData.hasDelayedUIUpdate)
-            {
-                return _saveData.currentExp;
-            }
-
-            var viewDisplayState = GetViewDisplayState(viewId);
-            return viewDisplayState != null ? viewDisplayState.displayedExp : _saveData.delayedDisplayExp;
+            return _progressTracker.GetDisplayedPoints(_saveData, viewId);
         }
 
         public void FlushDelayedUIUpdate(string viewId)
         {
-            if (!_saveData.hasDelayedUIUpdate || string.IsNullOrEmpty(viewId)) return;
+            if (!_progressTracker.FlushDelayedUIUpdate(_saveData, viewId)) return;
 
-            SetViewDisplayedExp(viewId, _saveData.currentExp);
-            _passSaveAdapter.SaveData(_saveData);
+            _saveController.Save();
         }
 
         public void FlushDelayedUIUpdate()
         {
-            if (!_saveData.hasDelayedUIUpdate) return;
+            if (!_progressTracker.FlushDelayedUIUpdate(_saveData)) return;
 
-            ClearDelayedUIUpdate();
-            _passSaveAdapter.SaveData(_saveData);
-        }
-
-        private void BeginDelayedUIUpdate()
-        {
-            if (_saveData.hasDelayedUIUpdate) return;
-
-            _saveData.hasDelayedUIUpdate = true;
-            _saveData.delayedDisplayExp = _saveData.currentExp;
-            _saveData.viewDisplayStates.Clear();
-        }
-
-        private void ClearDelayedUIUpdate()
-        {
-            _saveData.hasDelayedUIUpdate = false;
-            _saveData.delayedDisplayExp = _saveData.currentExp;
-            _saveData.viewDisplayStates.Clear();
-        }
-
-        private PassViewDisplayState GetViewDisplayState(string viewId)
-        {
-            if (string.IsNullOrEmpty(viewId)) return null;
-            return _saveData.viewDisplayStates.FirstOrDefault(state => state != null && state.viewId == viewId);
-        }
-
-        private void SetViewDisplayedExp(string viewId, int displayedExp)
-        {
-            var viewDisplayState = GetViewDisplayState(viewId);
-            if (viewDisplayState == null)
-            {
-                viewDisplayState = new PassViewDisplayState { viewId = viewId };
-                _saveData.viewDisplayStates.Add(viewDisplayState);
-            }
-
-            viewDisplayState.displayedExp = displayedExp;
+            _saveController.Save();
         }
 
         public void UnlockPremium()
@@ -393,7 +321,7 @@ namespace ChieChie.GamePass
                 _saveData.claimedPremiumMilestones.Add(0);
             }
 
-            _passSaveAdapter.SaveData(_saveData);
+            _saveController.Save();
             NotifyDataChanged();
         }
 
@@ -504,7 +432,7 @@ namespace ChieChie.GamePass
             _saveData.isBonusBankClaimed = true;
             OnRewardsClaimed?.Invoke(new List<IItemReward> { reward }, PassRewardSource.BonusBank);
 
-            _passSaveAdapter.SaveData(_saveData);
+            _saveController.Save();
             NotifyDataChanged();
             OnBonusBankClaimNotificationTriggered?.Invoke(
                 new PassNotificationEventData(new List<IItemReward> { reward }, false, true));
@@ -569,8 +497,7 @@ namespace ChieChie.GamePass
                 OnRewardsClaimed?.Invoke(finalRewards, PassRewardSource.Bonus);
             }
 
-            _passSaveAdapter.SaveData(_passSaveAdapter.LoadData() ?? _saveData);
-            _passSaveAdapter.SaveData(_saveData);
+            _saveController.Save();
             NotifyDataChanged();
             return true;
         }
@@ -610,7 +537,7 @@ namespace ChieChie.GamePass
                 OnRewardsClaimed?.Invoke(finalRewards, source);
             }
   
-            _passSaveAdapter.SaveData(_saveData);
+            _saveController.Save();
             NotifyDataChanged();
             return true;
         }
