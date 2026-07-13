@@ -1,119 +1,101 @@
+using ChieChie.MVP;
+using UnityEngine;
+
 namespace ChieChie.GamePass
 {
-    public class PassPresenter
+    public class PassPresenter : BasePresenter<IPassView, PassModel>
     {
-        private readonly PassModel _model;
-        private IPassView _view;
-
-        public PassPresenter(PassModel model)
+        public PassPresenter(IPassView view, PassModel model) : base(view, model)
         {
-            _model = model;
-            _model.OnDataChanged += HandleModelDataChanged;
         }
 
-        public void BindView(IPassView view)
+        public bool IsBoundTo(IPassView view)
         {
-            if (view == null) return;
-
-            CleanUpDestroyedView();
-            if (ReferenceEquals(_view, view)) return;
-
-            UnbindCurrentView();
-
-            _view = view;
-            _view.OnClaimRewardClicked += HandleClaimReward;
-            _view.OnClaimBonusClicked += HandleClaimBonus;
-            _view.OnClaimBonusBankClicked += HandleClaimBonusBank;
-            _view.OnBuyPremiumClicked += HandleBuyPremium;
-
-            RefreshView(_model.GetViewData(_view.ViewId));
+            return ReferenceEquals(View, view);
         }
 
-        public void UnbindView(IPassView view)
+        protected override void OnInitialize()
         {
-            if (!ReferenceEquals(_view, view)) return;
+            Model.OnDataChanged += HandleModelDataChanged;
+            View.OnClaimRewardClicked += HandleClaimReward;
+            View.OnClaimBonusClicked += HandleClaimBonus;
+            View.OnClaimBonusBankClicked += HandleClaimBonusBank;
+            View.OnBuyPremiumClicked += HandleBuyPremium;
 
-            UnbindCurrentView();
+            RefreshView(Model.GetViewData(View.ViewId));
+        }
+
+        protected override void OnDispose()
+        {
+            Model.OnDataChanged -= HandleModelDataChanged;
+            View.OnClaimRewardClicked -= HandleClaimReward;
+            View.OnClaimBonusClicked -= HandleClaimBonus;
+            View.OnClaimBonusBankClicked -= HandleClaimBonusBank;
+            View.OnBuyPremiumClicked -= HandleBuyPremium;
         }
 
         public void ForceUpdateUI()
         {
-            CleanUpDestroyedView();
-            if (_view == null) return;
+            if (IsViewDestroyed()) return;
 
-            RefreshView(_model.GetCurrentViewData());
+            RefreshView(Model.GetCurrentViewData());
+        }
+
+        public PassViewData FlushDelayedUIUpdate()
+        {
+            if (IsViewDestroyed()) return null;
+
+            var viewData = Model.FlushDelayedUIUpdate(View.ViewId);
+            RefreshView(viewData);
+            return viewData;
         }
 
         public void RefreshView(string viewId, PassViewData viewData)
         {
-            CleanUpDestroyedView();
-            if (_view == null || _view.ViewId != viewId) return;
+            if (IsViewDestroyed() || View.ViewId != viewId) return;
 
             RefreshView(viewData);
         }
 
         private void HandleModelDataChanged()
         {
-            CleanUpDestroyedView();
-            if (_view == null) return;
+            if (IsViewDestroyed()) return;
 
-            RefreshView(_model.HasDelayedUIUpdate
-                ? _model.GetViewData(_view.ViewId)
-                : _model.GetCurrentViewData());
+            RefreshView(Model.HasDelayedUIUpdate
+                ? Model.GetViewData(View.ViewId)
+                : Model.GetCurrentViewData());
         }
 
         private void RefreshView(PassViewData viewData)
         {
-            if (_view == null || viewData == null) return;
+            if (IsViewDestroyed() || viewData == null) return;
 
-            _view.RefreshUI(viewData);
+            View.RefreshUI(viewData);
         }
 
         private void HandleClaimReward(int index, bool isPremium)
         {
-            _model.ClaimReward(index, isPremium);
+            Model.ClaimReward(index, isPremium);
         }
 
         private void HandleClaimBonus(int index)
         {
-            _model.ClaimBonusReward(index);
+            Model.ClaimBonusReward(index);
         }
 
         private void HandleClaimBonusBank()
         {
-            _model.ClaimBonusBankReward();
+            Model.ClaimBonusBankReward();
         }
 
         private void HandleBuyPremium()
         {
-            _model.UnlockPremium();
+            Model.UnlockPremium();
         }
 
-        private void CleanUpDestroyedView()
+        private bool IsViewDestroyed()
         {
-            if (_view == null) return;
-
-            if (_view is UnityEngine.MonoBehaviour mb && mb == null)
-            {
-                _view = null;
-            }
-        }
-
-        private void UnbindCurrentView()
-        {
-            if (_view == null) return;
-
-            _view.OnClaimRewardClicked -= HandleClaimReward;
-            _view.OnClaimBonusClicked -= HandleClaimBonus;
-            _view.OnClaimBonusBankClicked -= HandleClaimBonusBank;
-            _view.OnBuyPremiumClicked -= HandleBuyPremium;
-            _view = null;
-        }
-
-        public void Cleanup()
-        {
-            _model.OnDataChanged -= HandleModelDataChanged;
-            UnbindCurrentView();
+            return View is MonoBehaviour monoBehaviour && monoBehaviour == null;
         }
     }
 }

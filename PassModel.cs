@@ -4,17 +4,18 @@ using System.Linq;
 using System.Threading;
 using ChieChie.Constracts;
 using ChieChie.GenericLiveOps;
+using ChieChie.MVP;
 using Cysharp.Threading.Tasks;
 
 namespace ChieChie.GamePass
 {
-    public class PassModel : IPassService, IDisposable
+    public class PassModel : IPassService, IModel, IDisposable
     {
         private readonly PassDatabase _database;
         private readonly EventSaveController<PassSaveData> _saveController;
         private readonly EventProgressTracker<PassSaveData, PassViewDisplayState> _progressTracker = new EventProgressTracker<PassSaveData, PassViewDisplayState>();
         private readonly IEventScheduler _eventScheduler;
-        private readonly PassPresenter _passPresenter;
+        private PassPresenter _passPresenter;
         private PassSaveData _saveData;
         private int _totalRequiredNormalExp;
         private Dictionary<int, PassBonusData> _bonusItemsCache;
@@ -50,7 +51,6 @@ namespace ChieChie.GamePass
             _eventScheduler = new PassEventScheduler();
             _timeProvider = timeProvider;
             CacheStaticDatabaseData();
-            _passPresenter = new PassPresenter(this);
         }
 
         public async UniTask<bool> InitializeAsync(CancellationToken cancellationToken)
@@ -185,12 +185,25 @@ namespace ChieChie.GamePass
 
         public void BindView(IPassView view)
         {
-            _passPresenter.BindView(view);
+            if (view == null) return;
+
+            if (_passPresenter != null)
+            {
+                if (_passPresenter.IsBoundTo(view)) return;
+
+                _passPresenter.Dispose();
+            }
+
+            _passPresenter = new PassPresenter(view, this);
+            _passPresenter.Initialize();
         }
 
         public void UnbindView(IPassView view)
         {
-            _passPresenter.UnbindView(view);
+            if (_passPresenter == null || !_passPresenter.IsBoundTo(view)) return;
+
+            _passPresenter.Dispose();
+            _passPresenter = null;
         }
 
         public PassViewData GetViewData(string viewId)
@@ -266,7 +279,6 @@ namespace ChieChie.GamePass
             FlushDelayedProgress(viewId);
 
             var viewData = GetViewData(viewId);
-            _passPresenter.RefreshView(viewId, viewData);
             return viewData;
         }
 
@@ -711,7 +723,8 @@ namespace ChieChie.GamePass
 
         public void Dispose()
         {
-            _passPresenter?.Cleanup();
+            _passPresenter?.Dispose();
+            _passPresenter = null;
             Cleanup();
         }
 

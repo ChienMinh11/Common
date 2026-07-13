@@ -6,6 +6,7 @@ using ChieChie.Constracts;
 using ChieChie.Core;
 using ChieChie.Core.Utilities;
 using ChieChie.GamePass;
+using ChieChie.MVP;
 using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using Sirenix.OdinInspector;
@@ -17,7 +18,7 @@ using VContainer;
 
 namespace Game.GamePlay
 {
-    public class GamePassView : MonoBehaviour, IPassView
+    public class GamePassView : BaseView<PassPresenter>, IPassView
     {
         [SerializeField] private string viewId = nameof(GamePassView);
         [Header("Top Bar")] [SerializeField] private UITimeCountdownWidget timeCountdownWidget;
@@ -72,11 +73,15 @@ namespace Game.GamePlay
         private CancellationTokenSource _refreshAnimationCts;
         private CancellationTokenSource _scrollCts;
 
-        public void Initialize(IPassService passService, IEventService eventService)
+        public void Initialize(PassModel passModel, IEventService eventService)
         {
-            _passService = passService;
+            _passService = passModel;
             _eventService = eventService;
-            _passService.BindView(this);
+
+            if (passModel != null && Presenter == null)
+            {
+                BindPresenter(new PassPresenter(this, passModel));
+            }
         }
 
         private void Awake()
@@ -92,7 +97,7 @@ namespace Game.GamePlay
         public void RefreshUIManual()
         {
             _playManualRefreshAnimation = true;
-            _passService.FlushDelayedUIUpdate(ViewId);
+            Presenter?.FlushDelayedUIUpdate();
         }
 
         public void RefreshUI(PassViewData viewData)
@@ -761,13 +766,9 @@ namespace Game.GamePlay
             _eventService.PublishEvent(GameEvent.OnGamePassViewShowPopupTutorial);
         }
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
-            if (_passService != null)
-            {
-                _passService.UnbindView(this);
-            }
-
+            base.OnDestroy();
             CancelRefreshAnimation();
             CancelScrollAnimation();
         }

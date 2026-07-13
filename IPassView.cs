@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using ChieChie.Constracts;
+using ChieChie.MVP;
 
 namespace ChieChie.GamePass
 {
@@ -70,7 +71,7 @@ namespace ChieChie.GamePass
         public UnityEngine.GameObject CustomIconPremiumPass;
     }
 
-    public interface IPassView 
+    public interface IPassView : IView
     {
         string ViewId { get; }
         event Action<int, bool> OnClaimRewardClicked;

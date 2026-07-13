@@ -9,16 +9,16 @@ namespace Game.GamePlay
     {
         [SerializeField] private GamePassView gamePassView;
 
-        private IPassService _passService;
+        private PassModel _passModel;
         private IEventService _eventService;
 
         [Inject]
-        private void Construct(IPassService passService, IEventService eventService)
+        private void Construct(PassModel passModel, IEventService eventService)
         {
-            _passService = passService;
+            _passModel = passModel;
             _eventService = eventService;
             if (gamePassView == null) gamePassView = GetComponent<GamePassView>();
-            gamePassView?.Initialize(_passService,_eventService);
+            gamePassView?.Initialize(_passModel,_eventService);
         }
         protected override void SetPopupName() => PopupName = "PopupGamePass";
       
