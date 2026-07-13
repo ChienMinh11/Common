@@ -169,6 +169,7 @@ namespace Game.GamePlay
 
             try
             {
+                Debug.Log("Start Show Popup");
                 while (_rewardPopupRequests.Count > 0)
                 {
                     var request = _rewardPopupRequests.Dequeue();
@@ -191,6 +192,7 @@ namespace Game.GamePlay
                 {
                     ProcessRewardPopupQueueAsync().Forget();
                 }
+                Debug.Log("End Show Popup");
             }
         }
 
@@ -264,7 +266,7 @@ namespace Game.GamePlay
 
         private void HandleShowpopupTutorialOnFirstOpened()
         {
-            _popupService.ShowPopup("PopupShowGamePassTutorial", "", true);
+            _popupService.ShowPopup("PopupShowGamePassTutorial");
         }
 
         #endregion
