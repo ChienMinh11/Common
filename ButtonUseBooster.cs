@@ -2,6 +2,8 @@ using System;
 using ChieChie.Booster;
 using ChieChie.Constracts;
 using ChieChie.Core;
+using ChieChie.MVP;
+using ChieChie.Resource;
 using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
@@ -10,12 +12,13 @@ using VContainer;
 
 namespace Game.GamePlay
 {
-    public class ButtonUseBooster : MonoBehaviour, IResourceView
+    public class ButtonUseBooster : BaseView<ResourcePresenter>, IResourceView
     {
         [Header("Settings")] 
         [SerializeField] private ResourceIdentity identitySource;
 
         private string BoosterType => identitySource.ResourceId;
+        public string ResourceKey => BoosterType;
         
         [Header("Visual Settings")] [SerializeField]
         private GameObject selectHighlight;
@@ -42,11 +45,17 @@ namespace Game.GamePlay
         }
 
         [Inject]
-        private void Contruct(IBoosterService boosterController, IResourceService resourceService)
+        private void Contruct(
+            IBoosterService boosterController,
+            IResourceService resourceService,
+            IPresenterFactory<ResourcePresenter, IResourceView> presenterFactory)
         {
             _boosterController = boosterController;
             _resourceService = resourceService;
-            _resourceService.RegisterView(BoosterType, this);
+            if (Presenter == null)
+            {
+                BindPresenter(presenterFactory, this);
+            }
         }
 
         private void Start()
@@ -66,10 +75,10 @@ namespace Game.GamePlay
             UnregisterEvents();
         }
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
             UnregisterEvents();
-            _resourceService?.UnregisterView(this);
+            base.OnDestroy();
         }
 
         private void RegisterEvents()
@@ -210,12 +219,18 @@ namespace Game.GamePlay
 
         public void UpdateInfinityStatus(bool isInfinite, DateTime expirationTime)
         {
-            
+            SetInfiniteStatus(isInfinite);
+            if (isInfinite)
+            {
+                TimeSpan remaining = expirationTime - DateTime.UtcNow;
+                UpdateInfinityRemainingTime(remaining > TimeSpan.Zero
+                    ? $"{(int)remaining.TotalHours:00}:{remaining.Minutes:00}:{remaining.Seconds:00}"
+                    : string.Empty);
+            }
         }
 
         public void UpdateRegenStatus(bool isRegenEnabled, bool isMaxStack, DateTime nextRegenTime)
         {
-            throw new NotImplementedException();
         }
 
         public void SetInfiniteStatus(bool isInfinite)
@@ -235,8 +250,10 @@ namespace Game.GamePlay
             if (!isInfinite && countdownText != null)
             {
                 countdownText.text = string.Empty;
-                infiniteBadge.gameObject.SetActive(false);
+                if (infiniteBadge != null) infiniteBadge.SetActive(false);
             }
+
+            if (infiniteBadge != null) infiniteBadge.SetActive(isInfinite);
         }
 
         public void UpdateInfinityRemainingTime(string formattedTime)
@@ -246,13 +263,13 @@ namespace Game.GamePlay
                 _myBehavior.HasUsedInfiniteFreePass)
             {
                 if (countdownText != null) countdownText.text = string.Empty;
-                infiniteBadge.gameObject.SetActive(false);
+                if (infiniteBadge != null) infiniteBadge.SetActive(false);
                 return;
             }
 
             if (countdownText != null)
             {
-                infiniteBadge.gameObject.SetActive(true);
+                if (infiniteBadge != null) infiniteBadge.SetActive(true);
                 countdownText.text = formattedTime;
             }
         }

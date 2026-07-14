@@ -1,6 +1,8 @@
 using System;
 using ChieChie.Constracts;
 using ChieChie.Core;
+using ChieChie.MVP;
+using ChieChie.Resource;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -8,46 +10,39 @@ using VContainer;
 
 namespace Game.GamePlay
 {
-    public class ResourceViewUI : MonoBehaviour, IResourceView
+    public class ResourceViewUI : BaseView<ResourcePresenter>, IResourceView
     {
         [SerializeField] private ResourceIdentity resourceId;
 
-        [Header("Standard Resource UI")] [SerializeField]
-        private TextMeshProUGUI amountText;
-
+        [Header("Standard Resource UI")]
+        [SerializeField] private TextMeshProUGUI amountText;
         [SerializeField] private Image iconImage;
         [SerializeField] private TextMeshProUGUI nameText;
 
-        [Header("Infinite Resource UI Add-on")] [SerializeField]
-        private GameObject infiniteBadge;
+        [Header("Optional Resource Widgets")]
+        [SerializeField] private UIResourceInfinityWidget infinityWidget;
+        [SerializeField] private UIResourceRegenWidget regenWidget;
 
+        [Header("Infinite Resource UI Fallback")]
+        [SerializeField] private GameObject infiniteBadge;
         [SerializeField] private TextMeshProUGUI countdownText;
 
-        [Header("Animation Settings")] [SerializeField]
-        private NumberAnimationSettings animationSettings;
+        [Header("Animation Settings")]
+        [SerializeField] private NumberAnimationSettings animationSettings;
 
-        private NumberTextAnimation numberAnimation;
-        private long currentDisplayedAmount;
+        private NumberTextAnimation _numberAnimation;
+        private long _currentDisplayedAmount;
+        private bool _isInfiniteActive;
 
-        private IResourceService _resourceService;
+        public string ResourceKey => resourceId != null ? resourceId.ResourceId : string.Empty;
 
         [Inject]
-        private void Construct(IResourceService resourceService)
+        private void Construct(
+            IPresenterFactory<ResourcePresenter, IResourceView> presenterFactory)
         {
-            _resourceService = resourceService;
-            _resourceService.RegisterView(resourceId.ResourceId, this);
-        }
-
-        private void EnsureAnimationInitialized()
-        {
-            if (numberAnimation == null)
+            if (Presenter == null)
             {
-                if (animationSettings == null)
-                {
-                    animationSettings = new NumberAnimationSettings();
-                }
-
-                numberAnimation = new NumberTextAnimation(animationSettings, UpdateAmountText);
+                BindPresenter(presenterFactory, this);
             }
         }
 
@@ -56,8 +51,7 @@ namespace Game.GamePlay
             if (amountText == null) return;
 
             EnsureAnimationInitialized();
-            long fromValue = currentDisplayedAmount;
-            numberAnimation.AnimateTo(fromValue, amount);
+            _numberAnimation.AnimateTo(_currentDisplayedAmount, amount);
         }
 
         public void SetResourceAmountWithoutAnimation(long amount)
@@ -65,92 +59,115 @@ namespace Game.GamePlay
             UpdateAmountText(amount);
         }
 
+        public void SetResourceIcon(Sprite icon)
+        {
+            if (iconImage != null && iconImage.sprite != icon)
+            {
+                iconImage.sprite = icon;
+            }
+        }
+
+        public void SetResourceName(string resourceName)
+        {
+            if (nameText != null && nameText.text != resourceName)
+            {
+                nameText.text = resourceName;
+            }
+        }
+
+        public void ShowInsufficientMessage()
+        {
+            Debug.LogWarning($"[{name}] Not enough {ResourceKey}.");
+        }
+
+        public void OnMaxStackReached(string resourceKey)
+        {
+            Debug.Log($"[{name}] {resourceKey} reached its maximum stack.");
+        }
+
+        public void UpdateInfinityStatus(bool isInfinite, DateTime expirationTime)
+        {
+            _isInfiniteActive = isInfinite;
+
+            if (amountText != null)
+            {
+                amountText.gameObject.SetActive(!isInfinite);
+            }
+
+            if (infinityWidget != null)
+            {
+                infinityWidget.Setup(isInfinite, expirationTime);
+            }
+
+            SetInfiniteFallback(isInfinite, expirationTime);
+        }
+
+        public void UpdateRegenStatus(
+            bool isRegenEnabled,
+            bool isMaxStack,
+            DateTime nextRegenTime)
+        {
+            if (regenWidget == null) return;
+
+            if (_isInfiniteActive)
+            {
+                regenWidget.Setup(false, false, DateTime.MinValue);
+                return;
+            }
+
+            regenWidget.Setup(isRegenEnabled, isMaxStack, nextRegenTime);
+        }
+
+        protected override void OnDestroy()
+        {
+            _numberAnimation?.Stop();
+            base.OnDestroy();
+        }
+
+        private void EnsureAnimationInitialized()
+        {
+            if (_numberAnimation != null) return;
+
+            animationSettings ??= new NumberAnimationSettings();
+            _numberAnimation = new NumberTextAnimation(animationSettings, UpdateAmountText);
+        }
+
         private void UpdateAmountText(long amount)
         {
-            currentDisplayedAmount = amount;
+            _currentDisplayedAmount = amount;
             if (amountText != null)
             {
                 amountText.text = NumberFormatter.FormatNumber(amount);
             }
         }
 
-        public void SetResourceIcon(Sprite icon)
-        {
-            if (iconImage != null)
-                iconImage.sprite = icon;
-        }
-
-        public void SetResourceName(string name)
-        {
-            if (nameText != null)
-                nameText.text = name;
-        }
-
-        public void ShowInsufficientMessage()
-        {
-            Debug.LogWarning($"[{name}] Không đủ tài nguyên!");
-        }
-
-        public void OnMaxStackReached(string type)
-        {
-            Debug.Log($"[{name}] Đã đạt giới hạn stack của {type}!");
-        }
-
-        public void UpdateInfinityStatus(bool isInfinite, DateTime expirationTime)
-        {
-            
-        }
-
-        public void UpdateRegenStatus(bool isRegenEnabled, bool isMaxStack, DateTime nextRegenTime)
-        {
-            
-        }
-
-        // --- HIỆN THỰC IInfiniteResourceView ---
-        public void SetInfiniteStatus(bool isInfinite)
+        private void SetInfiniteFallback(bool isInfinite, DateTime expirationTime)
         {
             if (infiniteBadge != null)
             {
                 infiniteBadge.SetActive(isInfinite);
             }
 
-            // Khi vô hạn thì ẩn text số lượng đi để giao diện gọn gàng
-            if (amountText != null)
-            {
-                amountText.gameObject.SetActive(!isInfinite);
-            }
+            if (countdownText == null) return;
 
-            if (!isInfinite && countdownText != null)
+            if (!isInfinite || expirationTime == DateTime.MinValue)
             {
                 countdownText.text = string.Empty;
+                return;
             }
+
+            TimeSpan remaining = expirationTime - DateTime.UtcNow;
+            countdownText.text = FormatRemainingTime(remaining);
         }
 
-        public void UpdateInfinityRemainingTime(string formattedTime)
+        private static string FormatRemainingTime(TimeSpan remaining)
         {
-            if (countdownText != null)
-            {
-                countdownText.text = formattedTime;
-            }
-        }
+            if (remaining <= TimeSpan.Zero) return string.Empty;
 
-        public void SetRegenStatusActive(bool isActive)
-        {
-           
-        }
-
-        public void SetRegenStatusText(string text)
-        {
-           
-        }
-
-        private void OnDestroy()
-        {
-            numberAnimation?.Stop();
-            if (_resourceService != null)
-            {
-                _resourceService.UnregisterView(this);
-            }
+            int totalHours = (int)remaining.TotalHours;
+            return totalHours > 0
+                ? $"{totalHours:00}:{remaining.Minutes:00}:{remaining.Seconds:00}"
+                : $"{remaining.Minutes:00}:{remaining.Seconds:00}";
         }
     }
 }

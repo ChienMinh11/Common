@@ -1,179 +1,312 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using ChieChie.Constracts;
-using UnityEngine;
+using ChieChie.MVP;
+using Cysharp.Threading.Tasks;
 
 namespace ChieChie.Resource
 {
-    public class ResourceModel<T>
+    /// <summary>
+    /// Owns all resource state and business rules. UI binding belongs to ResourcePresenter;
+    /// this model only publishes state changes and presentation requests.
+    /// </summary>
+    public sealed class ResourceModel : IResourceService, IModel, IDisposable
     {
-        private ResourceConfig _config;
-
-        private readonly INumberConverter<T> _converter;
+        private readonly ResourceConfig _resourceConfig;
         private readonly IResourceSaveAdapter _saveAdapter;
-        private readonly ResourceManager _infiniteStatus;
+        private readonly Dictionary<string, long> _resourceAmounts = new();
 
-        private readonly Dictionary<string, T> _resourceAmounts = new();
+        private InfiniteResourceModel _infiniteModel;
+        private ResourceRegenController _resourceRegenController;
 
-        public event Action<ResourceChangeData<T>> OnResourceChanged;
-        public event Action<ResourceChangeData<T>> OnResourceSpent;
-        public event Action<ResourceChangeData<T>> OnResourceAdded;
+        public bool IsInitialized { get; private set; }
+
+        public event Action<ResourceChangeData<long>> OnResourceChanged;
+        public event Action<ResourceChangeData<long>> OnResourceSpent;
+        public event Action<ResourceChangeData<long>> OnResourceAdded;
         public event Action<string> OnResourceMaxStackReached;
         public event Action<string> OnResourceInsufficient;
+        public event Action<string> OnInfiniteExpired;
+        public event Action<string, bool> OnInfiniteAdded;
 
-        public ResourceModel(INumberConverter<T> converter, IResourceSaveAdapter saveAdapter,
-            ResourceManager infiniteStatus)
+        internal event Action OnRefreshRequested;
+        internal event Action<string, long> OnPendingUpdateRequested;
+        internal event Action<string> OnRegenStatusChanged;
+
+        public ResourceModel(ResourceConfig resourceConfig, IResourceSaveAdapter saveAdapter)
         {
-            this._converter = converter;
-            this._saveAdapter = saveAdapter;
-            this._infiniteStatus = infiniteStatus;
+            _resourceConfig = resourceConfig ?? throw new ArgumentNullException(nameof(resourceConfig));
+            _saveAdapter = saveAdapter ?? throw new ArgumentNullException(nameof(saveAdapter));
         }
 
-        public void Initialize(ResourceConfig config)
+        public UniTask<bool> InitializeAsync(CancellationToken cancellationToken)
         {
-            _config = config;
+            cancellationToken.ThrowIfCancellationRequested();
+            if (IsInitialized) return UniTask.FromResult(true);
 
-            foreach (var resourceData in config.GetAllResources())
+            InitializeAmounts();
+
+            _infiniteModel = new InfiniteResourceModel(_saveAdapter);
+            _infiniteModel.OnInfiniteDurationAdded += HandleInfiniteDurationAdded;
+            _infiniteModel.OnInfiniteDurationExpired += HandleInfiniteDurationExpired;
+            _infiniteModel.Initialize(_resourceConfig);
+
+            _resourceRegenController = new ResourceRegenController();
+            _resourceRegenController.Initialize(this, _resourceConfig, _saveAdapter);
+
+            IsInitialized = true;
+            OnRefreshRequested?.Invoke();
+            return UniTask.FromResult(true);
+        }
+
+        private void InitializeAmounts()
+        {
+            bool isFirstInitialization = _saveAdapter.IsFirstInit();
+
+            foreach (var resourceData in _resourceConfig.GetAllResources())
             {
+                if (resourceData == null || string.IsNullOrEmpty(resourceData.ResourceId)) continue;
+
                 _saveAdapter.RegisterResource(resourceData);
+                long fallbackAmount = resourceData.HasRegen
+                    ? resourceData.MaxStack
+                    : resourceData.DefaultAmount;
+                long amount = isFirstInitialization
+                    ? fallbackAmount
+                    : _saveAdapter.LoadAmount(resourceData, fallbackAmount);
+
+                _resourceAmounts[resourceData.ResourceId] = amount;
+
+                if (isFirstInitialization)
+                {
+                    _saveAdapter.SaveAmount(resourceData, amount);
+                }
             }
 
-            if (_saveAdapter.IsFirstInit())
+            if (isFirstInitialization)
             {
-                Debug.Log($"[ResourceModel] khởi tạo lần đầu! Nạp cấu hình mặc định từ Config");
-                foreach (var resourceData in config.GetAllResources())
-                {
-                    long initialAmount = resourceData.HasRegen ? resourceData.MaxStack : resourceData.DefaultAmount;
-
-                    var convertedAmt = _converter.FromLong(initialAmount);
-                    _resourceAmounts[resourceData.ResourceId] = convertedAmt;
-
-                    _saveAdapter.SaveAmount(resourceData, initialAmount);
-                }
-                _saveAdapter.SetFirstInitComplete(); 
-            }
-            else
-            {  
-                Debug.Log($"[ResourceModel] Trạng thái game cũ phát hiện. Tiến hành nạp dữ liệu từ file save");
-                foreach (var resourceData in config.GetAllResources())
-                {
-                    long fallbackValue = resourceData.HasRegen ? resourceData.MaxStack : resourceData.DefaultAmount;
-                    long savedLong = _saveAdapter.LoadAmount(resourceData, fallbackValue);
-                    
-                    _resourceAmounts[resourceData.ResourceId] = _converter.FromLong(savedLong);
-                }
+                _saveAdapter.SetFirstInitComplete();
             }
         }
 
-        private void SaveAmount(ResourceData resourceData, T amount)
+        public void AddResource(string resourceKey, long amount, bool delayUpdate = false)
         {
-            long longAmount = _converter.ToLong(amount);
-            _saveAdapter.SaveAmount(resourceData, longAmount);
-        }
-
-        public T GetAmount(string resourceKey)
-        {
-            if (string.IsNullOrEmpty(resourceKey)) return _converter.Zero;
-            return _resourceAmounts.TryGetValue(resourceKey, out var amount) ? amount : _converter.Zero;
-        }
-
-        public void AddResource(string resourceKey, T amount, bool delayUpdate = false)
-        {
-            if (string.IsNullOrEmpty(resourceKey) || _converter.IsLessThan(amount, _converter.Zero)) return;
+            if (string.IsNullOrEmpty(resourceKey) || amount < 0) return;
 
             var resourceData = GetResourceData(resourceKey);
             if (resourceData == null) return;
 
-            var currentAmount = _resourceAmounts.TryGetValue(resourceKey, out var amt) ? amt : _converter.Zero;
-            var newAmount = _converter.Add(currentAmount, amount);
-
-            var maxStack = GetMaxStack(resourceKey);
-            if (maxStack > 0)
+            long currentAmount = GetCurrentAmount(resourceKey);
+            long newAmount;
+            try
             {
-                long longNewAmount = _converter.ToLong(newAmount);
-                if (longNewAmount > maxStack)
-                {
-                    newAmount = _converter.FromLong(maxStack);
-                    OnResourceMaxStackReached?.Invoke(resourceKey);
-                }
+                newAmount = checked(currentAmount + amount);
+            }
+            catch (OverflowException)
+            {
+                newAmount = long.MaxValue;
+            }
+
+            long maxStack = resourceData.MaxStack;
+            bool reachedMaxStack = maxStack > 0 && currentAmount < maxStack && newAmount >= maxStack;
+            if (maxStack > 0 && newAmount > maxStack)
+            {
+                newAmount = maxStack;
             }
 
             _resourceAmounts[resourceKey] = newAmount;
-            SaveAmount(resourceData, newAmount);
+            _saveAdapter.SaveAmount(resourceData, newAmount);
 
-            var changeData = new ResourceChangeData<T>(resourceKey, currentAmount, newAmount, delayUpdate);
-            
+            var changeData = new ResourceChangeData<long>(resourceKey, currentAmount, newAmount, delayUpdate);
             OnResourceChanged?.Invoke(changeData);
             OnResourceAdded?.Invoke(changeData);
+            if (reachedMaxStack)
+            {
+                OnResourceMaxStackReached?.Invoke(resourceKey);
+            }
         }
 
-        public bool SpendResource(string resourceKey, T amount)
+        public bool SpendResource(string resourceKey, long amount)
         {
-            if (string.IsNullOrEmpty(resourceKey) || _converter.IsLessThan(amount, _converter.Zero)) return false;
+            if (string.IsNullOrEmpty(resourceKey) || amount < 0) return false;
 
             var resourceData = GetResourceData(resourceKey);
             if (resourceData == null) return false;
 
-            if (_infiniteStatus != null && _infiniteStatus.IsCurrentlyInfinite(resourceKey))
+            long currentAmount = GetCurrentAmount(resourceKey);
+            if (IsCurrentlyInfinite(resourceKey))
             {
-                var currentAmt = _resourceAmounts.TryGetValue(resourceKey, out var amt) ? amt : _converter.Zero;
-                var changeData = new ResourceChangeData<T>(resourceKey, currentAmt, currentAmt);
-                OnResourceSpent?.Invoke(changeData);
+                OnResourceSpent?.Invoke(new ResourceChangeData<long>(resourceKey, currentAmount, currentAmount));
                 return true;
             }
 
-            var currentAmount = _resourceAmounts.TryGetValue(resourceKey, out var cAmt) ? cAmt : _converter.Zero;
-            if (_converter.IsLessThan(currentAmount, amount))
+            if (currentAmount < amount)
             {
                 OnResourceInsufficient?.Invoke(resourceKey);
                 return false;
             }
 
-            var newAmount = _converter.Subtract(currentAmount, amount);
+            long newAmount = currentAmount - amount;
             _resourceAmounts[resourceKey] = newAmount;
-            SaveAmount(resourceData, newAmount);
+            _saveAdapter.SaveAmount(resourceData, newAmount);
 
-            var changeDataNormal = new ResourceChangeData<T>(resourceKey, currentAmount, newAmount);
-            OnResourceChanged?.Invoke(changeDataNormal);
-            OnResourceSpent?.Invoke(changeDataNormal);
+            var changeData = new ResourceChangeData<long>(resourceKey, currentAmount, newAmount);
+            OnResourceChanged?.Invoke(changeData);
+            OnResourceSpent?.Invoke(changeData);
             return true;
         }
 
-        public ResourceData GetResourceData(string resourceKey) => _config.GetResourceData(resourceKey);
-        public long GetMaxStack(string resourceKey) => _config.GetResourceData(resourceKey)?.MaxStack ?? 0;
-
-        public bool SetMaxStack(string resourceKey, long newMaxStack)
+        public long GetCurrentAmount(string resourceKey)
         {
-            var resourceData = _config.GetResourceData(resourceKey);
-            if (resourceData == null) return false;
+            if (string.IsNullOrEmpty(resourceKey)) return 0;
+            return _resourceAmounts.TryGetValue(resourceKey, out long amount) ? amount : 0;
+        }
+
+        public bool IsAtMaxStack(string resourceKey)
+        {
+            long maxStack = GetMaxStack(resourceKey);
+            return maxStack > 0 && GetCurrentAmount(resourceKey) >= maxStack;
+        }
+
+        public long GetMaxStack(string resourceKey)
+        {
+            return GetResourceData(resourceKey)?.MaxStack ?? 0;
+        }
+
+        public void SetMaxStackAndFill(string resourceKey, long newMaxStack, bool fillFull = false)
+        {
+            var resourceData = GetResourceData(resourceKey);
+            if (resourceData == null) return;
 
             resourceData.MaxStack = newMaxStack;
-            if (newMaxStack > 0)
+            long currentAmount = GetCurrentAmount(resourceKey);
+
+            if (newMaxStack > 0 && currentAmount > newMaxStack)
             {
-                var currentAmount = _resourceAmounts.TryGetValue(resourceKey, out var amt) ? amt : _converter.Zero;
-                long longCurrentAmount = _converter.ToLong(currentAmount);
-                if (longCurrentAmount > newMaxStack)
-                {
-                    var newAmount = _converter.FromLong(newMaxStack);
-                    _resourceAmounts[resourceKey] = newAmount;
-                    SaveAmount(resourceData, newAmount);
-
-                    var changeData = new ResourceChangeData<T>(resourceKey, currentAmount, newAmount);
-                    OnResourceChanged?.Invoke(changeData);
-                }
+                SetAmount(resourceData, currentAmount, newMaxStack);
             }
-
-            return true;
+            else if (fillFull && currentAmount < newMaxStack)
+            {
+                AddResource(resourceKey, newMaxStack - currentAmount);
+            }
         }
 
-        public void Cleanup()
+        public void ProcessPendingUpdate(string resourceKey, long amountIncrement = 0)
         {
+            if (string.IsNullOrEmpty(resourceKey)) return;
+            OnPendingUpdateRequested?.Invoke(resourceKey, amountIncrement);
+        }
+
+        public void ForceUpdateAllView()
+        {
+            OnRefreshRequested?.Invoke();
+        }
+
+        public void AddInfiniteDuration(string resourceKey, TimeSpan duration, bool delayUpdate = false)
+        {
+            if (!IsInitialized || _infiniteModel == null) return;
+
+            _infiniteModel.AddDuration(resourceKey, duration, delayUpdate);
+            if (!delayUpdate)
+            {
+                OnRefreshRequested?.Invoke();
+            }
+        }
+
+        public bool IsCurrentlyInfinite(string resourceKey)
+        {
+            return IsInitialized && _infiniteModel != null && _infiniteModel.IsInfinite(resourceKey);
+        }
+
+        public TimeSpan GetRemainingInfiniteTime(string resourceKey)
+        {
+            return IsInitialized && _infiniteModel != null
+                ? _infiniteModel.GetRemainingTime(resourceKey)
+                : TimeSpan.Zero;
+        }
+
+        public bool IsRegenEnabled(string resourceKey)
+        {
+            return _resourceRegenController != null && _resourceRegenController.IsRegenEnabled(resourceKey);
+        }
+
+        public DateTime GetNextRegenTime(string resourceKey)
+        {
+            return _resourceRegenController != null
+                ? _resourceRegenController.GetNextRegenTime(resourceKey)
+                : DateTime.UtcNow;
+        }
+
+        public void SetRegenStatus(string resourceKey, bool isEnabled)
+        {
+            if (_resourceRegenController == null) return;
+
+            _resourceRegenController.SetRegenStatus(resourceKey, isEnabled);
+            OnRegenStatusChanged?.Invoke(resourceKey);
+        }
+
+        public ResourceData GetResourceData(string resourceKey)
+        {
+            return string.IsNullOrEmpty(resourceKey) ? null : _resourceConfig.GetResourceData(resourceKey);
+        }
+
+        private void SetAmount(ResourceData resourceData, long oldAmount, long newAmount)
+        {
+            _resourceAmounts[resourceData.ResourceId] = newAmount;
+            _saveAdapter.SaveAmount(resourceData, newAmount);
+            OnResourceChanged?.Invoke(
+                new ResourceChangeData<long>(resourceData.ResourceId, oldAmount, newAmount));
+        }
+
+        private void HandleInfiniteDurationAdded(string resourceKey, bool delayUpdate)
+        {
+            OnInfiniteAdded?.Invoke(resourceKey, delayUpdate);
+        }
+
+        private void HandleInfiniteDurationExpired(string resourceKey)
+        {
+            OnInfiniteExpired?.Invoke(resourceKey);
+        }
+
+        public void OnAppQuit()
+        {
+            _resourceRegenController?.SaveAllRegenTimes();
+        }
+
+        public void OnAppPause(bool pauseStatus)
+        {
+            if (pauseStatus)
+            {
+                _resourceRegenController?.SaveAllRegenTimes();
+            }
+        }
+
+        public void Dispose()
+        {
+            if (_infiniteModel != null)
+            {
+                _infiniteModel.OnInfiniteDurationAdded -= HandleInfiniteDurationAdded;
+                _infiniteModel.OnInfiniteDurationExpired -= HandleInfiniteDurationExpired;
+                _infiniteModel.Cleanup();
+                _infiniteModel = null;
+            }
+
+            _resourceRegenController?.Dispose();
+            _resourceRegenController = null;
             _resourceAmounts.Clear();
+            IsInitialized = false;
+
             OnResourceChanged = null;
             OnResourceSpent = null;
             OnResourceAdded = null;
             OnResourceMaxStackReached = null;
             OnResourceInsufficient = null;
+            OnInfiniteExpired = null;
+            OnInfiniteAdded = null;
+            OnRefreshRequested = null;
+            OnPendingUpdateRequested = null;
+            OnRegenStatusChanged = null;
         }
     }
 }

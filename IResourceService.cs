@@ -4,9 +4,6 @@ namespace ChieChie.Constracts
 {
     public interface IResourceService
     {
-        void RegisterView(string resourceKey, IResourceView view);
-        void UnregisterView(IResourceView view);
-
         void AddResource(string resourceKey, long amount, bool delayUpdate = false);
         bool SpendResource(string resourceKey, long amount);
         long GetCurrentAmount(string resourceKey);
@@ -26,11 +23,9 @@ namespace ChieChie.Constracts
         void SetRegenStatus(string resourceKey, bool isEnabled);
         
         event Action<string> OnInfiniteExpired;
-        event Action<string,bool> OnInfiniteAdded;
-        
-       void OnAppQuit();
+        event Action<string, bool> OnInfiniteAdded;
 
-       void OnAppPause(bool pauseStatus);
-
+        void OnAppQuit();
+        void OnAppPause(bool pauseStatus);
     }
 }

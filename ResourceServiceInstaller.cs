@@ -1,5 +1,6 @@
 using System;
 using ChieChie.Constracts;
+using ChieChie.Core;
 using ChieChie.Resource;
 using Game.GamePlay;
 using VContainer;
@@ -24,10 +25,13 @@ namespace Game.DependencyInjection
    
             builder.Register<ResourceSaveAdapter>(Lifetime.Singleton).As<IResourceSaveAdapter>();
 
-            builder.Register<ResourceManager>(Lifetime.Singleton)
+            builder.Register<ResourceModel>(Lifetime.Singleton)
                 .As<IResourceService>()
                 .As<IDisposable>()
                 .AsSelf();
+
+            builder.Register<ResourcePresenterFactory>(Lifetime.Singleton)
+                .As<IPresenterFactory<ResourcePresenter, IResourceView>>();
 
             builder.RegisterComponent(_resourceLifecycleBridge);
         }

@@ -8,7 +8,7 @@ namespace ChieChie.Resource
 {
     public class ResourceRegenController : IDisposable
     {
-        private ResourceManager _resourceManager;
+        private ResourceModel _resourceModel;
         private IResourceSaveAdapter _saveAdapter;
         private CancellationTokenSource _cts;
         private ResourceConfig _resourceConfig;
@@ -16,11 +16,14 @@ namespace ChieChie.Resource
         private readonly Dictionary<string, bool> _activeStatuses = new();
         private readonly Dictionary<string, DateTime> _nextRegenTimes = new();
 
-        public void Initialize(ResourceManager resourceService, IResourceSaveAdapter saveAdapter)
+        public void Initialize(
+            ResourceModel resourceModel,
+            ResourceConfig resourceConfig,
+            IResourceSaveAdapter saveAdapter)
         {
-            _resourceManager = resourceService;
+            _resourceModel = resourceModel;
             _saveAdapter = saveAdapter;
-            _resourceConfig = _resourceManager.GetConfig();
+            _resourceConfig = resourceConfig;
     
             if (_resourceConfig == null) return;
 
@@ -45,33 +48,44 @@ namespace ChieChie.Resource
 
         private async UniTaskVoid StartRegenCheckLoopAsync(CancellationToken token)
         {
-            while (!token.IsCancellationRequested)
+            try
             {
-                DateTime now = DateTime.UtcNow;
-
-                foreach (var setting in _resourceConfig.GetAllRegenSettings())
+                while (!token.IsCancellationRequested)
                 {
-                    string resKey = setting.ResourceId;
-                    if (string.IsNullOrEmpty(resKey)) continue;
+                    DateTime now = DateTime.UtcNow;
 
-                    if (_activeStatuses.TryGetValue(resKey, out bool isEnabled) && isEnabled)
+                    foreach (var setting in _resourceConfig.GetAllRegenSettings())
                     {
-                        if (_resourceManager.IsAtMaxStack(resKey))
-                        {
-                            _nextRegenTimes[resKey] = now.AddSeconds(setting.IntervalSeconds);
-                            continue;
-                        }
+                        string resKey = setting.ResourceId;
+                        if (string.IsNullOrEmpty(resKey)) continue;
 
-                        if (now >= _nextRegenTimes[resKey])
+                        if (_activeStatuses.TryGetValue(resKey, out bool isEnabled) && isEnabled)
                         {
-                            _nextRegenTimes[resKey] = _nextRegenTimes[resKey].AddSeconds(setting.IntervalSeconds);
-                            _saveAdapter.SaveNextRegenTime(setting, _nextRegenTimes[resKey]);
-                            _resourceManager.AddResource(resKey, setting.RegenAmount);
+                            if (_resourceModel.IsAtMaxStack(resKey))
+                            {
+                                _nextRegenTimes[resKey] = now.AddSeconds(setting.IntervalSeconds);
+                                continue;
+                            }
+
+                            if (now >= _nextRegenTimes[resKey])
+                            {
+                                _nextRegenTimes[resKey] = _nextRegenTimes[resKey]
+                                    .AddSeconds(setting.IntervalSeconds);
+                                _saveAdapter.SaveNextRegenTime(setting, _nextRegenTimes[resKey]);
+                                _resourceModel.AddResource(resKey, setting.RegenAmount);
+                            }
                         }
                     }
+
+                    await UniTask.Delay(
+                        TimeSpan.FromSeconds(1),
+                        delayTiming: PlayerLoopTiming.Update,
+                        cancellationToken: token);
                 }
-                
-                await UniTask.Delay(TimeSpan.FromSeconds(1), delayTiming: PlayerLoopTiming.Update, cancellationToken: token);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                // Expected when the model is disposed.
             }
         }
 
@@ -86,7 +100,7 @@ namespace ChieChie.Resource
 
                 if (_activeStatuses.TryGetValue(resKey, out bool isEnabled) && isEnabled)
                 {
-                    if (_resourceManager.IsAtMaxStack(resKey)) continue;
+                    if (_resourceModel.IsAtMaxStack(resKey)) continue;
 
                     DateTime nextTime = _nextRegenTimes[resKey];
                     if (now >= nextTime)
@@ -95,7 +109,7 @@ namespace ChieChie.Resource
                         int extraCycles = (int)(overdue.TotalSeconds / setting.IntervalSeconds) + 1;
 
                         long totalRegenAmount = extraCycles * setting.RegenAmount;
-                        _resourceManager.AddResource(resKey, totalRegenAmount);
+                        _resourceModel.AddResource(resKey, totalRegenAmount);
                         _nextRegenTimes[resKey] = nextTime.AddSeconds(extraCycles * setting.IntervalSeconds);
                         _saveAdapter.SaveNextRegenTime(setting, _nextRegenTimes[resKey]);
                     }

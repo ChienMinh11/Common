@@ -1,250 +1,240 @@
 using System;
 using ChieChie.Constracts;
+using ChieChie.MVP;
 using UnityEngine;
 
 namespace ChieChie.Resource
 {
-    public class ResourcePresenter<T>
+    /// <summary>
+    /// Presents one resource on one view. Each view owns and disposes its presenter
+    /// through BaseView rather than registering itself with the model.
+    /// </summary>
+    public sealed class ResourcePresenter : BasePresenter<IResourceView, ResourceModel>
     {
-        private readonly ResourceModel<T> _model;
-        private readonly IResourceView _view;
-        private readonly INumberConverter<T> _converter;
-        private readonly ResourceManager _infiniteStatus;
+        private readonly ResourceUpdateQueue _updateQueue = new();
+        private readonly string _resourceKey;
 
-        private readonly ResourceUpdateQueue _updateQueue;
-        private ResourceData _currentResourceData;
-        public IResourceView View => _view;
         private long _currentVisualAmount;
+        private bool _isInfiniteUpdateDelayed;
+        private bool _isCurrentlyShowingInfinite;
 
-        public string ResourceKey { get; }
+        public string ResourceKey => _resourceKey;
         public bool HasPendingUpdates => _updateQueue.HasPendingUpdates;
 
-        private bool _isInfiniteUpdateDelayed = false;
-        private bool _isCurrentlyShowingInfinite = false;
-        private bool _isInfiniteTimeUpdateDelayed = false;
-        public bool IsInfiniteUpdateDelayed => _isInfiniteUpdateDelayed;
-
-        public event Action<string> OnPendingUpdatesProcessed;
-
-        public ResourcePresenter(
-            ResourceModel<T> model,
-            IResourceView view,
-            string resourceKey,
-            INumberConverter<T> converter,
-            ResourceManager infiniteStatus)
+        public ResourcePresenter(IResourceView view, ResourceModel model)
+            : base(view, model)
         {
-            _model = model;
-            _view = view;
-            ResourceKey = resourceKey;
-            _converter = converter;
-            _infiniteStatus = infiniteStatus;
-            _updateQueue = new ResourceUpdateQueue();
-
-            SubscribeToEvents();
-            _currentVisualAmount = _converter.ToLong(_model.GetAmount(ResourceKey));
-            UpdateView();
+            _resourceKey = view.ResourceKey;
         }
 
-        private void SubscribeToEvents()
+        protected override void OnInitialize()
         {
-            if (_model != null)
-            {
-                _model.OnResourceChanged += OnResourceChanged;
-                _model.OnResourceInsufficient += OnResourceInsufficient;
-            }
+            Model.OnResourceChanged += HandleResourceChanged;
+            Model.OnResourceInsufficient += HandleResourceInsufficient;
+            Model.OnResourceMaxStackReached += HandleMaxStackReached;
+            Model.OnInfiniteAdded += HandleInfiniteAdded;
+            Model.OnInfiniteExpired += HandleInfiniteExpired;
+            Model.OnRefreshRequested += HandleRefreshRequested;
+            Model.OnPendingUpdateRequested += HandlePendingUpdateRequested;
+            Model.OnRegenStatusChanged += HandleRegenStatusChanged;
 
-            if (_infiniteStatus != null)
-            {
-                _infiniteStatus.OnInfiniteAdded += OnInfiniteAddedFromManager;
-                _infiniteStatus.OnInfiniteExpired += OnInfiniteExpiredFromManager;
-            }
+            _currentVisualAmount = Model.GetCurrentAmount(ResourceKey);
+            RefreshView();
         }
 
-        private void OnResourceInsufficient(string resourceKey)
+        protected override void OnDispose()
         {
-            if (resourceKey == ResourceKey)
-            {
-                _view?.ShowInsufficientMessage();
-            }
-        }
-
-        private void OnResourceChanged(ResourceChangeData<T> changeData)
-        {
-            if (changeData.ResourceId != ResourceKey) return;
-
-            long oldDisplay = _converter.ToLong(changeData.OldAmount);
-            long newDisplay = _converter.ToLong(changeData.NewAmount);
-
-            if (changeData.DelayUpdate)
-            {
-                _updateQueue.EnqueueUpdate(oldDisplay, newDisplay);
-            }
-            else
-            {
-                _updateQueue.Clear();
-                if (!_infiniteStatus.IsCurrentlyInfinite(ResourceKey))
-                {
-                    _currentVisualAmount = newDisplay;
-                    _view?.SetResourceAmountWithoutAnimation(newDisplay);
-                }
-
-                UpdateView();
-            }
-        }
-
-        private void OnInfiniteAddedFromManager(string resourceKey, bool delayUpdate)
-        {
-            if (resourceKey != ResourceKey) return;
-
-            if (delayUpdate)
-            {
-                long currentAmount = _converter.ToLong(_model.GetAmount(ResourceKey));
-
-                if (_isCurrentlyShowingInfinite)
-                {
-                    _isInfiniteTimeUpdateDelayed = true;
-                    _updateQueue.EnqueueUpdate(currentAmount, currentAmount);
-                }
-                else
-                {
-                    _isInfiniteUpdateDelayed = true;
-                    _updateQueue.EnqueueUpdate(0, currentAmount);
-                }
-            }
-            else
-            {
-                _isInfiniteUpdateDelayed = false;
-                _isInfiniteTimeUpdateDelayed = false;
-                UpdateView();
-            }
-        }
-
-        private void OnInfiniteExpiredFromManager(string resourceKey)
-        {
-            if (resourceKey != ResourceKey) return;
-
-            _isInfiniteUpdateDelayed = false;
-            _isInfiniteTimeUpdateDelayed = false;
-            UpdateView();
+            Model.OnResourceChanged -= HandleResourceChanged;
+            Model.OnResourceInsufficient -= HandleResourceInsufficient;
+            Model.OnResourceMaxStackReached -= HandleMaxStackReached;
+            Model.OnInfiniteAdded -= HandleInfiniteAdded;
+            Model.OnInfiniteExpired -= HandleInfiniteExpired;
+            Model.OnRefreshRequested -= HandleRefreshRequested;
+            Model.OnPendingUpdateRequested -= HandlePendingUpdateRequested;
+            Model.OnRegenStatusChanged -= HandleRegenStatusChanged;
+            _updateQueue.Clear();
         }
 
         public void ProcessPendingUpdates(long amountIncrement = 0)
         {
             _isInfiniteUpdateDelayed = false;
-            _isInfiniteTimeUpdateDelayed = false;
-            var updateFromQueue = _updateQueue.ProcessNextUpdate(ResourceKey);
-            long modelMaxAmount = _converter.ToLong(_model.GetAmount(ResourceKey));
-            long oldVisual = _currentVisualAmount;
-            bool isCurrentlyInfinite = _infiniteStatus != null && _infiniteStatus.IsCurrentlyInfinite(ResourceKey);
+            var queuedUpdate = _updateQueue.ProcessNextUpdate(ResourceKey);
+            long modelAmount = Model.GetCurrentAmount(ResourceKey);
+            bool isInfinite = Model.IsCurrentlyInfinite(ResourceKey);
 
-            if (isCurrentlyInfinite)
+            if (isInfinite)
             {
-                _currentVisualAmount = modelMaxAmount;
+                _currentVisualAmount = modelAmount;
+            }
+            else if (amountIncrement > 0)
+            {
+                _currentVisualAmount = AddWithoutOverflow(_currentVisualAmount, amountIncrement);
             }
             else
             {
-                if (amountIncrement > 0)
-                {
-                    _currentVisualAmount += amountIncrement;
-                }
-                else
-                {
-                    if (updateFromQueue != null)
-                    {
-                        _currentVisualAmount = updateFromQueue.Amount;
-                    }
-                    else
-                    {
-                        _currentVisualAmount = modelMaxAmount;
-                    }
-                }
+                _currentVisualAmount = queuedUpdate?.Amount ?? modelAmount;
             }
-            if (_currentVisualAmount > modelMaxAmount)
+
+            if (_currentVisualAmount > modelAmount)
             {
-                _currentVisualAmount = modelMaxAmount;
+                _currentVisualAmount = modelAmount;
             }
 
-            _currentResourceData = _model.GetResourceData(ResourceKey);
-            if (_currentResourceData != null && _view != null)
-            {
-                _isCurrentlyShowingInfinite = isCurrentlyInfinite;
-
-                if (!isCurrentlyInfinite)
-                {
-                    _view.SetResourceAmount(_currentVisualAmount);
-                }
-
-                Sprite iconToSet = SetIcon(isCurrentlyInfinite);
-                _view.SetResourceIcon(iconToSet);
-                _view.SetResourceName(_currentResourceData.DisplayName);
-                DateTime expireTime = isCurrentlyInfinite
-                    ? DateTime.UtcNow.Add(_infiniteStatus.GetRemainingInfiniteTime(ResourceKey))
-                    : DateTime.MinValue;
-
-                _view.UpdateInfinityStatus(isCurrentlyInfinite, expireTime);
-
-                if (_currentResourceData.MaxStack > 0 && _currentVisualAmount >= _currentResourceData.MaxStack)
-                {
-                    _view.OnMaxStackReached(ResourceKey);
-                }
-            }
-
-            OnPendingUpdatesProcessed?.Invoke(ResourceKey);
+            PresentState(_currentVisualAmount, isInfinite, true);
         }
 
         public void ForceUpdateView()
         {
-            UpdateView();
+            RefreshView();
         }
 
-        private void UpdateView()
+        private void HandleResourceChanged(ResourceChangeData<long> changeData)
         {
-            _currentResourceData = _model.GetResourceData(ResourceKey);
-            if (_currentResourceData == null || _view == null) return;
-            _currentVisualAmount = _converter.ToLong(_model.GetAmount(ResourceKey));
-            bool isCurrentlyInfinite = _infiniteStatus.IsCurrentlyInfinite(ResourceKey) && !_isInfiniteUpdateDelayed;
-            _isCurrentlyShowingInfinite = isCurrentlyInfinite;
+            if (changeData.ResourceId != ResourceKey) return;
 
-            Sprite iconToSet = SetIcon(isCurrentlyInfinite);
-            _view.SetResourceIcon(iconToSet);
-            _view.SetResourceName(_currentResourceData.DisplayName);
-
-            long displayAmount = _converter.ToLong(_model.GetAmount(_currentResourceData.ResourceId));
-            _view.SetResourceAmount(displayAmount);
-            DateTime expireTime = isCurrentlyInfinite
-                ? DateTime.UtcNow.Add(_infiniteStatus.GetRemainingInfiniteTime(ResourceKey))
-                : DateTime.MinValue;
-
-            _view.UpdateInfinityStatus(isCurrentlyInfinite, expireTime);
-        }
-
-        private Sprite SetIcon(bool isCurrentlyInfinite)
-        {
-            _currentResourceData = _model.GetResourceData(ResourceKey);
-            Sprite iconToSet = _currentResourceData?.Icon;
-            if (isCurrentlyInfinite && _currentResourceData != null && _currentResourceData.InfinityIcon != null)
+            if (changeData.DelayUpdate)
             {
-                iconToSet = _currentResourceData.InfinityIcon;
-            }
-
-            return iconToSet;
-        }
-
-        public void Cleanup()
-        {
-            if (_model != null)
-            {
-                _model.OnResourceChanged -= OnResourceChanged;
-                _model.OnResourceInsufficient -= OnResourceInsufficient;
-            }
-
-            if (_infiniteStatus != null)
-            {
-                _infiniteStatus.OnInfiniteAdded -= OnInfiniteAddedFromManager;
-                _infiniteStatus.OnInfiniteExpired -= OnInfiniteExpiredFromManager;
+                _updateQueue.EnqueueUpdate(changeData.OldAmount, changeData.NewAmount);
+                RefreshRegenStatus();
+                return;
             }
 
             _updateQueue.Clear();
+            _currentVisualAmount = changeData.NewAmount;
+
+            if (!Model.IsCurrentlyInfinite(ResourceKey))
+            {
+                View.SetResourceAmountWithoutAnimation(changeData.NewAmount);
+            }
+
+            RefreshView();
+        }
+
+        private void HandleResourceInsufficient(string resourceKey)
+        {
+            if (resourceKey == ResourceKey)
+            {
+                View.ShowInsufficientMessage();
+            }
+        }
+
+        private void HandleMaxStackReached(string resourceKey)
+        {
+            if (resourceKey == ResourceKey)
+            {
+                View.OnMaxStackReached(resourceKey);
+            }
+        }
+
+        private void HandleInfiniteAdded(string resourceKey, bool delayUpdate)
+        {
+            if (resourceKey != ResourceKey) return;
+
+            if (delayUpdate)
+            {
+                long currentAmount = Model.GetCurrentAmount(ResourceKey);
+                _isInfiniteUpdateDelayed = true;
+                _updateQueue.EnqueueUpdate(
+                    _isCurrentlyShowingInfinite ? currentAmount : 0,
+                    currentAmount);
+                RefreshRegenStatus();
+                return;
+            }
+
+            _isInfiniteUpdateDelayed = false;
+            RefreshView();
+        }
+
+        private void HandleInfiniteExpired(string resourceKey)
+        {
+            if (resourceKey != ResourceKey) return;
+
+            _isInfiniteUpdateDelayed = false;
+            RefreshView();
+        }
+
+        private void HandleRefreshRequested()
+        {
+            RefreshView();
+        }
+
+        private void HandlePendingUpdateRequested(string resourceKey, long amountIncrement)
+        {
+            if (resourceKey == ResourceKey)
+            {
+                ProcessPendingUpdates(amountIncrement);
+            }
+        }
+
+        private void HandleRegenStatusChanged(string resourceKey)
+        {
+            if (resourceKey == ResourceKey)
+            {
+                RefreshRegenStatus();
+            }
+        }
+
+        private void RefreshView()
+        {
+            _currentVisualAmount = Model.GetCurrentAmount(ResourceKey);
+            bool isInfinite = Model.IsCurrentlyInfinite(ResourceKey) && !_isInfiniteUpdateDelayed;
+            PresentState(_currentVisualAmount, isInfinite, false);
+        }
+
+        private void PresentState(long displayAmount, bool isInfinite, bool processAnimation)
+        {
+            ResourceData resourceData = Model.GetResourceData(ResourceKey);
+            if (resourceData == null) return;
+
+            _isCurrentlyShowingInfinite = isInfinite;
+            View.SetResourceIcon(GetIcon(resourceData, isInfinite));
+            View.SetResourceName(resourceData.DisplayName);
+
+            if (!isInfinite || !processAnimation)
+            {
+                View.SetResourceAmount(displayAmount);
+            }
+
+            DateTime expirationTime = isInfinite
+                ? DateTime.UtcNow.Add(Model.GetRemainingInfiniteTime(ResourceKey))
+                : DateTime.MinValue;
+            View.UpdateInfinityStatus(isInfinite, expirationTime);
+            RefreshRegenStatus();
+
+        }
+
+        private void RefreshRegenStatus()
+        {
+            bool isInfinite = Model.IsCurrentlyInfinite(ResourceKey) && !_isInfiniteUpdateDelayed;
+            if (isInfinite)
+            {
+                View.UpdateRegenStatus(false, false, DateTime.MinValue);
+                return;
+            }
+
+            View.UpdateRegenStatus(
+                Model.IsRegenEnabled(ResourceKey),
+                Model.IsAtMaxStack(ResourceKey),
+                Model.GetNextRegenTime(ResourceKey));
+        }
+
+        private static Sprite GetIcon(ResourceData resourceData, bool isInfinite)
+        {
+            return isInfinite && resourceData.InfinityIcon != null
+                ? resourceData.InfinityIcon
+                : resourceData.Icon;
+        }
+
+        private static long AddWithoutOverflow(long currentAmount, long increment)
+        {
+            try
+            {
+                return checked(currentAmount + increment);
+            }
+            catch (OverflowException)
+            {
+                return long.MaxValue;
+            }
         }
     }
 }
