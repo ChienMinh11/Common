@@ -42,6 +42,8 @@ namespace ChieChie.Resource
 
         public void Initialize()
         {
+            if (IsInitialized) return;
+
             InitializeAmounts();
             _infiniteModel = new InfiniteResourceModel(_saveAdapter);
             _infiniteModel.OnInfiniteDurationAdded += HandleInfiniteDurationAdded;
@@ -49,6 +51,8 @@ namespace ChieChie.Resource
             _infiniteModel.Initialize(_resourceConfig);
             _resourceRegenController = new ResourceRegenController();
             _resourceRegenController.Initialize(this, _resourceConfig, _saveAdapter);
+
+            IsInitialized = true;
             OnRefreshRequested?.Invoke();
         }
 
