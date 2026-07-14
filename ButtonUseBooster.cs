@@ -3,7 +3,6 @@ using ChieChie.Booster;
 using ChieChie.Constracts;
 using ChieChie.Core;
 using ChieChie.MVP;
-using ChieChie.Resource;
 using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
@@ -12,7 +11,7 @@ using VContainer;
 
 namespace Game.GamePlay
 {
-    public class ButtonUseBooster : BaseView<ResourcePresenter>, IResourceView
+    public class ButtonUseBooster : BaseView<IResourcePresenter>, IResourceView
     {
         [Header("Settings")] 
         [SerializeField] private ResourceIdentity identitySource;
@@ -48,7 +47,7 @@ namespace Game.GamePlay
         private void Contruct(
             IBoosterService boosterController,
             IResourceService resourceService,
-            IPresenterFactory<ResourcePresenter, IResourceView> presenterFactory)
+            IPresenterFactory<IResourcePresenter, IResourceView> presenterFactory)
         {
             _boosterController = boosterController;
             _resourceService = resourceService;

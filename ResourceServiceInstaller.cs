@@ -1,15 +1,17 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using ChieChie.Constracts;
 using ChieChie.Core;
 using ChieChie.Resource;
+using Cysharp.Threading.Tasks;
 using Game.GamePlay;
 using VContainer;
 using VContainer.Unity;
 
 namespace Game.DependencyInjection
 {
-    public class ResourceServiceInstaller : IInstaller
+    public sealed class ResourceServiceInstaller : IInstaller
     {
         private readonly ResourceConfig _config;
         private readonly ResourceLifecycleBridge _resourceLifecycleBridge;
@@ -27,18 +29,22 @@ namespace Game.DependencyInjection
             builder.Register<ResourceSaveAdapter>(Lifetime.Singleton).As<IResourceSaveAdapter>();
 
             builder.Register<ResourceModel>(Lifetime.Singleton)
-                .As<IResourceService>()
                 .As<IDisposable>()
                 .AsSelf();
+        
 
             builder.Register<ResourcePresenterFactory>(Lifetime.Singleton)
-                .As<IPresenterFactory<ResourcePresenter, IResourceView>>();
-
+                .As<IPresenterFactory<IResourcePresenter, IResourceView>>();
+         
+            builder.Register<ResourceService>(Lifetime.Singleton)
+                            .As<IResourceService>()
+                            .AsSelf();
+            
             builder.RegisterComponent(_resourceLifecycleBridge);
         }
     }
     public sealed class ResourcePresenterFactory
-        : IPresenterFactory<ResourcePresenter, IResourceView>
+        : IPresenterFactory<IResourcePresenter, IResourceView>
     {
         private readonly ResourceModel _model;
 
@@ -47,7 +53,7 @@ namespace Game.DependencyInjection
             _model = model;
         }
 
-        public ResourcePresenter Create(IResourceView view)
+        public IResourcePresenter Create(IResourceView view)
         {
             return new ResourcePresenter(view, _model);
         }
@@ -81,8 +87,6 @@ namespace Game.DependencyInjection
             {
                 _currentRuntimeData = new ResourceSaveData();
             }
-
-            // Đồng bộ dữ liệu từ List vào Dictionary Cache để truy xuất O(1)
             _entryCache.Clear();
             foreach (var entry in _currentRuntimeData.resources)
             {
@@ -214,4 +218,108 @@ namespace Game.DependencyInjection
 
         #endregion
     }
+      public sealed class ResourceService : IResourceService
+      {
+          private readonly ResourceModel _model;
+
+          public ResourceService(ResourceModel model)
+          {
+              _model = model;
+          }
+          public UniTask<bool> InitializeAsync(CancellationToken cancellationToken)
+          {
+              _model.Initialize();
+              return UniTask.FromResult(true);
+          }
+
+          public void AddResource(string resourceKey, long amount, bool delayUpdate = false)
+          {
+              _model.AddResource(resourceKey,amount,delayUpdate);
+          }
+
+          public bool SpendResource(string resourceKey, long amount)
+          {
+              return _model.SpendResource(resourceKey, amount);
+          }
+
+          public long GetCurrentAmount(string resourceKey)
+          {
+             return _model.GetCurrentAmount(resourceKey);
+          }
+
+          public bool IsAtMaxStack(string resourceKey)
+          {
+              return   _model.IsAtMaxStack(resourceKey);
+          }
+
+          public long GetMaxStack(string resourceKey)
+          {
+              return _model.GetMaxStack(resourceKey);
+          }
+
+          public void SetMaxStackAndFill(string resourceKey, long newMaxStack, bool fillFull = false)
+          {
+              _model.SetMaxStackAndFill(resourceKey, newMaxStack, fillFull);
+          }
+
+          public void ProcessPendingUpdate(string resourceKey, long amountIncrement = 0)
+          {
+              _model.ProcessPendingUpdate(resourceKey, amountIncrement);
+          }
+
+          public void ForceUpdateAllView()
+          {
+              _model.ForceUpdateAllView();
+          }
+
+          public void AddInfiniteDuration(string resourceKey, TimeSpan duration, bool delayUpdate = false)
+          {
+              _model.AddInfiniteDuration(resourceKey, duration, delayUpdate);
+          }
+
+          public bool IsCurrentlyInfinite(string resourceKey)
+          {
+             return _model.IsCurrentlyInfinite(resourceKey);
+          }
+
+          public TimeSpan GetRemainingInfiniteTime(string resourceKey)
+          {
+              return _model.GetRemainingInfiniteTime(resourceKey);
+          }
+
+          public bool IsRegenEnabled(string resourceKey)
+          {
+              return _model.IsRegenEnabled(resourceKey);
+          }
+
+          public DateTime GetNextRegenTime(string resourceKey)
+          {
+              return _model.GetNextRegenTime(resourceKey);
+          }
+
+          public void SetRegenStatus(string resourceKey, bool isEnabled)
+          {
+              _model.SetRegenStatus(resourceKey, isEnabled);
+          }
+
+          public event Action<string> OnInfiniteExpired
+          {
+              add => _model.OnInfiniteExpired += value;
+              remove => _model.OnInfiniteExpired -= value;
+          }
+          public event Action<string, bool> OnInfiniteAdded
+          {
+              add => _model.OnInfiniteAdded += value;
+              remove => _model.OnInfiniteAdded -= value;
+          }
+          public void OnAppQuit()
+          {
+              _model.OnAppQuit();
+          }
+
+          public void OnAppPause(bool pauseStatus)
+          {
+              _model.OnAppPause(pauseStatus);
+          }
+      }
 }

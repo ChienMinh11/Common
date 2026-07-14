@@ -1,5 +1,6 @@
 using System;
 using ChieChie.Constracts;
+using ChieChie.Core;
 using ChieChie.MVP;
 using UnityEngine;
 
@@ -9,7 +10,7 @@ namespace ChieChie.Resource
     /// Presents one resource on one view. Each view owns and disposes its presenter
     /// through BaseView rather than registering itself with the model.
     /// </summary>
-    public sealed class ResourcePresenter : BasePresenter<IResourceView, ResourceModel>
+    public sealed class ResourcePresenter : BasePresenter<IResourceView, ResourceModel>,IResourcePresenter
     {
         private readonly ResourceUpdateQueue _updateQueue = new();
         private readonly string _resourceKey;

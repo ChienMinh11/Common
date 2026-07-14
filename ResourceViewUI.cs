@@ -2,7 +2,6 @@ using System;
 using ChieChie.Constracts;
 using ChieChie.Core;
 using ChieChie.MVP;
-using ChieChie.Resource;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -10,7 +9,7 @@ using VContainer;
 
 namespace Game.GamePlay
 {
-    public class ResourceViewUI : BaseView<ResourcePresenter>, IResourceView
+    public class ResourceViewUI : BaseView<IResourcePresenter>, IResourceView
     {
         [SerializeField] private ResourceIdentity resourceId;
 
@@ -38,7 +37,7 @@ namespace Game.GamePlay
 
         [Inject]
         private void Construct(
-            IPresenterFactory<ResourcePresenter, IResourceView> presenterFactory)
+            IPresenterFactory<IResourcePresenter, IResourceView> presenterFactory)
         {
             if (Presenter == null)
             {

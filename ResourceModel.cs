@@ -11,7 +11,7 @@ namespace ChieChie.Resource
     /// Owns all resource state and business rules. UI binding belongs to ResourcePresenter;
     /// this model only publishes state changes and presentation requests.
     /// </summary>
-    public sealed class ResourceModel : IResourceService, IModel, IDisposable
+    public sealed class ResourceModel : IModel, IDisposable
     {
         private readonly ResourceConfig _resourceConfig;
         private readonly IResourceSaveAdapter _saveAdapter;
@@ -40,24 +40,16 @@ namespace ChieChie.Resource
             _saveAdapter = saveAdapter ?? throw new ArgumentNullException(nameof(saveAdapter));
         }
 
-        public UniTask<bool> InitializeAsync(CancellationToken cancellationToken)
+        public void Initialize()
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (IsInitialized) return UniTask.FromResult(true);
-
             InitializeAmounts();
-
             _infiniteModel = new InfiniteResourceModel(_saveAdapter);
             _infiniteModel.OnInfiniteDurationAdded += HandleInfiniteDurationAdded;
             _infiniteModel.OnInfiniteDurationExpired += HandleInfiniteDurationExpired;
             _infiniteModel.Initialize(_resourceConfig);
-
             _resourceRegenController = new ResourceRegenController();
             _resourceRegenController.Initialize(this, _resourceConfig, _saveAdapter);
-
-            IsInitialized = true;
             OnRefreshRequested?.Invoke();
-            return UniTask.FromResult(true);
         }
 
         private void InitializeAmounts()
